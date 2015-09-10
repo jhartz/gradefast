@@ -26,9 +26,9 @@ or, for more detailed usage:
 Look in the `docs/` folder for the YAML spec. Use that to make your own YAML
 file representing the shit you want to grade.
 
-Want to delve deeper or use individual parts of GradeFasr as part of your
-larger, superior project? Check out the individual grader.py and gradebook.py
-modules, and look in __main__.py to see how they're used.
+Want to delve deeper or use individual parts of GradeFast as part of your
+larger, superior project? Check out the individual `grader.py` and
+`gradebook.py` modules, and look in `__main__.py` to see how they're used.
 
 ## I think your program is shitty
 
