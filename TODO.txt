@@ -1,0 +1,10 @@
+TODO
+====
+
+- Add ability to make a CSV file with names/scores/comments
+- Add diff ability for commands
+
+- Make greasemonkey script for Desire2Learn platforms for automatically adding grades
+
+    $(".dsh_c")[0].parentNode.parentNode.parentNode.getElementsByTagName("td")[1].textContent.trim()
+
