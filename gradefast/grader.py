@@ -167,14 +167,12 @@ def find_path(working_dir, folder, base=""):
                 print(without_base(new_path))
         else:
             # List the files inside
-            status("Files inside", end=" ")
-            print(without_base(new_path), end="")
-            status(":", end=" ")
+            status("Files inside %s:" % without_base(new_path), end=" ")
             for (index, item) in enumerate(os.listdir(new_path)):
                 if index != 0:
                     status(",", end=" ")
                 print(item, end="")
-            print("")
+            print("\n")
             
             user_happy = prompt_user("Does this directory satisfy your " +
                                      "innate human needs?", ["y", "n"]) == "y"
@@ -475,14 +473,18 @@ class Grader:
             
             # Run the subcommands in this folder
             new_path_pretty = new_path
+            # Make the path relative if possible
             if new_path[0:len(submission.path)] == submission.path:
-                new_path_pretty = new_path[len(submission.path):]
+                new_path_pretty = "." + new_path[len(submission.path):]
+            # Remove trailing "." if necessary
+            if new_path_pretty[-2:] == "/.":
+                new_path_pretty = new_path_pretty[:-1]
             print("")
             status("Running commands for folder: ." + new_path_pretty)
             print("")
             self._run_command_set(cmd["commands"], submission, new_path,
                                   helper_directory)
-            status("End commands for folder: ." + new_path_pretty)
+            status("End commands for folder: " + new_path_pretty)
             print("")
     
     def _run_command(self, cmd, submission, path, helper_directory=None):
@@ -503,7 +505,7 @@ class Grader:
         if submission.modify_all_commands:
             cmd = get_modified_command(cmd)
         else:
-            status("    " + cmd["command"])
+            print_bright("    " + cmd["command"])
         
         print("")
         
