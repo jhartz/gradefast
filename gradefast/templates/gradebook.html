@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>GradeFast grade book</title>
+<link rel="stylesheet" type="text/css" href="/static/style.css">
+</head>
+
+<body>
+<div id="container">
+
+<header>
+    <h2 id="late_container" style="display: none;"><span><input id="late" type="checkbox" tabindex="1"><label for="late"> Late?</label></span></h2>
+    <h1 id="name">GradeFast</h1>
+</header>
+
+<section id="main" style="display: none;"></section>
+
+<section id="done" style="display: none;">
+    <div class="box">
+        <h3>Grading Complete!</h3>
+        <p><a id="csv_link" target="_blank">Download CSV file</a></p>
+        <p><a id="json_link" target="_blank">Download JSON file</a></p>
+    </div>
+    <h3>Summary</h3>
+    <div id="summary"></div>
+</section>
+
+</div>
+
+<script type="text/javascript">
+var gradeStructure = {{ gradeStructure|safe }};
+var isDone = {{ isDone|safe }};
+</script>
+<script type="text/javascript" src="/static/jquery-2.1.4.min.js"></script>
+<script>
+document.write('<script type="text/javascript" src="/static/gradebook.js?a=' + Math.random() + '"></scr' + 'ipt>');
+</script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+greasemonkey
+
+$(".dsh_c")[0].parentNode.parentNode.parentNode.getElementsByTagName("td")[1].textContent.trim()
+
