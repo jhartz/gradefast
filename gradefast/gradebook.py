@@ -6,7 +6,7 @@ Licensed under the MIT License. For more, see the LICENSE file.
 
 Author: Jake Hartz <jhartz@mail.rit.edu>
 """
-import json, queue, logging, copy
+import json, queue, logging, copy, csv, io
 
 from flask import Flask, request, Response, render_template
 
@@ -299,14 +299,22 @@ class GradeBook:
         # Grades CSV file
         @app.route("/gradefast/gradebook/grades.csv")
         def gradebook_csv():
-            # TODO: Make a CSV file
-            return "csv,"
+            csv_stream = self._get_csv()
+            def gen():
+                try:
+                    while True:
+                        line = csv_stream.readline()
+                        if line == "":
+                            break
+                        yield line
+                except GeneratorExit:
+                    pass
+            return Response(gen(), mimetype="text/csv")
         
         # Grades JSON file
         @app.route("/gradefast/gradebook/grades.json")
         def gradebook_json():
-            return Response(json.dumps(self._get_grades()),
-                            mimetype="application/json")
+            return Response(self._get_json(), mimetype="application/json")
         
         # Event stream
         @app.route("/gradefast/gradebook/events")
@@ -438,7 +446,28 @@ class GradeBook:
             "score": grade.get_total_score(),
             "comments": grade.get_comments()
         } for grade in self._grades]
+
+    def _get_csv(self):
+        """
+        Return a stream representing the grades as a CSV file.
+        """
+        csv_stream = io.StringIO()
+        csv_writer = csv.writer(csv_stream)
+        csv_writer.writerow(["Name", "Score", "Comments"])
+        for grade in self._get_grades():
+            csv_writer.writerow([
+                grade["name"],
+                grade["score"],
+                grade["comments"]
+            ])
+        return csv_stream
     
+    def _get_json(self):
+        """
+        Return a string representing the grades as JSON.
+        """
+        return json.dumps(self._get_grades())
+
     def run(self, hostname, port, log_level=logging.ERROR):
         """
         Start the Flask server (using Werkzeug internally).

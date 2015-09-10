@@ -6,7 +6,7 @@ Licensed under the MIT License. For more, see the LICENSE file.
 
 Author: Jake Hartz <jhartz@mail.rit.edu>
 """
-import os, re, subprocess, zipfile
+import os, re, subprocess, zipfile, difflib
 
 from colorama import init, Fore, Back, Style
 
@@ -56,6 +56,23 @@ def error(msg, *args, **kwargs):
 def status(msg, *args, **kwargs):
     """Print a green status message"""
     msg = Style.BRIGHT + Fore.GREEN + msg + Fore.RESET + Style.NORMAL
+    print(msg, *args, **kwargs)
+
+def print_happy(msg, *args, **kwargs):
+    """Print a happy message with a green background"""
+    msg = Style.BRIGHT + Fore.WHITE + Back.GREEN + msg + \
+          Back.RESET + Fore.RESET + Style.NORMAL
+    print(msg, *args, **kwargs)
+
+def print_sad(msg, *args, **kwargs):
+    """Print a sad message with a red background"""
+    msg = Style.BRIGHT + Fore.WHITE + Back.RED + msg + \
+          Back.RESET + Fore.RESET + Style.NORMAL
+    print(msg, *args, **kwargs)
+
+def print_bright(msg, *args, **kwargs):
+    """Print a bright white message"""
+    msg = Style.BRIGHT + msg + Style.NORMAL
     print(msg, *args, **kwargs)
 
 def input_color(msg):
@@ -507,26 +524,40 @@ class Grader:
                 "cwd": path,
                 "shell": True,
                 "env": env,
-                "stderr": subprocess.STDOUT
+                "stderr": subprocess.STDOUT,
+                "universal_newlines": True
             }
-            if "diff" not in cmd:
-                # Just run with check_call
-                subprocess.check_call(cmd["command"], **kwargs)
-            else:
+            if "diff" in cmd and os.path.exists(os.path.join(helper_directory,
+                                                             cmd["diff"])):
                 # Run with check_output so we can compare the output
                 output = subprocess.check_output(cmd["command"], **kwargs)
+            else:
+                # Just run with check_call
+                subprocess.check_call(cmd["command"], **kwargs)
         except subprocess.CalledProcessError as ex:
-            if output is not None:
-                print(output)
-            print("")
             error("Command had nonzero return code: %s" % ex.returncode)
-        else:
-            if output is not None:
-                print(output)
+            print("")
         
         if output is not None:
             # Run diff
-            print("TODO: Diff with %s" % cmd["diff"])
+            with open(os.path.join(helper_directory, cmd["diff"]), "r") as ref:
+                #diff = difflib.unified_diff(ref, output, "reference", "output")
+                diff = difflib.ndiff(
+                    [line for line in ref],
+                    output.splitlines(keepends=True))
+                print_happy("--- Reference")
+                print_sad("+++ Output")
+                print("")
+                for line in diff:
+                    line = line.rstrip("\n")
+                    if line[0] == "-":
+                        print_happy(line)
+                    elif line[0] == "+":
+                        print_sad(line)
+                    elif line[0] == "?":
+                        print_bright(line)
+                    else:
+                        print(line)
         
         # All done with the command!
         # Ask user what they want to do
