@@ -10,6 +10,9 @@ var base = location.pathname.substring(0, location.pathname.indexOf("gradebook")
 // The ID of the current submission that we are on
 var currentSubmissionID = null;
 
+// The main gradebook grading elements
+var $main;
+
 /**
  * Send a simple POST request back to the server, adding in the current
  * submission ID.
@@ -180,13 +183,14 @@ function startSubmission(id, name) {
     $("#dammit").hide();
 
     // Hide the table and "Late" checkbox
-    $("#score_container").hide();
-    $("#main").hide();
+    $main.hide();
     
-    // Set the name, reset the score, and uncheck "Late"
+    // Set the name, reset the score, uncheck "Late", and reset the overall
+    // comments
     $("#name").text(name);
     $("#current_score").text(maxScore);
     $("#late").prop("checked", false);
+    $("#overall_comments").val("").trigger("input");
     
     // Clear all the old grade items
     $(".points-input").each(function () {
@@ -200,19 +204,20 @@ function startSubmission(id, name) {
     });
     
     // Show the table and "Late" checkbox again
-    $("#main").show();
-    $("#score_container").show();
+    $main.show();
     window.scrollTo(0, 0);
 }
 
 var evtSource;
 $(document).ready(function () {
+    $main = $("#score_container, #main, #main_footer");
+
     // Set up the CSV and JSON links (for when we're done)
     $("#csv_link").attr("href", base + "grades.csv");
     $("#json_link").attr("href", base + "grades.json");
     
     // "Name" original text
-    $("#name").attr("data-orig", $("#name").text())
+    $("#name").attr("data-orig", $("#name").text());
     
     // "Late" checkbox
     $("#late").click(function () {
@@ -220,6 +225,20 @@ $(document).ready(function () {
             is_late: "" + this.checked
         });
     });
+
+    // Overall comments
+    $("#overall_comments").change(function () {
+        post("overall_comments", {
+            value: this.value
+        });
+    }).on("input", function () {
+        // reset the height
+        this.style.height = "";
+        // Calculate new height (min 40px, max 140px)
+        var newHeight = Math.max(Math.min(this.scrollHeight + 3, 140), 40);
+        this.style.height = newHeight + "px";
+        //this.parentNode.style.height = (newHeight + 27) + "px";
+    }).trigger("input");
     
     // Load the grade items
     if (isDone) {
@@ -249,8 +268,7 @@ $(document).ready(function () {
     
     evtSource.addEventListener("done", function (event) {
         // Hide main table and "Late" checkbox
-        $("#score_container").hide();
-        $("#main").hide();
+        $main.hide();
         $("#name").text($("#name").attr("data-orig"));
         
         // Show the "done" container

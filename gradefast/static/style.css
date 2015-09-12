@@ -13,7 +13,7 @@ html, body {
 
 body {
     line-height: 1.6;
-    font-size: 18px;
+    font-size: 14px;
     font-family: sans-serif;
     background-color: #011826;
     color: #F1F2EB;
@@ -27,21 +27,29 @@ body {
     height: 100%;
     display: flex;
     flex-direction: column;
+    padding: 5px;
 }
 
-header, section {
+header, section, footer {
     width: 100%;
     margin: 0 auto;
     max-width: 800px;
     padding: 10px;
 }
 
-header {
-    border-bottom: 1px solid #011826;
+header, footer {
     background-color: #03658C;
     color: #F1F2EB;
-    margin-top: 5px;
+}
+
+header {
+    border-bottom: 1px solid #011826;
     border-radius: 8px 8px 0 0;
+}
+
+footer {
+    top: 1px solid #011826;
+    border-radius: 0 0 8px 8px;
 }
 
 section {
@@ -85,21 +93,25 @@ h3 {
 
 h4 {
     margin: 0 0 0 20px;
-    font-size: 17px;
+    font-size: 18px;
 }
 
 h5 {
     margin: 0 0 0 40px;
-    font-size: 12px;
+    font-size: 16px;
 }
 
 h6 {
     margin: 0 0 0 60px;
-    font-size: 8px;
+    font-size: 14px;
 }
 
 table.bigtable {
     width: 100%;
+}
+
+table.bigtable > tbody > tr > td {
+    width: 50%;
 }
 
 textarea {
@@ -112,5 +124,5 @@ textarea {
 }
 
 tr.topborder > td:not(.noborder) {
-    border-top: 1px solid;
+    border-top: 1px solid #03658C;
 }

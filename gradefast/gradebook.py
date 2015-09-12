@@ -14,7 +14,8 @@ from flask import Flask, request, Response, render_template
 FEEDBACK_HTML_TEMPLATES = {
     # (content)
     "base": """<div style="font-family: Helvetica, Arial, sans-serif; """
-            """font-size: 10pt; line-height: 1.3;">%s</div>""",
+            """font-size: 10pt; line-height: 1.3;">%s"""
+            """<p style="font-size: 11pt;">%s</p></div>""",
 
     # (title, earned points, total points)
     "section_header": "<p><b><u>%s</u></b><br>Section Score: %s / %s</p>",
@@ -94,6 +95,7 @@ class SubmissionGrade:
         self.name = name
         self._grade_structure = copy.deepcopy(grade_structure)
         self._is_late = False
+        self._overall_comments = ""
 
     def _get_location(self, path):
         """
@@ -115,6 +117,12 @@ class SubmissionGrade:
         Set whether this submission is late.
         """
         self._is_late = is_late
+
+    def set_overall_comments(self, comments):
+        """
+        Set the overall comments for this submission.
+        """
+        self._overall_comments = comments
 
     def set_points(self, path, points):
         """
@@ -282,8 +290,9 @@ class SubmissionGrade:
         """
         Patch together all the grade comments for this submission.
         """
-        return FEEDBACK_HTML_TEMPLATES["base"] % self._get_grades_feedback(
-            self._grade_structure)
+        return FEEDBACK_HTML_TEMPLATES["base"] % (
+            self._get_grades_feedback(self._grade_structure),
+            "<br>".join(self._overall_comments.splitlines()))
 
 
 class GradeBook:
@@ -328,6 +337,8 @@ class GradeBook:
                     return "Invalid grade ID"
                 if command == "late":
                     grade.set_late(request.form["is_late"] == "true")
+                elif command == "overall_comments":
+                    grade.set_overall_comments(request.form["value"])
                 elif command == "points":
                     grade.set_points(request.form["path"],
                                      request.form["value"])

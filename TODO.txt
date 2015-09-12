@@ -1,7 +1,6 @@
 TODO
 ====
 
-- Add "Opening Comments" and "Closing Comments"
 - In grade book, for each line, make a drop down (or button of some sort) to show previous score/comments values, and click on one to copy it ("Copy Previous Value")
 - Ability to add deductions to the list on-the-fly
 - In monstrous list of options after a command, add "f" ("open folder")
