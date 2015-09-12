@@ -15,8 +15,8 @@ body {
     line-height: 1.6;
     font-size: 18px;
     font-family: sans-serif;
-    background-color: #444;
-    color: #fff;
+    background-color: #011826;
+    color: #F1F2EB;
 }
 
 #container {
@@ -34,19 +34,21 @@ header, section {
     margin: 0 auto;
     max-width: 800px;
     padding: 10px;
-    
-    background-color: #fff;
-    color: #444;
 }
 
 header {
-    border-bottom: 1px solid #444;
-    background-color: #bbb;
+    border-bottom: 1px solid #011826;
+    background-color: #03658C;
+    color: #F1F2EB;
+    margin-top: 5px;
+    border-radius: 8px 8px 0 0;
 }
 
 section {
     overflow: auto;
     flex: 1;
+    background-color: #F1F2EB;
+    color: #011826;
 }
 
 .box {
@@ -54,10 +56,18 @@ section {
     max-width: 80%;
     padding: 8px;
     border-radius: 8px;
-    border: 1px solid #444;
-    background-color: #bbb;
-    color: #444;
+    border: 1px solid #011826;
+    background-color: #023859;
+    color: #F1F2EB;
     text-align: center;
+}
+
+.box a {
+    color: #F1F2EB;
+}
+
+.box a:hover {
+    text-decoration: none;
 }
 
 h1, h2 {
