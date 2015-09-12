@@ -38,6 +38,28 @@ def print_bordered_message(*msgs):
     print("")
 
 
+def _start_thread(grader_thread, url):
+    """
+    Prompt the user for whether they want to open the gradebook in their web
+    browser, then start the grader thread.
+
+    :param grader_thread: The grader thread to start
+    :param url: The URL to the grade book
+    """
+    # First, sleep for a bit to give some time for the web server to print shit
+    time.sleep(1)
+
+    # Give the user the grade book URL
+    print_bordered_message("Grade Book URL: %s" % url)
+
+    if input("Open in browser (y/N)? ").strip().lower() == "y":
+        webbrowser.open_new(url)
+    print("")
+
+    # Start the Grader thread
+    grader_thread.start()
+
+
 def _run_grader(yaml_data, yaml_directory, *args, **kwargs):
     """
     Load the Grader and start it.
@@ -49,8 +71,6 @@ def _run_grader(yaml_data, yaml_directory, *args, **kwargs):
     :param yaml_directory: The directory where the YAML file lives (to get any
         paths that are relative to it)
     """
-    # First, sleep for a bit to give some time for the web server to print shit
-    time.sleep(1)
     try:
         print("")
         grader = Grader(*args, **kwargs)
@@ -117,17 +137,15 @@ def run(yaml_file, hostname, port):
             "on_end_of_submissions": lambda: gradebook.end_of_submissions()
         }
     )
-    
-    # Give the user the grade book URL
-    url = "http://%s:%s/gradefast/gradebook" % (hostname, port)
-    print_bordered_message("Grade Book URL: %s" % url)
-    
-    if input("Open in browser (y/N)? ").strip().lower() == "y":
-        webbrowser.open_new(url)
-    print("")
-    
-    # Start the Grader thread
-    grader_thread.start()
+
+    # Start the shit
+    threading.Thread(
+        target=_start_thread,
+        kwargs={
+            "grader_thread": grader_thread,
+            "url": "http://%s:%s/gradefast/gradebook" % (hostname, port)
+        }
+    ).start()
     
     # Start the main gradebook server
     gradebook.run(hostname, port)
