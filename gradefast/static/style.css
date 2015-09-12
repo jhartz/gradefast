@@ -126,3 +126,7 @@ textarea {
 tr.topborder > td:not(.noborder) {
     border-top: 1px solid #03658C;
 }
+
+details > div {
+    margin-left: 18px;
+}
