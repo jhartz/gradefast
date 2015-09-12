@@ -252,7 +252,7 @@ class GradeBook:
         """
         # Check validity of _grade_structure
         self._grade_structure = grade_structure
-        self._check_grade_structure()
+        self._max_score = self._check_grade_structure()
         
         self._grades = []
         self._subscriptions = []
@@ -269,6 +269,7 @@ class GradeBook:
             return render_template(
                 "gradebook.html",
                 gradeStructure=json.dumps(self._grade_structure),
+                maxScore=self._max_score,
                 isDone=json.dumps(self._is_done))
         
         # AJAX calls regarding grades
@@ -293,8 +294,11 @@ class GradeBook:
             except Exception as ex:
                 print("GRADEBOOK AJAX HANDLER EXCEPTION:", ex)
                 return "Look what you did..."
-            # All good@
-            return "Aight"
+            # All good
+            return json.dumps({
+                "status": "Aight",
+                "currentScore": grade.get_total_score()
+            });
         
         # Grades CSV file
         @app.route("/gradefast/gradebook/grades.csv")
@@ -338,15 +342,18 @@ class GradeBook:
     def _check_grade_structure(self, st=None):
         """
         Check a grade structure and raise a BadStructureException if the
-        structure is invalid.
+        structure is invalid. If not, return the maximum score.
         
         :param st: The structure to check. If not provided, defaults to
                    self._grade_structure
+        :return: The maximum score for this grade structure.
         """
         if st is None:
             st = self._grade_structure
         if not isinstance(st, list):
             raise BadStructureException("Grade structure is not a list")
+
+        max_score = 0
         
         for grade in st:
             if not isinstance(grade["name"], str) or not grade["name"]:
@@ -357,8 +364,9 @@ class GradeBook:
                        grade["deductPercentIfLate"] > 100:
                         raise BadStructureException(
                             "Grade item has an invalid deductPercentIfLate")
-                self._check_grade_structure(grade["grades"])
+                max_score += self._check_grade_structure(grade["grades"])
             elif "points" in grade:
+                max_score += grade["points"]
                 if "deductions" in grade:
                     for deduction in grade["deductions"]:
                         if not "name" in deduction:
@@ -370,6 +378,8 @@ class GradeBook:
             else:
                 raise BadStructureException(
                     "Grade item needs one of points or grades")
+
+        return max_score
     
     def _get_grade(self, id_):
         """

@@ -10,9 +10,11 @@
 <div id="container">
 
 <header>
-    <h2 id="late_container" style="display: none;"><span><input id="late" type="checkbox" tabindex="1"><label for="late"> Late?</label></span></h2>
+    <h2 id="score_container" style="display: none;"><span><label>Current Score: </label><span id="current_score">0</span> &emsp; <input id="late" type="checkbox" tabindex="1"><label for="late"> Late?</label></span></h2>
     <h1 id="name">GradeFast</h1>
 </header>
+
+<section id="dammit">Start a submission, dammit!</section>
 
 <section id="main" style="display: none;"></section>
 
@@ -30,6 +32,7 @@
 
 <script type="text/javascript">
 var gradeStructure = {{ gradeStructure|safe }};
+var maxScore = {{ maxScore | safe }};
 var isDone = {{ isDone|safe }};
 </script>
 <script type="text/javascript" src="/static/jquery-2.1.4.min.js"></script>

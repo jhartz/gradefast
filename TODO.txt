@@ -1,7 +1,6 @@
 TODO
 ====
 
-- Show running score at top of grade book
 - SORT BY NAME
 - Fix csv output
 - Add "Opening Comments" and "Closing Comments"

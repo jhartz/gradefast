@@ -18,14 +18,20 @@ function post(path, data) {
     data.id = currentSubmissionID;
     $.ajax({
         method: "POST",
+        dataType: "json",
         url: base + "_/" + path,
         data: data,
         error: function (xhr, textStatus, error) {
             alert("XHR Error with " + path + " (" + textStatus + "): " + error);
         },
         success: function (data, textStatus, xhr) {
-            if (data.substring(0, 5) != "Aight") {
-                alert("Error with " + path + " (" + textStatus + "): " + data);
+            if (data.status != "Aight") {
+                alert("Error with " + path + "): " + JSON.stringify(data));
+                return;
+            }
+            // Update the current total score
+            if (typeof data.currentScore == "number") {
+                $("#current_score").text(data.currentScore);
             }
         }
     });
@@ -170,12 +176,16 @@ function writeGradeItems(table, grades, depth, path) {
 function startSubmission(id, name) {
     currentSubmissionID = id;
     
+    // Hide the dammit message
+    $("#dammit").hide();
+
     // Hide the table and "Late" checkbox
-    $("#late_container").hide();
+    $("#score_container").hide();
     $("#main").hide();
     
-    // Set the name and uncheck "Late"
+    // Set the name, reset the score, and uncheck "Late"
     $("#name").text(name);
+    $("#current_score").text(maxScore);
     $("#late").prop("checked", false);
     
     // Clear all the old grade items
@@ -191,7 +201,7 @@ function startSubmission(id, name) {
     
     // Show the table and "Late" checkbox again
     $("#main").show();
-    $("#late_container").show();
+    $("#score_container").show();
     window.scrollTo(0, 0);
 }
 
@@ -216,6 +226,7 @@ $(document).ready(function () {
         // We're done already!
         $("#done").show();
     } else {
+        $("#dammit").show();
         var table = document.createElement("table");
         table.className = "bigtable";
         $("#main").append(table);
@@ -238,7 +249,7 @@ $(document).ready(function () {
     
     evtSource.addEventListener("done", function (event) {
         // Hide main table and "Late" checkbox
-        $("#late_container").hide();
+        $("#score_container").hide();
         $("#main").hide();
         $("#name").text($("#name").attr("data-orig"));
         
