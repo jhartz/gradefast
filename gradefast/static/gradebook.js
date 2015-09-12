@@ -266,7 +266,7 @@ $(document).ready(function () {
             $.each(jsonData.grades, function (index, value) {
                 var $details = $(document.createElement("details"));
                 $details.append($(document.createElement("summary")).text(value.name + ": " + value.score));
-                $details.append(value.comments);
+                $details.append(value.feedback);
                 $("#summary").append($details);
             });
         }

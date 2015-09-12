@@ -11,6 +11,29 @@ import json, queue, logging, copy, csv, io
 from flask import Flask, request, Response, render_template
 
 
+FEEDBACK_HTML_TEMPLATES = {
+    # (content)
+    "base": """<div style="font-family: Helvetica, Arial, sans-serif; """
+            """font-size: 10pt; line-height: 1.3;">%s</div>""",
+
+    # (title, earned points, total points)
+    "section_header": "<p><b><u>%s</u></b><br>Section Score: %s / %s</p>",
+    # (points deducted, percentage deducted)
+    "section_deduction": "<p><b>-%s</b> (%s%%)<b>:</b> "
+                         "<i>Turned in late</i></p>",
+    # (content)
+    "section_body": """<div style="margin-left: 15px;">%s</div>""",
+
+    # (title, earned points, total points)
+    "item_header": "<p><u>%s</u><br>Score: %s / %s</p>",
+    # (points deducted, reason)
+    "item_deduction": """<div style="text-indent: -20px; margin-left: 20px;">"""
+                      "<b>-%s:</b> <i>%s</i></div>",
+    # (content)
+    "item_body": "<p>%s</p>"
+}
+
+
 class ServerSentEvent:
     """
     Represents an event that the server is sending to a client event stream.
@@ -107,6 +130,9 @@ class SubmissionGrade:
             earned_points = float(points)
         except:
             raise BadValueException()
+        # Make it an int if we can
+        if int(earned_points) == earned_points:
+            earned_points = int(earned_points)
         location["_earned_points"] = earned_points
 
     def set_comments(self, path, comments):
@@ -119,7 +145,7 @@ class SubmissionGrade:
         location = self._get_location(path[1:])
 
         # Store the comments
-        location["_comments"] = str(comments.replace("\r\n", "\n"))
+        location["_comments"] = str(comments).replace("\r\n", "\n")
 
     def set_deduction(self, path, is_set):
         """
@@ -154,97 +180,110 @@ class SubmissionGrade:
         Get the points for a subset of a grade structure.
         
         :param grades: The subset of self._grade_structure (a list of dict)
-        :return: The total points for this subset
+        :return: A tuple with the total points earned for this subset and the
+            total points possible for this subset.
         """
-        total = 0
+        total_earned = 0.0
+        total_possible = 0.0
         for grade in grades:
             if "grades" in grade:
                 # We have sub-grades
-                score = self._get_grades_score(grade["grades"])
+                section_earned, section_possible = self._get_grades_score(
+                    grade["grades"])
                 if "deductPercentIfLate" in grade and self._is_late:
                     # It's late! Deduct
-                    score -= self._get_late_deduction(
-                        score,
+                    section_earned -= self._get_late_deduction(
+                        section_earned,
                         grade["deductPercentIfLate"])
                 # Add to the total
-                total += score
+                total_earned += section_earned
+                total_possible += section_possible
             else:
                 # Just a normal grade item
+                total_possible += grade["points"]
                 if "_earned_points" in grade:
-                    total += grade["_earned_points"]
+                    total_earned += grade["_earned_points"]
                 else:
                     # Default amount of points
-                    total += grade["points"]
-        return total
+                    total_earned += grade["points"]
 
-    def get_total_score(self):
+        # Make everything an int if we can
+        if int(total_earned) == total_earned:
+            total_earned = int(total_earned)
+        if int(total_possible) == total_possible:
+            total_possible = int(total_possible)
+        return total_earned, total_possible
+
+    def get_score(self):
         """
         Calculate the total score (all points added up) for this submission.
         """
         return self._get_grades_score([{
             "grades": self._grade_structure
-        }])
+        }])[0]
 
-    def _get_grades_comments(self, grades):
+    def _get_grades_feedback(self, grades):
         """
-        Get the comments for a subset of a grade structure.
+        Get the feedback for a subset of a grade structure.
         
         :param grades: The subset of self._grade_structure (a list of dict)
-        :return: The comments for this subset
+        :return: The feedback, including score and comments, for this subset
         """
-        comments = ""
+        feedback = ""
         for grade in grades:
             if "grades" in grade:
-                # Add the name of this grading section
-                comments += "<p><b><u>%s</u></b></p>" % grade["name"]
-
                 # We have sub-grades
+                points_earned, points_possible = self._get_grades_score(
+                    grade["grades"])
+                # Add the name of this grading section and the total score
+                feedback += FEEDBACK_HTML_TEMPLATES["section_header"] % (
+                    grade["name"],
+                    points_earned,
+                    points_possible
+                )
+
+                # Check if it was late and, if so, add that deduction
                 if "deductPercentIfLate" in grade and self._is_late:
                     # Add the "late" message
-                    comments += "<p><b>-%s:</b> <i>Turned in late</i></p>" % \
-                        self._get_late_deduction(
-                            self._get_grades_score(grade["grades"]),
+                    feedback += FEEDBACK_HTML_TEMPLATES["section_deduction"] % \
+                        (
+                            self._get_late_deduction(
+                                points_earned,
+                                grade["deductPercentIfLate"]),
                             grade["deductPercentIfLate"])
-                # Add the comments for all the sub-grades
-                comments += "<blockquote>"
-                comments += self._get_grades_comments(grade["grades"])
-                comments += "</blockquote>"
-            else:
-                # Add the name of this grading section
-                comments += "<p><u>%s</u>" % grade["name"]
-                # NOTE: We're missing a </p> on purpose
 
+                # Add the feedback for all the sub-grades
+                feedback += FEEDBACK_HTML_TEMPLATES["section_body"] % \
+                    self._get_grades_feedback(grade["grades"])
+            else:
                 # Just a normal grade item
                 earned_points = grade["points"]
                 if "_earned_points" in grade:
                     earned_points = grade["_earned_points"]
-                comments += "<br>Score: %s / %s" % \
-                    (earned_points, grade["points"])
+
+                feedback += FEEDBACK_HTML_TEMPLATES["item_header"] % \
+                    (grade["name"], earned_points, grade["points"])
+
                 # Add deductions, if applicable
                 if "deductions" in grade:
                     for deduction in grade["deductions"]:
                         if "_set" in deduction and deduction["_set"]:
-                            comments += "<br><b>-%s:</b> <i>%s</i>" % \
+                            feedback += FEEDBACK_HTML_TEMPLATES[
+                                            "item_deduction"] % \
                                 (deduction["minus"], deduction["name"])
-
-                # Finally, close that paragraph
-                comments += "</p>"
 
                 # Now, add any comments
                 if "_comments" in grade and grade["_comments"]:
-                    comments += "<blockquote>%s</blockquote>" % \
+                    feedback += FEEDBACK_HTML_TEMPLATES["item_body"] % \
                         "<br>".join(grade["_comments"].split("\n"))
-        return comments
+        return feedback
 
-    def get_comments(self):
+    def get_feedback(self):
         """
         Patch together all the grade comments for this submission.
         """
-        return """<div style="font-family: Helvetica, Arial, sans-serif; line-height: 1.3;">%s</div>""" % \
-            self._get_grades_comments([{
-                "name": "Grading Breakdown",
-                "grades": self._grade_structure
-            }])
+        return FEEDBACK_HTML_TEMPLATES["base"] % self._get_grades_feedback(
+            self._grade_structure)
 
 
 class GradeBook:
@@ -283,10 +322,10 @@ class GradeBook:
         # AJAX calls regarding grades
         @app.route("/gradefast/gradebook/_/<command>", methods=["POST"])
         def gradebook_ajax(command):
-            grade = self._get_grade(request.form["id"])
-            if grade is None:
-                return "Invalid grade ID"
             try:
+                grade = self._get_grade(request.form["id"])
+                if grade is None:
+                    return "Invalid grade ID"
                 if command == "late":
                     grade.set_late(request.form["is_late"] == "true")
                 elif command == "points":
@@ -298,18 +337,18 @@ class GradeBook:
                 elif command == "deduction":
                     grade.set_deduction(request.form["path"],
                                         request.form["value"])
+                # All good
+                return json.dumps({
+                    "status": "Aight",
+                    "currentScore": grade.get_score()
+                })
             except BadPathException:
-                return "Bad path"
+                return "Invalid path"
             except BadValueException:
-                return "Bad value"
+                return "Invalid value"
             except Exception as ex:
                 print("GRADEBOOK AJAX HANDLER EXCEPTION:", ex)
                 return "Look what you did..."
-            # All good
-            return json.dumps({
-                "status": "Aight",
-                "currentScore": grade.get_total_score()
-            })
 
         # Grades CSV file
         @app.route("/gradefast/gradebook/grades.csv")
@@ -460,13 +499,13 @@ class GradeBook:
 
     def _get_grades(self):
         """
-        Return a list of dicts representing the scores and comments for each
+        Return a list of dicts representing the scores and feedback for each
         submission.
         """
         return [{
             "name": grade.name,
-            "score": grade.get_total_score(),
-            "comments": grade.get_comments()
+            "score": grade.get_score(),
+            "feedback": grade.get_feedback()
         } for grade in self._grades]
 
     def _get_csv(self):
@@ -475,12 +514,12 @@ class GradeBook:
         """
         csv_stream = io.StringIO()
         csv_writer = csv.writer(csv_stream)
-        csv_writer.writerow(["Name", "Score", "Comments"])
+        csv_writer.writerow(["Name", "Score", "Feedback"])
         for grade in self._get_grades():
             csv_writer.writerow([
                 grade["name"],
                 grade["score"],
-                grade["comments"]
+                grade["feedback"]
             ])
         csv_stream.seek(0)
         return csv_stream
@@ -491,7 +530,7 @@ class GradeBook:
         """
         return json.dumps(self._get_grades())
 
-    def run(self, hostname, port, log_level=logging.ERROR):
+    def run(self, hostname, port, log_level=logging.WARNING):
         """
         Start the Flask server (using Werkzeug internally).
         
