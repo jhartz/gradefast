@@ -405,6 +405,9 @@ class Grader:
                 print("Found submission: " + submission.name)
             self._submissions.append(submission)
 
+        # Sort the submissions by name
+        self._submissions.sort(key=lambda s: s.name)
+
     def run_commands(self, commands, helper_directory=None):
         """
         Run some commands for each of our submissions. The command list is
