@@ -2,7 +2,6 @@ TODO
 ====
 
 - SORT BY NAME
-- Fix csv output
 - Add "Opening Comments" and "Closing Comments"
 - Not as much margin for blockquotes (maybe use DIVs) - and, comments don't need to be in a blockquote.
 - Include what % it was when telling how much was docked for late
