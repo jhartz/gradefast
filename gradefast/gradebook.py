@@ -145,7 +145,7 @@ class SubmissionGrade:
         location = self._get_location(path[1:])
 
         # Store the comments
-        location["_comments"] = str(comments).replace("\r\n", "\n")
+        location["_comments"] = str(comments)
 
     def set_deduction(self, path, is_set):
         """
@@ -275,7 +275,7 @@ class SubmissionGrade:
                 # Now, add any comments
                 if "_comments" in grade and grade["_comments"]:
                     feedback += FEEDBACK_HTML_TEMPLATES["item_body"] % \
-                        "<br>".join(grade["_comments"].split("\n"))
+                        "<br>".join(grade["_comments"].splitlines())
         return feedback
 
     def get_feedback(self):
