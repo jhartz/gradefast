@@ -66,14 +66,16 @@ def _run_grader(yaml_data, yaml_directory, *args, **kwargs):
         traceback.print_exc()
     finally:
         print("")
-        print_bordered_message("Grading complete!",
-                               "Download the gradebook and any other data you need.",
-                               "Once you exit the server, the gradebook is lost.")
+        print_bordered_message(
+            "Grading complete!",
+            "Download the gradebook and any other data you need.",
+            "Once you exit the server, the gradebook is lost.")
         print("")
         input("Press Enter to exit server... ")
         #sys.exit()
         _thread.interrupt_main()
         os._exit(0)
+
 
 def run(yaml_file, hostname, port):
     """
@@ -101,12 +103,16 @@ def run(yaml_file, hostname, port):
     
     # Create grade book WSGI app
     gradebook = GradeBook(yaml_data["grades"])
-    
+
+    # Ask the user if they want color
+    use_color = input("Use color (Y/n)? ").strip().lower() != "n"
+
     # Load up the Grader in its own thread
     grader_thread = threading.Thread(
         target=_run_grader,
         args=(yaml_data, os.path.dirname(yaml_file)),
         kwargs={
+            "use_color": use_color,
             "on_submission_start": lambda n: gradebook.start_submission(n),
             "on_end_of_submissions": lambda: gradebook.end_of_submissions()
         }
@@ -144,7 +150,7 @@ if __name__ == "__main__":
     PORT = DEFAULT_PORT if len(sys.argv) < 4 else int(sys.argv[3])
     
     # Zhu Li, do the thing!
-    if run(sys.argv[1], HOST, PORT) == False:
+    if not run(sys.argv[1], HOST, PORT):
         # Something bad happened
         sys.exit(1)
 

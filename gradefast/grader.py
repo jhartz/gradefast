@@ -10,10 +10,12 @@ import os, re, subprocess, zipfile, difflib
 
 from colorama import init, Fore, Back, Style
 
+
 def _cmd_exists(cmd):
     """Determine whether a command exists on this system"""
     return subprocess.call(["which", cmd], stdout=subprocess.DEVNULL,
                            stderr=subprocess.DEVNULL) == 0
+
 
 def _default_shell_unix(path):
     """Default function to open a terminal in a Unix-like environment"""    
@@ -37,7 +39,8 @@ def _default_shell_unix(path):
             "cd \"" + path + "\" && /bin/bash"
         ])
     else:
-        error("No shell found")
+        print("No shell found")
+
 
 def _default_shell_windows(path):
     """Default function to open a command prompt on Windows"""
@@ -47,39 +50,6 @@ def _default_shell_windows(path):
         path = path[0:path.rfind("\\")]
     os.system("start cmd /K \"cd " + path + "\"")
 
-
-def error(msg, *args, **kwargs):
-    """Print a red error"""
-    msg = Style.BRIGHT + Fore.RED + msg + Fore.RESET + Style.NORMAL
-    print(msg, *args, **kwargs)
-
-def status(msg, *args, **kwargs):
-    """Print a green status message"""
-    msg = Style.BRIGHT + Fore.GREEN + msg + Fore.RESET + Style.NORMAL
-    print(msg, *args, **kwargs)
-
-def print_happy(msg, *args, **kwargs):
-    """Print a happy message with a green background"""
-    msg = Style.BRIGHT + Fore.WHITE + Back.GREEN + msg + \
-          Back.RESET + Fore.RESET + Style.NORMAL
-    print(msg, *args, **kwargs)
-
-def print_sad(msg, *args, **kwargs):
-    """Print a sad message with a red background"""
-    msg = Style.BRIGHT + Fore.WHITE + Back.RED + msg + \
-          Back.RESET + Fore.RESET + Style.NORMAL
-    print(msg, *args, **kwargs)
-
-def print_bright(msg, *args, **kwargs):
-    """Print a bright white message"""
-    msg = Style.BRIGHT + msg + Style.NORMAL
-    print(msg, *args, **kwargs)
-
-def input_color(msg):
-    """Ask the user for input in cyan"""
-    print(Style.BRIGHT + Fore.CYAN + msg.rstrip() + Fore.RESET + Style.NORMAL,
-          end=" ")
-    return input()
 
 def extract_zipfile(path):
     """
@@ -109,87 +79,6 @@ def extract_zipfile(path):
     zfile.extractall(folder)
     return True
 
-def find_path(working_dir, folder, base=""):
-    """
-    Find a new path based on a current path and either a subfolder or a list of
-    regular expressions representing subfolders. Prompts the user for input if
-    a folder is invalid.
-    
-    :param working_dir: The current path
-    :param folder: A single subfolder, or list of regular expressions
-    :param base: The base directory (that we shouldn't include when printing
-        directory paths)
-    :return: The new path, or None if none exists
-    """
-    # Make sure the current path exists
-    if not os.path.isdir(working_dir):
-        return None
-    
-    def without_base(path):
-        """Get a pretty version of a path"""
-        if path[0:len(base)] == base:
-            path = path[len(base):]
-            if path[0] == "/":
-                path = path[1:]
-        if path[-1] == ".":
-            path = path[:-1]
-        if path[-1] == "/":
-            path = path[:-1]
-        return path
-    
-    new_path = working_dir
-    if isinstance(folder, list):
-        # Form up the sub-paths
-        for folder_regex in folder:
-            new_dir = _find_folder_from_regex(new_path, folder_regex)
-            if new_dir is None:
-                # We ain't got shit
-                new_path = None
-                break
-            new_path = new_dir
-    elif isinstance(folder, str):
-        # Just a simple path concat
-        new_path = os.path.join(working_dir, folder)
-    
-    # Check the folder, and make sure it's what the user wants
-    user_happy = False
-    while not user_happy:
-        if new_path is None or not os.path.isdir(new_path):
-            # It doesn't exist!
-            user_happy = False
-            if new_path is None:
-                error("Folder not found:", end=" ")
-                print(without_base(working_dir), end=" ")
-                status("::", end=" ")
-                print(folder)
-            else:
-                error("Folder not found:", end=" ")
-                print(without_base(new_path))
-        else:
-            # List the files inside
-            status("Files inside %s:" % without_base(new_path), end=" ")
-            for (index, item) in enumerate(os.listdir(new_path)):
-                if index != 0:
-                    status(",", end=" ")
-                print(item, end="")
-            print("\n")
-            
-            user_happy = prompt_user("Does this directory satisfy your " +
-                                     "innate human needs?", ["y", "n"]) == "y"
-        
-        if not user_happy:
-            new_path_input = input_color(
-                "Enter folder path (relative to %s), or Enter to cancel:" %
-                without_base(working_dir))
-            if new_path_input:
-                new_path = os.path.join(working_dir, new_path_input)
-            else:
-                # They've given up
-                new_path = None
-                # And they'd better be damn happy with that choice
-                user_happy = True
-    
-    return new_path
 
 def _find_folder_from_regex(working_dir, folder_regex):
     """
@@ -217,58 +106,6 @@ def _find_folder_from_regex(working_dir, folder_regex):
     return None
 
 
-def prompt_user(prompt, choices, show_choices=True):
-    """
-    Ask the user a question, returning their choice.
-    
-    :param prompt: The string to prompt the user with
-    :param choices: The list of valid choices (possibly including "")
-    :show_choices: Whether to add the list of choices
-    :return: An element of choices chosen by the user (lowercase)
-    """
-    our_choices = []
-    user_choices = "("
-    has_enter_key = False
-    
-    for choice in choices:
-        if choice == "":
-            has_enter_key = True
-        else:
-            user_choices += choice + "/"
-            our_choices.append(choice.lower())
-    
-    if has_enter_key:
-        user_choices += "Enter"
-    else:
-        user_choices = user_choices[:-1]
-    user_choices += ")"
-    
-    msg = prompt
-    if show_choices:
-        msg += " " + user_choices
-    msg += ": "
-    
-    while True:
-        choice = input_color(msg).strip().lower()
-        if choice == "" and has_enter_key:
-            return ""
-        elif choice in our_choices:
-            return choice
-        else:
-            error("Learn how to read, dumbass. `" + choice + "' ain't a choice!")
-
-
-def get_modified_command(cmd):
-    """
-    Prompt the user for a modified version of a command.
-    """
-    print("Existing command: " + cmd["command"])
-    return {
-        "name": cmd["name"] + " (modified)",
-        "command": input_color("Enter new command: ")
-    }
-
-
 class Submission:
     """
     Class representing a submission by a certain user.
@@ -292,8 +129,100 @@ class Grader:
     """
     Class to grade (run commands on) submissions.
     """
-    def __init__(self, open_shell=None, on_submission_start=None,
-                 on_end_of_submissions=None):
+
+    def error(self, msg, *args, **kwargs):
+        """Print a red error"""
+        if self._use_color:
+            msg = Style.BRIGHT + Fore.RED + msg + Fore.RESET + Style.NORMAL
+        print(msg, *args, **kwargs)
+
+    def status(self, msg, *args, **kwargs):
+        """Print a green status message"""
+        if self._use_color:
+            msg = Style.BRIGHT + Fore.GREEN + msg + Fore.RESET + Style.NORMAL
+        print(msg, *args, **kwargs)
+
+    def print_happy(self, msg, *args, **kwargs):
+        """Print a happy message with a green background"""
+        if self._use_color:
+            msg = Style.BRIGHT + Fore.WHITE + Back.GREEN + msg + \
+                  Back.RESET + Fore.RESET + Style.NORMAL
+        print(msg, *args, **kwargs)
+
+    def print_sad(self, msg, *args, **kwargs):
+        """Print a sad message with a red background"""
+        if self._use_color:
+            msg = Style.BRIGHT + Fore.WHITE + Back.RED + msg + \
+                  Back.RESET + Fore.RESET + Style.NORMAL
+        print(msg, *args, **kwargs)
+
+    def print_bright(self, msg, *args, **kwargs):
+        """Print a bright white message"""
+        if self._use_color:
+            msg = Style.BRIGHT + msg + Style.NORMAL
+        print(msg, *args, **kwargs)
+
+    def input_color(self, msg):
+        """Ask the user for input in cyan"""
+        msg = msg.rstrip()
+        if self._use_color:
+            msg = Style.BRIGHT + Fore.CYAN + msg + Fore.RESET + Style.NORMAL
+        print(msg, end=" ")
+        return input()
+
+    def prompt_user(self, prompt, choices, show_choices=True):
+        """
+        Ask the user a question, returning their choice.
+
+        :param prompt: The string to prompt the user with
+        :param choices: The list of valid choices (possibly including "")
+        :show_choices: Whether to add the list of choices
+        :return: An element of choices chosen by the user (lowercase)
+        """
+        our_choices = []
+        user_choices = "("
+        has_enter_key = False
+
+        for choice in choices:
+            if choice == "":
+                has_enter_key = True
+            else:
+                user_choices += choice + "/"
+                our_choices.append(choice.lower())
+
+        if has_enter_key:
+            user_choices += "Enter"
+        else:
+            user_choices = user_choices[:-1]
+        user_choices += ")"
+
+        msg = prompt
+        if show_choices:
+            msg += " " + user_choices
+        msg += ": "
+
+        while True:
+            choice = self.input_color(msg).strip().lower()
+            if choice == "" and has_enter_key:
+                return ""
+            elif choice in our_choices:
+                return choice
+            else:
+                self.error("Learn how to read, dumbass. `%s' ain't a choice!" %
+                           choice)
+
+    def get_modified_command(self, cmd):
+        """
+        Prompt the user for a modified version of a command.
+        """
+        print("Existing command: " + cmd["command"])
+        return {
+            "name": cmd["name"] + " (modified)",
+            "command": self.input_color("Enter new command: ")
+        }
+
+    def __init__(self, use_color=True, open_shell=None,
+                 on_submission_start=None, on_end_of_submissions=None):
         """
         Initialize a Grader.
         
@@ -305,6 +234,7 @@ class Grader:
             all the submissions.
         """
         self._submissions = []
+        self._use_color = use_color
         
         if open_shell is not None:
             self._open_shell = open_shell
@@ -324,12 +254,94 @@ class Grader:
             self._on_end_of_submissions = on_end_of_submissions
         else:
             self._on_end_of_submissions = lambda: None
-        
-        
+
         # Initialize colorama
         init()
-    
-    
+
+    def find_path(self, working_dir, folder, base=""):
+        """
+        Find a new path based on a current path and either a subfolder or a list
+        of regular expressions representing subfolders. Prompts the user for
+        input if a folder is invalid.
+
+        :param working_dir: The current path
+        :param folder: A single subfolder, or list of regular expressions
+        :param base: The base directory (that we shouldn't include when printing
+            directory paths)
+        :return: The new path, or None if none exists
+        """
+        # Make sure the current path exists
+        if not os.path.isdir(working_dir):
+            return None
+
+        def without_base(path):
+            """Get a pretty version of a path"""
+            if path[0:len(base)] == base:
+                path = path[len(base):]
+                if path[0] == "/":
+                    path = path[1:]
+            if path[-1] == ".":
+                path = path[:-1]
+            if path[-1] == "/":
+                path = path[:-1]
+            return path
+
+        new_path = working_dir
+        if isinstance(folder, list):
+            # Form up the sub-paths
+            for folder_regex in folder:
+                new_dir = _find_folder_from_regex(new_path, folder_regex)
+                if new_dir is None:
+                    # We ain't got shit
+                    new_path = None
+                    break
+                new_path = new_dir
+        elif isinstance(folder, str):
+            # Just a simple path concat
+            new_path = os.path.join(working_dir, folder)
+
+        # Check the folder, and make sure it's what the user wants
+        user_happy = False
+        while not user_happy:
+            if new_path is None or not os.path.isdir(new_path):
+                # It doesn't exist!
+                user_happy = False
+                if new_path is None:
+                    self.error("Folder not found:", end=" ")
+                    print(without_base(working_dir), end=" ")
+                    self.status("::", end=" ")
+                    print(folder)
+                else:
+                    self.error("Folder not found:", end=" ")
+                    print(without_base(new_path))
+            else:
+                # List the files inside
+                self.status("Files inside %s:" % without_base(new_path),
+                            end=" ")
+                for (index, item) in enumerate(os.listdir(new_path)):
+                    if index != 0:
+                        self.status(",", end=" ")
+                    print(item, end="")
+                print("\n")
+
+                user_happy = self.prompt_user(
+                    "Does this directory satisfy your innate human needs?",
+                    ["y", "n"]) == "y"
+
+            if not user_happy:
+                new_path_input = self.input_color(
+                    "Enter folder path (relative to %s), or Enter to cancel:" %
+                    without_base(working_dir))
+                if new_path_input:
+                    new_path = os.path.join(working_dir, new_path_input)
+                else:
+                    # They've given up
+                    new_path = None
+                    # And they'd better be damn happy with that choice
+                    user_happy = True
+
+        return new_path
+
     def add_submissions(self, submissions_directory, folder_regex,
                         check_zipfiles=False, print_found_submissions=True):
         """
@@ -392,8 +404,7 @@ class Grader:
             if print_found_submissions:
                 print("Found submission: " + submission.name)
             self._submissions.append(submission)
-    
-    
+
     def run_commands(self, commands, helper_directory=None):
         """
         Run some commands for each of our submissions. The command list is
@@ -416,20 +427,21 @@ class Grader:
         for submission in self._submissions:
             msg = "Starting " + submission.name
             
-            status("-" * len(msg))
-            status(msg)
-            status("-" * len(msg))
+            self.status("-" * len(msg))
+            self.status(msg)
+            self.status("-" * len(msg))
             
-            if prompt_user("Press Enter to begin, or 's' to skip", ["s", ""],
-                           False) == "s":
+            if self.prompt_user(
+                    "Press Enter to begin, or 's' to skip",
+                    ["s", ""],
+                    False) == "s":
                 continue
             
             self._on_submission_start(submission.name)
             self._run_command_set(commands, submission, submission.path,
                                   helper_directory)
         self._on_end_of_submissions()
-    
-    
+
     def _run_command_set(self, commands, submission, path,
                          helper_directory=None):
         """
@@ -448,27 +460,27 @@ class Grader:
                 # It's an actual command
                 if "name" in cmd and "command" in cmd:
                     # If False, then we want to skip the rest of this submission
-                    if self._run_command(cmd, submission, path,
-                                         helper_directory) == False:
+                    if not self._run_command(cmd, submission, path,
+                                             helper_directory):
                         return False
                     # Otherwise, just continue on to the next command
                     continue
                 else:
-                    error("Invalid command found")
+                    self.error("Invalid command found")
                     continue
             
             # If we're still here, we have a group of commands
             # Figure out our new directory for these commands
             new_path = path
             if "folder" in cmd:
-                new_path = find_path(path, cmd["folder"], submission.base)
+                new_path = self.find_path(path, cmd["folder"], submission.base)
                 # Handle a bad folder
                 if new_path is None:
-                    error("Skipping commands: " + ", ".join(
+                    self.error("Skipping commands: " + ", ".join(
                         [subcmd["name"] for subcmd in cmd["commands"]
                          if "name" in subcmd]))
                     # Skip running these commands
-                    input_color("Press Enter to continue...")
+                    self.input_color("Press Enter to continue...")
                     continue
             
             # Run the subcommands in this folder
@@ -480,11 +492,11 @@ class Grader:
             if new_path_pretty[-2:] == "/.":
                 new_path_pretty = new_path_pretty[:-1]
             print("")
-            status("Running commands for folder: ." + new_path_pretty)
+            self.status("Running commands for folder: ." + new_path_pretty)
             print("")
             self._run_command_set(cmd["commands"], submission, new_path,
                                   helper_directory)
-            status("End commands for folder: " + new_path_pretty)
+            self.status("End commands for folder: " + new_path_pretty)
             print("")
     
     def _run_command(self, cmd, submission, path, helper_directory=None):
@@ -500,12 +512,12 @@ class Grader:
         :return: True to move on to the next command,
                  False to move on to the next submission
         """
-        status("-" * 50)
-        status("::: " + cmd["name"])
+        self.status("-" * 50)
+        self.status("::: " + cmd["name"])
         if submission.modify_all_commands:
-            cmd = get_modified_command(cmd)
+            cmd = self.get_modified_command(cmd)
         else:
-            print_bright("    " + cmd["command"])
+            self.print_bright("    " + cmd["command"])
         
         print("")
         
@@ -537,7 +549,7 @@ class Grader:
                 # Just run with check_call
                 subprocess.check_call(cmd["command"], **kwargs)
         except subprocess.CalledProcessError as ex:
-            error("Command had nonzero return code: %s" % ex.returncode)
+            self.error("Command had nonzero return code: %s" % ex.returncode)
             print("")
         
         if output is not None:
@@ -547,17 +559,17 @@ class Grader:
                 diff = difflib.ndiff(
                     [line for line in ref],
                     output.splitlines(keepends=True))
-                print_happy("--- Reference")
-                print_sad("+++ Output")
+                self.print_happy("--- Reference")
+                self.print_sad("+++ Output")
                 print("")
                 for line in diff:
                     line = line.rstrip("\n")
                     if line[0] == "-":
-                        print_happy(line)
+                        self.print_happy(line)
                     elif line[0] == "+":
-                        print_sad(line)
+                        self.print_sad(line)
                     elif line[0] == "?":
-                        print_bright(line)
+                        self.print_bright(line)
                     else:
                         print(line)
         
@@ -569,7 +581,7 @@ class Grader:
             available_choices.remove("p")
         while True:
             print("")
-            choice = prompt_user("What now?", available_choices)
+            choice = self.prompt_user("What now?", available_choices)
             print("")
             if choice == "o":
                 # Open a shell in the current folder
@@ -580,7 +592,8 @@ class Grader:
                                          helper_directory)
             elif choice == "m":
                 # Modify the command, then repeat it
-                return self._run_command(get_modified_command(cmd), submission,
+                return self._run_command(self.get_modified_command(cmd),
+                                         submission,
                                          path, helper_directory)
             elif choice == "p":
                 # Move on to the next command, but modify it before running
