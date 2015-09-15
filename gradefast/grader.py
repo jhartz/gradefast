@@ -6,7 +6,12 @@ Licensed under the MIT License. For more, see the LICENSE file.
 
 Author: Jake Hartz <jhartz@mail.rit.edu>
 """
-import os, re, subprocess, zipfile, difflib
+import os
+import platform
+import re
+import subprocess
+import zipfile
+import difflib
 
 from colorama import init, Fore, Back, Style
 
@@ -80,6 +85,16 @@ def extract_zipfile(path):
     return True
 
 
+def open_file(path):
+    """Open a file (or folder) using the OS's default program"""
+    if platform.system() == "Windows":
+        os.startfile(path)
+    elif platform.system() == "Darwin":
+        subprocess.Popen(["open", path])
+    else:
+        subprocess.Popen(["xdg-open", path])
+
+
 def _find_folder_from_regex(working_dir, folder_regex):
     """
     Helper method for find_path
@@ -122,55 +137,72 @@ class Submission:
         self.path = path
         self.base = base
         self.grades = {}
-        self.modify_all_commands = False
 
 
-class Grader:
+class FancyIO:
     """
-    Class to grade (run commands on) submissions.
+    Class with methods for colored / fancy output
     """
+
+    def __init__(self, use_color=True, input_func=input, output_func=print):
+        """
+        Initialize a new FancyIO object
+
+        :param use_color: Whether to use color in our outputs
+        :param input_func: The function to use for getting input from the user.
+            This function is not passed any arguments.
+        :param output_func: The function to use for any output to the user.
+            Should mimic "print()"
+        """
+        self._use_color = use_color
+        self._in = input_func
+        self._out = output_func
+
+    def print(self, msg, *args, **kwargs):
+        """Print a message"""
+        self._out(msg, *args, **kwargs)
 
     def error(self, msg, *args, **kwargs):
         """Print a red error"""
         if self._use_color:
             msg = Style.BRIGHT + Fore.RED + msg + Fore.RESET + Style.NORMAL
-        print(msg, *args, **kwargs)
+        self._out(msg, *args, **kwargs)
 
     def status(self, msg, *args, **kwargs):
         """Print a green status message"""
         if self._use_color:
             msg = Style.BRIGHT + Fore.GREEN + msg + Fore.RESET + Style.NORMAL
-        print(msg, *args, **kwargs)
+        self._out(msg, *args, **kwargs)
 
     def print_happy(self, msg, *args, **kwargs):
         """Print a happy message with a green background"""
         if self._use_color:
             msg = Style.BRIGHT + Fore.WHITE + Back.GREEN + msg + \
                   Back.RESET + Fore.RESET + Style.NORMAL
-        print(msg, *args, **kwargs)
+        self._out(msg, *args, **kwargs)
 
     def print_sad(self, msg, *args, **kwargs):
         """Print a sad message with a red background"""
         if self._use_color:
             msg = Style.BRIGHT + Fore.WHITE + Back.RED + msg + \
                   Back.RESET + Fore.RESET + Style.NORMAL
-        print(msg, *args, **kwargs)
+        self._out(msg, *args, **kwargs)
 
     def print_bright(self, msg, *args, **kwargs):
         """Print a bright white message"""
         if self._use_color:
             msg = Style.BRIGHT + msg + Style.NORMAL
-        print(msg, *args, **kwargs)
+        self._out(msg, *args, **kwargs)
 
-    def input_color(self, msg):
+    def input(self, msg):
         """Ask the user for input in cyan"""
         msg = msg.rstrip()
         if self._use_color:
             msg = Style.BRIGHT + Fore.CYAN + msg + Fore.RESET + Style.NORMAL
-        print(msg, end=" ")
-        return input()
+        self._out(msg, end=" ")
+        return self._in()
 
-    def prompt_user(self, prompt, choices, show_choices=True):
+    def prompt(self, prompt, choices, show_choices=True):
         """
         Ask the user a question, returning their choice.
 
@@ -202,7 +234,7 @@ class Grader:
         msg += ": "
 
         while True:
-            choice = self.input_color(msg).strip().lower()
+            choice = self.input(msg).strip().lower()
             if choice == "" and has_enter_key:
                 return ""
             elif choice in our_choices:
@@ -211,21 +243,18 @@ class Grader:
                 self.error("Learn how to read, dumbass. `%s' ain't a choice!" %
                            choice)
 
-    def get_modified_command(self, cmd):
-        """
-        Prompt the user for a modified version of a command.
-        """
-        print("Existing command: " + cmd["command"])
-        return {
-            "name": cmd["name"] + " (modified)",
-            "command": self.input_color("Enter new command: ")
-        }
+
+class Grader:
+    """
+    Class to grade (run commands on) submissions.
+    """
 
     def __init__(self, use_color=True, open_shell=None,
                  on_submission_start=None, on_end_of_submissions=None):
         """
         Initialize a Grader.
-        
+
+        :param use_color: Whether to use color in our output.
         :param open_shell: A function to open a shell in a certain directory
             (passed as a string). If "None", then a platform default is used.
         :param on_submission_start: A function to call with the name of a
@@ -234,11 +263,11 @@ class Grader:
             all the submissions.
         """
         self._submissions = []
-        self._use_color = use_color
+        self._io = FancyIO(use_color)
         
         if open_shell is not None:
             self._open_shell = open_shell
-        elif os.name == "nt":
+        elif platform.system() == "Windows":
             self._open_shell = _default_shell_windows
         else:
             self._open_shell = _default_shell_unix
@@ -257,6 +286,16 @@ class Grader:
 
         # Initialize colorama
         init()
+
+    def get_modified_command(self, cmd):
+        """
+        Prompt the user for a modified version of a command.
+        """
+        self._io.print("Existing command: " + cmd["command"])
+        return {
+            "name": cmd["name"] + " (modified)",
+            "command": self._io.input("Enter new command: ")
+        }
 
     def find_path(self, working_dir, folder, base=""):
         """
@@ -307,29 +346,29 @@ class Grader:
                 # It doesn't exist!
                 user_happy = False
                 if new_path is None:
-                    self.error("Folder not found:", end=" ")
-                    print(without_base(working_dir), end=" ")
-                    self.status("::", end=" ")
-                    print(folder)
+                    self._io.error("Folder not found:", end=" ")
+                    self._io.print(without_base(working_dir), end=" ")
+                    self._io.status("::", end=" ")
+                    self._io.print(folder)
                 else:
-                    self.error("Folder not found:", end=" ")
-                    print(without_base(new_path))
+                    self._io.error("Folder not found:", end=" ")
+                    self._io.print(without_base(new_path))
             else:
                 # List the files inside
-                self.status("Files inside %s:" % without_base(new_path),
-                            end=" ")
+                self._io.status("Files inside %s:" % without_base(new_path),
+                                end=" ")
                 for (index, item) in enumerate(os.listdir(new_path)):
                     if index != 0:
-                        self.status(",", end=" ")
-                    print(item, end="")
-                print("\n")
+                        self._io.status(",", end=" ")
+                    self._io.print(item, end="")
+                self._io.print("\n")
 
-                user_happy = self.prompt_user(
+                user_happy = self._io.prompt(
                     "Does this directory satisfy your innate human needs?",
                     ["y", "n"]) == "y"
 
             if not user_happy:
-                new_path_input = self.input_color(
+                new_path_input = self._io.input(
                     "Enter folder path (relative to %s), or Enter to cancel:" %
                     without_base(working_dir))
                 if new_path_input:
@@ -378,7 +417,7 @@ class Grader:
                     if extract_zipfile(os.path.join(submissions_directory,
                                                     item)):
                         # We unzipped it
-                        print("Unzipped: " + item)
+                        self._io.print("Unzipped: " + item)
         
         # Step 3: Get a list of folders that match folder_regex
         for item in os.listdir(submissions_directory):
@@ -402,7 +441,7 @@ class Grader:
             
             # Add this submission to our list
             if print_found_submissions:
-                print("Found submission: " + submission.name)
+                self._io.print("Found submission: " + submission.name)
             self._submissions.append(submission)
 
         # Sort the submissions by name
@@ -419,8 +458,8 @@ class Grader:
         By default (i.e. for top-level commands), the working directory is the
         folder at the root of the submission it's running in.
         
-        After each command is run, the user will be prompted as to what they
-        want to do.
+        Before and after each command is run, the user will be prompted as to
+        what they want to do.
         
         :param commands: The command list to run.
         :param helper_directory: If specified, available to the client as an
@@ -430,11 +469,11 @@ class Grader:
         for submission in self._submissions:
             msg = "Starting " + submission.name
             
-            self.status("-" * len(msg))
-            self.status(msg)
-            self.status("-" * len(msg))
+            self._io.status("-" * len(msg))
+            self._io.status(msg)
+            self._io.status("-" * len(msg))
             
-            if self.prompt_user(
+            if self._io.prompt(
                     "Press Enter to begin, or 's' to skip",
                     ["s", ""],
                     False) == "s":
@@ -469,7 +508,7 @@ class Grader:
                     # Otherwise, just continue on to the next command
                     continue
                 else:
-                    self.error("Invalid command found")
+                    self._io.error("Invalid command found")
                     continue
             
             # If we're still here, we have a group of commands
@@ -479,11 +518,11 @@ class Grader:
                 new_path = self.find_path(path, cmd["folder"], submission.base)
                 # Handle a bad folder
                 if new_path is None:
-                    self.error("Skipping commands: " + ", ".join(
+                    self._io.error("Skipping commands: " + ", ".join(
                         [subcmd["name"] for subcmd in cmd["commands"]
                          if "name" in subcmd]))
                     # Skip running these commands
-                    self.input_color("Press Enter to continue...")
+                    self._io.input("Press Enter to continue...")
                     continue
             
             # Run the subcommands in this folder
@@ -494,17 +533,17 @@ class Grader:
             # Remove trailing "." if necessary
             if new_path_pretty[-2:] == "/.":
                 new_path_pretty = new_path_pretty[:-1]
-            print("")
-            self.status("Running commands for folder: ." + new_path_pretty)
-            print("")
+            self._io.print("")
+            self._io.status("Running commands for folder: ." + new_path_pretty)
+            self._io.print("")
             self._run_command_set(cmd["commands"], submission, new_path,
                                   helper_directory)
-            self.status("End commands for folder: " + new_path_pretty)
-            print("")
+            self._io.status("End commands for folder: " + new_path_pretty)
+            self._io.print("")
     
     def _run_command(self, cmd, submission, path, helper_directory=None):
         """
-        Actually run a command.
+        Run an individual command.
         
         :param cmd: The command to run
         :param submission: The submission that we're running these commands on
@@ -515,15 +554,83 @@ class Grader:
         :return: True to move on to the next command,
                  False to move on to the next submission
         """
-        self.status("-" * 50)
-        self.status("::: " + cmd["name"])
-        if submission.modify_all_commands:
-            cmd = self.get_modified_command(cmd)
-        else:
-            self.print_bright("    " + cmd["command"])
-        
-        print("")
-        
+        self._io.status("-" * 50)
+        self._io.status("::: " + cmd["name"])
+        self._io.print_bright("    " + cmd["command"])
+        self._io.print("")
+
+        # Before starting, ask the user what they want to do
+        while True:
+            choice = self._io.prompt("What now?",
+                                     ["o", "f", "m", "s", "ss", "?", ""])
+            if choice == "o":
+                # Open a shell in the current folder
+                self._open_shell(path)
+            elif choice == "f":
+                # Open the current folder
+                open_file(path)
+            elif choice == "m":
+                # Modify the command
+                cmd = self.get_modified_command(cmd)
+            elif choice == "s":
+                # Skip this command
+                return True
+            elif choice == "ss":
+                # Skip the rest of this submission
+                return False
+            elif choice == "?":
+                # Show help
+                self._io.print("  o:  Open a shell in the current folder")
+                self._io.print("  f:  Open the current folder")
+                self._io.print("  m:  Modify the command (just for this "
+                               "submission)")
+                self._io.print("  s:  Skip this command")
+                self._io.print("  ss: Skip the rest of this submission")
+                self._io.print("  ?:  Show this help message")
+                self._io.print("  Enter: Run the command")
+            else:
+                # Run the command
+                self._io.print("")
+                break
+
+        # Alrighty, it's command-running time!
+        self._exec_command(cmd, submission, path, helper_directory)
+
+        # All done with the command!
+        # Ask user what they want to do
+        while True:
+            self._io.print("")
+            choice = self._io.prompt("What now?", ["r", "ss", "?", ""])
+            self._io.print("")
+            if choice == "r":
+                # Repeat the command
+                return self._run_command(cmd, submission, path,
+                                         helper_directory)
+            elif choice == "ss":
+                # Skip the rest of this submission
+                return False
+            elif choice == "?":
+                # Show help
+                self._io.print("  r:  Repeat the command")
+                self._io.print("  ss: Skip the rest of this submission")
+                self._io.print("  ?:  Show this help message")
+                self._io.print("  Enter: Move on to the next command")
+            else:
+                # Move on to the next command
+                return True
+
+    def _exec_command(self, cmd, submission, path, helper_directory=None):
+        """
+        Actually execute an individual command.
+
+        :param cmd: The command to run
+        :param submission: The submission that we're running these commands on
+        :param path: The working directory for the command
+        :param helper_directory: If specified, available to the client as an
+            environmental variable and used as the default location for diff
+            files.
+        :return:
+        """
         env = dict(os.environ)
         # Set command environment
         env.update({
@@ -533,7 +640,7 @@ class Grader:
         })
         if helper_directory is not None:
             env["HELPER_DIRECTORY"] = helper_directory
-        
+
         # Run the command!
         output = None
         try:
@@ -552,9 +659,11 @@ class Grader:
                 # Just run with check_call
                 subprocess.check_call(cmd["command"], **kwargs)
         except subprocess.CalledProcessError as ex:
-            self.error("Command had nonzero return code: %s" % ex.returncode)
-            print("")
-        
+            self._io.print("")
+            self._io.error("Command had nonzero return code: %s" %
+                           ex.returncode)
+            self._io.print("")
+
         if output is not None:
             # Run diff
             with open(os.path.join(helper_directory, cmd["diff"]), "r") as ref:
@@ -562,69 +671,16 @@ class Grader:
                 diff = difflib.ndiff(
                     [line for line in ref],
                     output.splitlines(keepends=True))
-                self.print_happy("--- Reference")
-                self.print_sad("+++ Output")
-                print("")
+                self._io.print_happy("--- Reference")
+                self._io.print_sad("+++ Output")
+                self._io.print("")
                 for line in diff:
                     line = line.rstrip("\n")
                     if line[0] == "-":
-                        self.print_happy(line)
+                        self._io.print_happy(line)
                     elif line[0] == "+":
-                        self.print_sad(line)
+                        self._io.print_sad(line)
                     elif line[0] == "?":
-                        self.print_bright(line)
+                        self._io.print_bright(line)
                     else:
-                        print(line)
-        
-        # All done with the command!
-        # Ask user what they want to do
-        available_choices = ["o", "r", "m", "p", "s", "?", ""]
-        if submission.modify_all_commands:
-            available_choices.remove("m")
-            available_choices.remove("p")
-        while True:
-            print("")
-            choice = self.prompt_user("What now?", available_choices)
-            print("")
-            if choice == "o":
-                # Open a shell in the current folder
-                self._open_shell(path)
-            elif choice == "r":
-                # Repeat the command
-                return self._run_command(cmd, submission, path,
-                                         helper_directory)
-            elif choice == "m":
-                # Modify the command, then repeat it
-                return self._run_command(self.get_modified_command(cmd),
-                                         submission,
-                                         path, helper_directory)
-            elif choice == "p":
-                # Move on to the next command, but modify it before running
-                submission.modify_all_commands = True
-                return True
-            elif choice == "s":
-                # Skip the rest of this submission
-                return False
-            elif choice == "?":
-                # Show help
-                print("  o: Open a shell in the current folder")
-                print("  r: Repeat the command")
-                if not submission.modify_all_commands:
-                    print("  m: Modify the command (just for this " +
-                          "submission) and repeat it")
-                    print("  p: Continue to the next command, but modify " +
-                          "each command for the rest of this submission " +
-                          "before running it")
-                print("  s: Skip the rest of this submission")
-                print("  ?: Show this help message")
-                print("  Enter: Continue to the next command")
-            else:
-                # Continue on to the next submission
-                return True
-
-
-
-
-
-
-
+                        self._io.print(line)
