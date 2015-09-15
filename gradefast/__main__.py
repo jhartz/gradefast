@@ -6,7 +6,13 @@ Licensed under the MIT License. For more, see the LICENSE file.
 
 Author: Jake Hartz <jhartz@mail.rit.edu>
 """
-import os, sys, threading, webbrowser, time, _thread, traceback
+import os
+import sys
+import threading
+import webbrowser
+import time
+import _thread
+import traceback
 
 import yaml
 
@@ -109,7 +115,8 @@ def run(yaml_file, hostname, port):
     # Try to load the YAML file
     yaml_data = None
     try:
-        yaml_data = yaml.load(open(yaml_file))
+        with open(yaml_file) as f:
+            yaml_data = yaml.load(f)
     except FileNotFoundError:
         print("YAML file not found: %s" % yaml_file)
         return False
@@ -122,7 +129,8 @@ def run(yaml_file, hostname, port):
         return False
     
     # Create grade book WSGI app
-    gradebook = GradeBook(yaml_data["grades"])
+    gradebook = GradeBook(yaml_data["grades"],
+                          os.path.splitext(os.path.basename(yaml_file))[0])
 
     # Ask the user if they want color
     use_color = input("Use color (Y/n)? ").strip().lower() != "n"
@@ -148,19 +156,22 @@ def run(yaml_file, hostname, port):
     ).start()
     
     # Start the main gradebook server
-    gradebook.run(hostname, port)
+    gradebook.run(hostname, port) #, debug=True
 
 
 if __name__ == "__main__":
     # Make sure that we have a YAML file
     if len(sys.argv) <= 1:
         print("Usage: python -m gradefast YAML_FILE [HOSTNAME [PORT]]")
+        print("")
         print("    \"YAML_FILE\" contains the structure of the grading and " +
               "the commands to run.")
-        print("    \"HOSTNAME\" is the hostname to run the grade book HTTP " +
-              "server on. Default: localhost")
-        print("    \"PORT\" is the port to run the grade book HTTP server " +
-              "on. Default: 8051")
+        print("    \"HOSTNAME\"  is the hostname to run the grade book HTTP " +
+              "server on.")
+        print("                Default: localhost")
+        print("    \"PORT\"      is the port to run the grade book HTTP " +
+              "server on.")
+        print("                Default: 8051")
         sys.exit(2)
     
     # Figure out the hostname and port for the server

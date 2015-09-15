@@ -6,7 +6,13 @@ Licensed under the MIT License. For more, see the LICENSE file.
 
 Author: Jake Hartz <jhartz@mail.rit.edu>
 """
-import json, queue, logging, copy, csv, io
+import json
+import queue
+import logging
+import copy
+import csv
+import io
+from collections import OrderedDict
 
 from flask import Flask, request, Response, render_template
 
@@ -183,52 +189,88 @@ class SubmissionGrade:
         """
         return max(0, round(score * (percent_to_deduct / 100.0), precision))
 
+    @staticmethod
+    def get_point_titles(grade_structure):
+        """
+        Get a list of the titles for individual point items which corresponds
+        to the lists that are the third part of the tuples of the return value
+        of _get_grades_score.
+
+        :param grade_structure: The grade structure to get item titles from
+        :return: A list of item titles
+        """
+        items = []
+        for grade in grade_structure:
+            if "grades" in grade:
+                # We have sub-grades
+                items += [grade["name"] + ": " + name for name in
+                          SubmissionGrade.get_point_titles(grade["grades"])]
+            else:
+                items.append(grade["name"])
+        return items
+
     def _get_grades_score(self, grades):
         """
         Get the points for a subset of a grade structure.
         
         :param grades: The subset of self._grade_structure (a list of dict)
-        :return: A tuple with the total points earned for this subset and the
-            total points possible for this subset.
+        :return: A tuple with the points earned for this subset (int), the
+            total points possible for this subset (int), and the individual
+            point scores for this subset (list of (str, int) tuples).
         """
-        total_earned = 0.0
-        total_possible = 0.0
+        points_earned = 0.0
+        points_possible = 0.0
+        individual_points = []
+
         for grade in grades:
             if "grades" in grade:
                 # We have sub-grades
-                section_earned, section_possible = self._get_grades_score(
-                    grade["grades"])
+                section_earned, section_possible, section_points = \
+                    self._get_grades_score(grade["grades"])
                 if "deductPercentIfLate" in grade and self._is_late:
                     # It's late! Deduct
                     section_earned -= self._get_late_deduction(
                         section_earned,
                         grade["deductPercentIfLate"])
                 # Add to the total
-                total_earned += section_earned
-                total_possible += section_possible
+                points_earned += section_earned
+                points_possible += section_possible
+                if "name" in grade:
+                    individual_points += [(grade["name"] + ": " + name, score)
+                                          for name, score in section_points]
+                else:
+                    individual_points += section_points
             else:
                 # Just a normal grade item
-                total_possible += grade["points"]
+                points_possible += grade["points"]
                 if "_earned_points" in grade:
-                    total_earned += grade["_earned_points"]
+                    points_earned += grade["_earned_points"]
+                    individual_points.append((grade["name"],
+                                              grade["_earned_points"]))
                 else:
                     # Default amount of points
-                    total_earned += grade["points"]
+                    points_earned += grade["points"]
+                    individual_points.append((grade["name"], grade["points"]))
 
         # Make everything an int if we can
-        if int(total_earned) == total_earned:
-            total_earned = int(total_earned)
-        if int(total_possible) == total_possible:
-            total_possible = int(total_possible)
-        return total_earned, total_possible
+        if int(points_earned) == points_earned:
+            points_earned = int(points_earned)
+        if int(points_possible) == points_possible:
+            points_possible = int(points_possible)
+
+        return points_earned, points_possible, individual_points
 
     def get_score(self):
         """
         Calculate the total score (all points added up) for this submission.
+
+        :return: A tuple with the points earned for this submission (int), the
+            total points possible for this submission (int), and the individual
+            point scores for this submission (list of (str, int) tuples).
         """
         return self._get_grades_score([{
             "grades": self._grade_structure
-        }])[0]
+        }])
 
     def _get_grades_feedback(self, grades):
         """
@@ -241,7 +283,7 @@ class SubmissionGrade:
         for grade in grades:
             if "grades" in grade:
                 # We have sub-grades
-                points_earned, points_possible = self._get_grades_score(
+                points_earned, points_possible, _ = self._get_grades_score(
                     grade["grades"])
                 # Add the name of this grading section and the total score
                 feedback += FEEDBACK_HTML_TEMPLATES["section_header"] % (
@@ -297,7 +339,7 @@ class SubmissionGrade:
 
 class GradeBook:
     """Represents a grade book with submissions and grade structures."""
-    def __init__(self, grade_structure):
+    def __init__(self, grade_structure, grade_name=None):
         """
         Create a WSGI app representing a grade book.
         
@@ -305,7 +347,10 @@ class GradeBook:
         detailed in the documentation for the YAML format.
         
         :param grade_structure: A list of grading items
+        :param grade_name: A name for whatever we're grading
         """
+        self._grade_name = grade_name or "grades"
+
         # Check validity of _grade_structure
         self._grade_structure = grade_structure
         self._max_score = self._check_grade_structure()
@@ -351,7 +396,7 @@ class GradeBook:
                 # All good
                 return json.dumps({
                     "status": "Aight",
-                    "currentScore": grade.get_score()
+                    "currentScore": grade.get_score()[0]
                 })
             except BadPathException:
                 return "Invalid path"
@@ -375,7 +420,12 @@ class GradeBook:
                         yield line
                 except GeneratorExit:
                     pass
-            return Response(gen(), mimetype="text/csv")
+            resp = Response(gen(), mimetype="text/csv")
+            filename_param = 'filename="%s.csv"' % self._grade_name\
+                .replace("\\", "").replace('"', '\\"')
+            resp.headers["Content-disposition"] = "attachment; " + \
+                                                  filename_param
+            return resp
 
         # Grades JSON file
         @app.route("/gradefast/gradebook/grades.json")
@@ -510,14 +560,21 @@ class GradeBook:
 
     def _get_grades(self):
         """
-        Return a list of dicts representing the scores and feedback for each
-        submission.
+        Return a list of ordered dicts representing the scores and feedback for
+        each submission.
         """
-        return [{
-            "name": grade.name,
-            "score": grade.get_score(),
-            "feedback": grade.get_feedback()
-        } for grade in self._grades]
+        grades = []
+        for grade in self._grades:
+            points_earned, points_possible, individual_points = \
+                grade.get_score()
+            grade_details = OrderedDict()
+            grade_details["name"] = grade.name
+            grade_details["score"] = points_earned
+            grade_details["feedback"] = grade.get_feedback()
+            for item_name, item_points in individual_points:
+                grade_details[item_name] = item_points
+            grades.append(grade_details)
+        return grades
 
     def _get_csv(self):
         """
@@ -525,13 +582,22 @@ class GradeBook:
         """
         csv_stream = io.StringIO()
         csv_writer = csv.writer(csv_stream)
-        csv_writer.writerow(["Name", "Score", "Feedback"])
+
+        # Make the header row
+        point_titles = SubmissionGrade.get_point_titles(self._grade_structure)
+        row_titles = ["Name", "Total Score", "Feedback", ""] + point_titles
+        csv_writer.writerow(row_titles)
+
+        # Make the value rows
         for grade in self._get_grades():
             csv_writer.writerow([
                 grade["name"],
                 grade["score"],
-                grade["feedback"]
-            ])
+                grade["feedback"],
+                ""
+            ] + [grade[title] for title in point_titles])
+
+        # Return the resulting stream
         csv_stream.seek(0)
         return csv_stream
 
@@ -541,19 +607,27 @@ class GradeBook:
         """
         return json.dumps(self._get_grades())
 
-    def run(self, hostname, port, log_level=logging.WARNING):
+    def run(self, hostname, port, log_level=logging.WARNING, debug=False):
         """
         Start the Flask server (using Werkzeug internally).
         
         :param hostname: The hostname to run on
         :param port: The port to run on
         :param log_level: The level to set the Werkzeug logger at
+        :param debug: Whether to start the server in debug mode (prints
+            tracebacks with 500 errors)
         """
         # Set logging level
         server_log = logging.getLogger("werkzeug")
         server_log.setLevel(log_level)
         # Start the server
-        self._app.run(hostname, port, threaded=True)
+        kwargs = {
+            "threaded": True
+        }
+        if debug:
+            kwargs["debug"] = True
+            kwargs["use_reloader"] = False
+        self._app.run(hostname, port, **kwargs)
 
     def get_wsgi_app(self):
         """
