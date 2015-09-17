@@ -48,7 +48,7 @@ header {
 }
 
 footer {
-    top: 1px solid #011826;
+    border-top: 1px solid #011826;
     border-radius: 0 0 8px 8px;
 }
 
@@ -84,6 +84,10 @@ h1, h2 {
 
 header h2 {
     float: right;
+}
+
+section h2 {
+    text-align: center;
 }
 
 h3 {
@@ -125,6 +129,10 @@ textarea {
 
 tr.topborder > td:not(.noborder) {
     border-top: 1px solid #03658C;
+}
+
+summary {
+    cursor: default;
 }
 
 details > div {

@@ -17,22 +17,27 @@ grader.py: "Submissions section" (for the add_submissions method),
 
 ## Grades section
 
+NOTE: Many of the strings in this section are **NOT** HTML-escaped before
+getting thrown into a grade's feedback HTML. This is marked below as:
+**HTML-parsed**
+
 The grades section is composed of a list of grading items. Each item represents
 an actual section of the grade, or a collection of other grading items. Each is
 an associative array with one of the following sets of elements:
 
 Actual section of grade:
 
- - `name` (string) - The name of the grading item
+ - `name` (string; **HTML-parsed**) - The name of the grading item
  - `points` (int) - The amount of points that this grading item is worth
  - `deductions` (list) - OPTIONAL - A list of common reasons for points being
    deducted from this grading item. Each list item is an associative array with
-   a "name" (string) and a "minus" amount (int). NOTE: These values are not used
-   to calculate actual scores; they are only used for feedback.
+   a "name" (string; **HTML-parsed**) and a "minus" amount (int). NOTE: These
+   values are not used to calculate actual scores; they are only used for
+   feedback.
 
 Collection of other grading items:
 
- - `name` (string) - The name of this section of grading items
+ - `name` (string; **HTML-parsed**) - The name of this section of grading items
  - `grades` (list) - A list of other grading items
  - `deductPercentIfLate` (int) - OPTIONAL - A value from 0 to 100 that indicates
    how much to deduct from this section if the submission is marked as late.

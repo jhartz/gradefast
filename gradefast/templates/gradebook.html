@@ -17,7 +17,13 @@
     <h1 id="name">GradeFast</h1>
 </header>
 
-<section id="dammit"><h3>Start a submission, dammit!</h3></section>
+<section id="loading">
+    <h2>Loading...</h2>
+</section>
+
+<section id="dammit" style="display: none;">
+    <h2>Start a submission, dammit!</h2>
+</section>
 
 <section id="main" style="display: none;"></section>
 
@@ -27,7 +33,7 @@
 
 <section id="done" style="display: none;">
     <div class="box">
-        <h3>Grading Complete!</h3>
+        <h2>Grading Complete!</h2>
         <p><a id="csv_link" target="_blank">Download CSV file</a></p>
         <p><a id="json_link" target="_blank">Download JSON file</a></p>
     </div>
@@ -38,13 +44,22 @@
 </div>
 
 <script type="text/javascript">
+// Server variables
 var gradeStructure = {{ gradeStructure|safe }};
-var maxScore = {{ maxScore | safe }};
+var maxScore = {{ maxScore|safe }};
 var isDone = {{ isDone|safe }};
+var currentSubmissionID = {{ currentSubmissionID|safe }};
+// usually /gradefast/gradebook/
+var base = location.pathname.substring(0, location.pathname.indexOf("gradebook")) + "gradebook/";
 </script>
 <script type="text/javascript" src="/static/jquery-2.1.4.min.js"></script>
 <script>
-document.write('<script type="text/javascript" src="/static/gradebook.js?a=' + Math.random() + '"></scr' + 'ipt>');
+// For development... (to always load the latest)
+var scripts = ["structure.js", "submissions.js", "gradebook.js"];
+for (var i = 0; i < scripts.length; i++) {
+    document.write('<script type="text/javascript" src="/static/' +
+    scripts[i] + '?a=' + Math.random() + '"></scr' + 'ipt>');
+}
 </script>
 </body>
 </html>
