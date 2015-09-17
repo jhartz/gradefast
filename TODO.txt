@@ -1,7 +1,23 @@
 TODO
 ====
 
-- In grade book, for each line, make a drop down (or button of some sort) to show previous score/comments values, and click on one to copy it ("Copy Previous Value")
-- Make greasemonkey script for Desire2Learn platforms for automatically adding grades
+- In grade book, for each line, make a drop down (or button of some sort) to
+  show previous score/comments values, and click on one to copy it ("Copy
+  Previous Value")
+- In grade book, make a "down arrow" button next to the Name at the top of the
+  page to allow users to go back to previous submissions. The drop-down list
+  should include the score next to each name.
+- On index page, make the <h1> for the page title and the <h1> for the name
+  different elements; section() will show the name <h1> if it's showing $main,
+  but show the title <h1> otherwise.
+- Store grades and shit as we go in a location spec'd in the YAML file (store
+  it using pickle)
+- Make logging system for output of Grader (by overriding FancyIO's print and
+  input methods) that stores the output log along with the grade (in
+  SubmissionGrade) and then in the dropdown from TODO#2, also have a button to
+  view the output. (On SubmissionGrade, have a method "get_output_as_html" that
+  replaces Colorama.Fore.RED with <span style="color: red;">, etc.)
+- Make greasemonkey script for Desire2Learn platforms for automatically adding
+  grades...
 
     $(".dsh_c")[0].parentNode.parentNode.parentNode.getElementsByTagName("td")[1].textContent.trim()
