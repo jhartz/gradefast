@@ -667,7 +667,6 @@ class Grader:
         if output is not None:
             # Run diff
             with open(os.path.join(helper_directory, cmd["diff"]), "r") as ref:
-                #diff = difflib.unified_diff(ref, output, "reference", "output")
                 diff = difflib.ndiff(
                     [line for line in ref],
                     output.splitlines(keepends=True))
