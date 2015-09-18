@@ -38,7 +38,7 @@ function createGradeStructure(table, grades, depth, path) {
             var $textarea = $(document.createElement("textarea"));
             $textarea.attr({
                 id: "comments" + currentPath,
-                placeholder: "Comments",
+                placeholder: "Comments (HTML Allowed)",
                 rows: "4"
             });
             $textarea.addClass("comments-input");
@@ -149,7 +149,7 @@ function createGradeStructure(table, grades, depth, path) {
             var $a = $("<a />").text("Add another deduction...").attr("href", "#");
             $a.click(function (event) {
                 event.preventDefault();
-                var name = prompt("Deduction name:");
+                var name = prompt("Deduction name (HTML allowed):");
                 if (!name) return;
                 var minus = Number(prompt("Points to deduct:", "0"));
                 if (!isNaN(minus)) {
