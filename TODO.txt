@@ -21,6 +21,11 @@ TODO
   Desire2Learn platforms to add "pre-data" into the YAML file somehow (so we
   can take the comments they wrote when uploading, and also possibly whether
   it was late, and put it in the YAML beforehand)
+    - Also in this script if we have multiple submissions by the same person,
+      run a checksum on them to make sure they're different and, if not,
+      delete the earlier one
+    - Actually, in general, delete the earlier one for any submissions that
+      have multiple submissions (unless one is on time and other is late)
 - Make greasemonkey script for Desire2Learn platforms for automatically adding
   grades...
 
