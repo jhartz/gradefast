@@ -17,6 +17,10 @@ TODO
   SubmissionGrade) and then in the dropdown from TODO#2, also have a button to
   view the output. (On SubmissionGrade, have a method "get_output_as_html" that
   replaces Colorama.Fore.RED with <span style="color: red;">, etc.)
+- Make separate shell script or something to parse the index.html from
+  Desire2Learn platforms to add "pre-data" into the YAML file somehow (so we
+  can take the comments they wrote when uploading, and also possibly whether
+  it was late, and put it in the YAML beforehand)
 - Make greasemonkey script for Desire2Learn platforms for automatically adding
   grades...
 
