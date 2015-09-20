@@ -31,6 +31,20 @@ function section(sectionToShow) {
     }
 }
 
+var requestQueue = [];
+requestQueue.push = function () {
+    // First, push the new guy onto the array
+    var length = Array.prototype.push.apply(this, arguments);
+    // Next, if this is the only element in the array, then we need to run it.
+    // Otherwise, it will be run after the current request completes.
+    if (length == 1) {
+        // Start the AJAX request
+        ajaxRequestQueue();
+    }
+    // Finally, return the new length of the array
+    return length;
+};
+
 /**
  * Send a simple POST request back to the server, adding in the current
  * submission ID.
@@ -40,25 +54,54 @@ function post(path, data, onsuccess) {
     if (typeof id != "number") {
         id = data.id = currentSubmissionID;
     }
+
+    // Add this to the request queue
+    requestQueue.push({
+        url: base + "_/" + path,
+        data: data,
+        onsuccess: function (data) {
+            if (!data || data.status != "Aight") {
+                alert("Error with \"" + path + "\":\n" + JSON.stringify(data));
+            } else {
+                // See if there is an "onsuccess" that we should run
+                if (typeof onsuccess == "function") {
+                    onsuccess(data);
+                }
+                // Update the grading interface (including the current score)
+                startSubmission(id, data.name, data.currentScore, data.is_late, data.overallComments, data.values);
+            }
+        }
+    });
+}
+
+function ajaxRequestQueue() {
+    // Function to run the "next" AJAX request, if there's one in the queue
+    function next() {
+        setTimeout(function () {
+            // We're all done with the last one
+            requestQueue.shift();
+            // Check if we have more POST requests to do
+            if (requestQueue.length) {
+                // Do the next one
+                ajaxRequestQueue();
+            }
+        }, 10);
+    }
+
+    // For THIS request
+    var request = requestQueue[0];
     $.ajax({
         method: "POST",
         dataType: "json",
-        url: base + "_/" + path,
-        data: data,
+        url: request.url,
+        data: request.data || {},
         error: function (xhr, textStatus, error) {
-            alert("XHR Error with \"" + path + "\" (" + textStatus + "): " + error);
+            alert("XHR Error with \"" + url + "\" (" + textStatus + "): " + error);
+            next();
         },
         success: function (data, textStatus, xhr) {
-            if (data.status != "Aight") {
-                alert("Error with \"" + path + "\":\n" + JSON.stringify(data));
-                return;
-            }
-            // Run onsuccess if necessary
-            if (typeof onsuccess == "function") {
-                onsuccess(data);
-            }
-            // Update the grading interface (including the current score)
-            startSubmission(id, data.name, data.currentScore, data.is_late, data.overallComments, data.values);
+            request.onsuccess(data);
+            next();
         }
     });
 }
