@@ -1,46 +1,22 @@
 TODO
 ====
 
-- In grade book, for each line, make a drop down (or button of some sort) to
-  show previous score/comments values, and click on one to copy it ("Copy
-  Previous Value")
-    - OR... Maybe make a "note book" where we store commonly used notes, and
-      we can access it by right-clicking in any of the comment boxes and
-      it brings it up, and we can click on something to insert it at that
-      point, or add a new one. It would show at the top the ones that were
-      created on the comment box where we right-clicked, and then below it
-      the ones created on other comment boxes.
-- If we type in a comment box then immediately click on the up/down for points,
-  the typed comments are lost
-- IN FEEDBACK: Instead of varying the boldness based on whether it has sub-
-  grades, do it by level (1st/2nd level are bold, rest not bold)
-- Autocomplete for new folder paths
-- Text areas for comments - auto height
-- Make <label>s noselect
-- Find some smarter way to do the "replace newline with <br>" if there's also
-  HTML in there (or just switch to markdown)
-- In the deductions table, make sure everything is valign=top
-- In grader.py, differentiate between the 2 "What now?"'s. In fact, maybe just
-  combine them into one
-- Add the current submission ID to the URL so when we reload (i.e. after adding
-  a deduction), it'll reload with the ID that we've been using
+- Save files (spec'd in YAML config)
+- In grade book, make a "note book" where we store commonly used notes, and we
+  can access it by right-clicking in any of the comment boxes and it brings it
+  up, and we can click on something to insert it at that point, or add a new
+  one. It would show at the top the ones that were created on the comment box
+  where we right-clicked, and then below it the ones created on other boxes.
 - Add "shortcut" command to open a list of files in a given editor (or maybe
   just another option on a command to append this list to the end of the
   parameters). Then we can have an order for the files, and any extra other
   files in the dir can be appended to the end of the list.
 - In grade book, make a "down arrow" button next to the Name at the top of the
   page to allow users to go back to previous submissions. The drop-down list
-  should include the score next to each name.
-- On index page, make the <h1> for the page title and the <h1> for the name
-  different elements; section() will show the name <h1> if it's showing $main,
-  but show the title <h1> otherwise.
+  should include the score next to each name, and for submissions other than
+  the latest one, a link to the log HTML page (/gradefast/log/<id>)
 - Store grades and shit as we go in a location spec'd in the YAML file (store
   it using pickle)
-- Make logging system for output of Grader (by overriding FancyIO's print and
-  input methods) that stores the output log along with the grade (in
-  SubmissionGrade) and then in the dropdown from TODO#2, also have a button to
-  view the output. (On SubmissionGrade, have a method "get_output_as_html" that
-  replaces Colorama.Fore.RED with <span style="color: red;">, etc.)
 - Make separate shell script or something to parse the index.html from
   Desire2Learn platforms to add "pre-data" into the YAML file somehow (so we
   can take the comments they wrote when uploading, and also possibly whether

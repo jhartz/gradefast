@@ -20,13 +20,16 @@ function section(sectionToShow) {
     });
 
     // Show/hide all components of the main grading interface
-    var $main = $("#score_container, #main, #main_footer");
+    var $main = $("#name, #score_container, #main, #main_footer");
+    var $notmain = $("#title");
     if (sectionToShow) {
         // We showed something other than the main grading interface;
-        // hide it all
+        // hide it all and show the generic title
         $main.hide();
+        $notmain.show();
     } else {
-        // Show the main grading interface
+        // Show the main grading interface; hide the generic title
+        $notmain.hide();
         $main.show();
     }
 }
@@ -49,7 +52,7 @@ requestQueue.push = function () {
  * Send a simple POST request back to the server, adding in the current
  * submission ID.
  */
-function post(path, data, onsuccess) {
+function post(path, data, onsuccess, dontPushState) {
     var id = data.id;
     if (typeof id != "number") {
         id = data.id = currentSubmissionID;
@@ -68,7 +71,7 @@ function post(path, data, onsuccess) {
                     onsuccess(data);
                 }
                 // Update the grading interface (including the current score)
-                startSubmission(id, data.name, data.currentScore, data.is_late, data.overallComments, data.values);
+                startSubmission(id, data.name, data.currentScore, data.maxScore, data.is_late, data.overallComments, data.values, dontPushState);
             }
         }
     });
@@ -108,6 +111,11 @@ function ajaxRequestQueue() {
 
 var evtSource;
 $(document).ready(function () {
+    // Make sure we're using the correct submission ID
+    if (history.state && typeof history.state.id == "number") {
+        currentSubmissionID = history.state.id;
+    }
+
     // Set up the CSV and JSON links (for when we're done)
     $("#csv_link").attr("href", base + "grades.csv");
     $("#json_link").attr("href", base + "grades.json");
@@ -129,7 +137,7 @@ $(document).ready(function () {
         });
     }).on("input", function () {
         // Reset the height
-        this.style.height = "";
+        this.style.height = "auto";
         // Calculate new height (min 40px, max 140px)
         var newHeight = Math.max(Math.min(this.scrollHeight + 3, 140), 40);
         this.style.height = newHeight + "px";
@@ -137,7 +145,7 @@ $(document).ready(function () {
     }).trigger("input");
     
     // Load the event stream
-    evtSource = new EventSource(base + "events");
+    evtSource = new EventSource(base + "events.stream");
     
     evtSource.addEventListener("start_submission", function (event) {
         // Parse the JSON data
@@ -146,8 +154,6 @@ $(document).ready(function () {
             jsonData = JSON.parse(event.data);
         } catch (err) {}
         if (jsonData && typeof jsonData.id == "number") {
-            // Show loading message
-            section("loading");
             // Tell the forces at large to start this submission
             goToSubmission(jsonData.id);
         }
@@ -198,4 +204,11 @@ $(document).ready(function () {
             section("dammit");
         }
     }
+
+    // Set up popstate
+    window.addEventListener("popstate", function (event) {
+        if (event.state && typeof event.state.id == "number") {
+            goToSubmission(event.state.id, true);
+        }
+    }, false);
 });

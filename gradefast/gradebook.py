@@ -14,7 +14,9 @@ import io
 from collections import OrderedDict
 import traceback
 
-from flask import Flask, request, Response, render_template
+import mistune
+from flask import Flask, request, Response, render_template, abort, redirect,\
+    url_for
 
 
 FEEDBACK_HTML_TEMPLATES = {
@@ -23,22 +25,42 @@ FEEDBACK_HTML_TEMPLATES = {
             """font-size: 10pt; line-height: 1.3;">%s"""
             """<p style="font-size: 11pt;">%s</p></div>""",
 
-    # (title, earned points, total points)
-    "section_header": "<p><b><u>%s</u></b><br>Section Score: %s / %s</p>",
+    # (points added/deducted, reason); used by "item" and "section"
+    "credit": """<div style="text-indent: -20px; margin-left: 20px;">"""
+              """<b>%s:</b> <i>%s</i></div>""",
+
+    # (title, points earned, total points)
+    "section_header_top": "<p><b><u>%s</u></b><br>Section Score: %s / %s</p>",
+    "section_header": "<p><u>%s</u><br>Section Score: %s / %s</p>",
     # (points deducted, percentage deducted)
-    "section_deduction": "<p><b>-%s</b> (%s%%)<b>:</b> "
-                         "<i>Turned in late</i></p>",
+    "section_deduction": """<p><b>-%s</b> (%s%%)<b>:</b> """
+                         """<i>Turned in late</i></p>""",
     # (content)
     "section_body": """<div style="margin-left: 15px;">%s</div>""",
 
-    # (title, earned points, total points)
-    "item_header": "<p><u>%s</u><br>Score: %s / %s</p>",
-    # (points deducted, reason)
-    "item_deduction": """<div style="text-indent: -20px; margin-left: 20px;">"""
-                      "<b>-%s:</b> <i>%s</i></div>",
+    # (title, points earned, total points)
+    "item_header_top": """<p><b><u>%s</u></b><br>Score: %s / %s</p>""",
+    "item_header": """<p><u>%s</u><br>Score: %s / %s</p>""",
     # (content)
-    "item_body": "<p>%s</p>"
+    "item_body": """<p>%s</p>"""
 }
+
+
+def make_number(str_val):
+    """
+    Convert a string to either a float or a int.
+    :param str_val: The string to convert.
+    :return: The numeric form of str_val.
+    """
+    try:
+        num_val = float(str_val)
+    except:
+        raise BadValueException()
+
+    # Make it an int if we can
+    if int(num_val) == num_val:
+        num_val = int(num_val)
+    return num_val
 
 
 class ServerSentEvent:
@@ -93,14 +115,17 @@ class BadValueException(Exception):
 
 class SubmissionGrade:
     """Represents a submission's grade"""
-    def __init__(self, name, grade_structure):
+    def __init__(self, name, grade_structure, markdown):
         """
         :param name: The name of the owner of the submission being graded
         :param grade_structure: A list of grading items (see GradeBook)
+        :param markdown: A configured instance of mistune.Markdown
         """
         self.name = name
         self._grade_structure = grade_structure
         self._grade_data = {}
+        self._md = markdown
+        self.log = ""
 
         self.is_late = False
         self.overall_comments = ""
@@ -145,7 +170,9 @@ class SubmissionGrade:
     @staticmethod
     def enumerate_grades(grade_structure, grade_data):
         """
-        Enumerate over both grade_structure and grade_data at once.
+        Enumerate over both grade_structure and grade_data at once, yielding
+        only enabled grade sections.
+        Yields tuples in the form (index, structure, data)
 
         :param grade_structure: A subset of self._grade_structure
         :param grade_data: A subset of self._grade_data
@@ -155,96 +182,44 @@ class SubmissionGrade:
                 grade_data[index] = {
                     "grades": {}
                 }
+            data = grade_data[index]
+
+            if "_enabled" in data:
+                if not data["_enabled"]:
+                    # It's been disabled
+                    continue
+            elif "disabled" in structure:
+                # It's disabled by default
+                continue
+
             yield index, structure, grade_data[index]
 
-    def set_points(self, path, points):
+    @staticmethod
+    def enumerate_boolean_list(name, grade_structure, grade_data):
         """
-        Set the points for a section of this submission's grade.
+        Enumerate over a list of possible boolean values in both grade_structure
+        and grade_data at once.
+        Yields tuples in the form (index, item, is_set)
+
+        :param name: The name of the list
+        :param grade_structure: A subset of self._grade_structure
+        :param grade_data: A subset of self._grade_data
         """
-        path = path.split(".")
-        if len(path) < 2 or path[0] != "points":
-            raise BadPathException()
-        structure, data = self._get_location(path[1:])
-
-        # Store the earned points
-        try:
-            earned_points = float(points)
-        except:
-            raise BadValueException()
-        # Make it an int if we can
-        if int(earned_points) == earned_points:
-            earned_points = int(earned_points)
-        data["_earned_points"] = earned_points
-
-    def set_comments(self, path, comments):
-        """
-        Set the comments for a section of this submission's grade.
-        """
-        path = path.split(".")
-        if len(path) < 2 or path[0] != "comments":
-            raise BadPathException()
-        structure, data = self._get_location(path[1:])
-
-        # Store the comments
-        data["_comments"] = str(comments)
-
-    def set_deduction(self, path, is_set):
-        """
-        Enable or disable a deduction for a section of this submission's grade.
-        """
-        path = path.split(".")
-        if len(path) < 3 or path[0] != "deduction":
-            raise BadPathException()
-        structure, data = self._get_location(path[1:-1])
-        try:
-            # Find the location to store our deduction data in
-            index = int(path[-1])
-            if "deductions" not in data:
-                data["deductions"] = {}
-            if index not in data["deductions"]:
-                data["deductions"][index] = {}
-            data = data["deductions"][index]
-        except:
-            raise BadPathException()
-
-        # Store the deduction
-        data["_set"] = is_set
-
-    def add_deduction_to_all_grades(self, path, name, minus):
-        """
-        Add a new possible deduction to ALL grade structures (by modifying
-        self._grade_structure, since that's shared by all SubmissionGrade
-        objects that use it).
-        """
-        path = path.split(".")
-        if len(path) < 2 or path[0] != "":
-            raise BadPathException()
-        structure, data = self._get_location(path[1:])
-        if "deductions" not in structure:
-            structure["deductions"] = []
-
-        # Convert the minus (string) to a float
-        try:
-            minus = float(minus)
-        except ValueError:
-            raise BadValueException()
-
-        # Make it an int if we can
-        if int(minus) == minus:
-            minus = int(minus)
-
-        # Add the new deduction
-        structure["deductions"].append({
-            "name": name,
-            "minus": minus
-        })
+        if name in grade_structure:
+            if name not in grade_data:
+                grade_data[name] = {}
+            for index, item in enumerate(grade_structure[name]):
+                is_set = index in grade_data[name] and \
+                         "_set" in grade_data[name][index] and \
+                         grade_data[name][index]["_set"]
+                yield index, item, is_set
 
     @staticmethod
     def _get_late_deduction(score, percent_to_deduct, precision=0):
         """
         Get the amount of points to lop off of a section if the submission is
         late.
-        
+
         :param score: The raw score
         :param percent_to_deduct: The percentage to lop off
         :param precision: The amount of decimal places
@@ -271,11 +246,139 @@ class SubmissionGrade:
                 items.append(grade["name"])
         return items
 
+    @staticmethod
+    def get_points_earned(grade_structure, grade_data):
+        """
+        Get the points earned for a specific grade item.
+        Precondition: The grade item has a "points" property (i.e. it is not a
+        list of other grade items).
+
+        :param grade_structure: A subset of self._grade_structure
+        :param grade_data: A subset of self._grade_data
+        """
+        if "_points_earned" in grade_data:
+            return grade_data["_points_earned"]
+        if "default points" in grade_structure:
+            return grade_structure["default points"]
+        return grade_structure["points"]
+
+    @staticmethod
+    def get_comments(grade_structure, grade_data):
+        """
+        Get the Markdown-parsed comments for a specific grade item.
+        Precondition: The grade item is capable of having comments (i.e. it is
+        not a list of other grade items).
+
+        :param grade_structure: A subset of self._grade_structure
+        :param grade_data: A subset of self._grade_data
+        """
+        if "_comments" in grade_data:
+            return grade_data["_comments"]
+        if "default comments" in grade_structure:
+            return grade_structure["default comments"]
+        return ""
+
+    def set_enabled(self, path, enabled):
+        """
+        Set whether a grading section is enabled.
+        """
+        path = path.split(".")
+        if len(path) < 2 or path[0] != "enabled":
+            raise BadPathException()
+        structure, data = self._get_location(path[1:])
+
+        # Store the enabled status
+        data["_enabled"] = enabled
+
+    def set_points(self, path, points):
+        """
+        Set the points for a section of this submission's grade.
+        """
+        path = path.split(".")
+        if len(path) < 2 or path[0] != "points":
+            raise BadPathException()
+        structure, data = self._get_location(path[1:])
+
+        # Store the points earned
+        data["_points_earned"] = make_number(points)
+
+    def set_comments(self, path, comments):
+        """
+        Set the comments for a section of this submission's grade.
+        """
+        path = path.split(".")
+        if len(path) < 2 or path[0] != "comments":
+            raise BadPathException()
+        structure, data = self._get_location(path[1:])
+
+        # Store the comments
+        data["_comments"] = str(comments)
+
+    def set_point_hint(self, path, is_set):
+        """
+        Enable or disable a point hint for a section of this submission's grade.
+        """
+        path = path.split(".")
+        if len(path) < 3 or path[0] != "point_hint":
+            raise BadPathException()
+        structure, data = self._get_location(path[1:-1])
+        try:
+            # Find the location to store our point hint data in
+            index = int(path[-1])
+            if "point hints" not in data:
+                data["point hints"] = {}
+            if index not in data["point hints"]:
+                data["point hints"][index] = {}
+            data = data["point hints"][index]
+        except:
+            raise BadPathException()
+
+        # Store the deduction
+        data["_set"] = is_set
+
+    def set_deduction(self, path, is_set):
+        """
+        Enable or disable a deduction for a section of this submission's grade.
+        """
+        path = path.split(".")
+        if len(path) < 3 or path[0] != "deduction":
+            raise BadPathException()
+        structure, data = self._get_location(path[1:-1])
+        try:
+            # Find the location to store our deduction data in
+            index = int(path[-1])
+            if "deductions" not in data:
+                data["deductions"] = {}
+            if index not in data["deductions"]:
+                data["deductions"][index] = {}
+            data = data["deductions"][index]
+        except:
+            raise BadPathException()
+
+        # Store the deduction
+        data["_set"] = is_set
+
+    def add_item_to_all_grades(self, path, name, item):
+        """
+        Add a new possible deduction or point hint to ALL grade structures (by
+        modifying self._grade_structure, since that's shared by all
+        SubmissionGrade objects that use it).
+        """
+        path = path.split(".")
+        if len(path) < 2 or path[0] != "":
+            raise BadPathException()
+        structure, data = self._get_location(path[1:])
+        if name not in structure:
+            structure[name] = []
+
+        # Add the new item
+        structure[name].append(item)
+
     def _get_subset_values(self, grade_structure, grade_data, path):
         """
         Get the values for each individual grade parameter (point values,
-        deductions enabled, and comments for each grading item) for a subset of
-        a grade structure.
+        deductions and point hints enabled, and comments for each grading item)
+        for a subset of a grade structure.
 
         :param grade_structure: The subset of self._grade_structure (a list of
             dict)
@@ -288,31 +391,34 @@ class SubmissionGrade:
         values = {}
         for index, structure, data in SubmissionGrade.enumerate_grades(
                 grade_structure, grade_data):
-
             sub_path = path + "." + str(index)
+
+            # Record that this one is enabled
+            values["enabled" + sub_path] = True
             if "grades" in structure:
                 # We have sub-grades
                 values.update(self._get_subset_values(structure["grades"],
                                                       data["grades"],
                                                       sub_path))
+                # Also add in the deduction values
+                for dindex, item, is_set in \
+                        SubmissionGrade.enumerate_boolean_list("deductions",
+                                                               structure, data):
+                    values["deduction" + sub_path + "." + str(dindex)] = is_set
             else:
                 # Now, do the hard work
                 # Firstly, add the point value
-                values["points" + sub_path] = structure["points"] \
-                    if "_earned_points" not in data else data["_earned_points"]
+                values["points" + sub_path] = \
+                    SubmissionGrade.get_points_earned(structure,
+                                                      data)
                 # Next, the comments
-                values["comments" + sub_path] = "" if "_comments" not in data \
-                    else data["_comments"]
-                # Finally, the deduction values
-                if "deductions" in structure:
-                    if "deductions" not in data:
-                        data["deductions"] = {}
-                    for dindex, deduction in enumerate(structure["deductions"]):
-                        is_set = dindex in data["deductions"] and \
-                                 "_set" in data["deductions"][dindex] and \
-                                 data["deductions"][dindex]["_set"]
-                        values["deduction" + sub_path + "." + str(dindex)] = \
-                            is_set
+                values["comments" + sub_path] = SubmissionGrade.get_comments(
+                    structure, data)
+                # Finally, the point hint values
+                for dindex, item, is_set in \
+                        SubmissionGrade.enumerate_boolean_list("point hints",
+                                                               structure, data):
+                    values["point_hint" + sub_path + "." + str(dindex)] = is_set
         return values
 
     def get_values(self):
@@ -350,11 +456,18 @@ class SubmissionGrade:
                 section_earned, section_possible, section_points = \
                     self._get_subset_score(structure["grades"],
                                            data["grades"])
-                if "deductPercentIfLate" in structure and self.is_late:
+                # Check for any deductions
+                for dindex, deduction, is_set in \
+                        SubmissionGrade.enumerate_boolean_list("deductions",
+                                                               structure, data):
+                    if is_set:
+                        section_earned -= deduction["minus"]
+                # Check if it's late
+                if "deduct percent if late" in structure and self.is_late:
                     # It's late! Deduct
                     section_earned -= self._get_late_deduction(
                         section_earned,
-                        structure["deductPercentIfLate"])
+                        structure["deduct percent if late"])
                 # Add to the total
                 points_earned += section_earned
                 points_possible += section_possible
@@ -367,15 +480,10 @@ class SubmissionGrade:
             else:
                 # Just a normal grade item
                 points_possible += structure["points"]
-                if "_earned_points" in data:
-                    points_earned += data["_earned_points"]
-                    individual_points.append((structure["name"],
-                                              data["_earned_points"]))
-                else:
-                    # Default amount of points
-                    points_earned += structure["points"]
-                    individual_points.append((structure["name"],
-                                              structure["points"]))
+                points_earned_item = SubmissionGrade.get_points_earned(
+                    structure, data)
+                points_earned += points_earned_item
+                individual_points.append((structure["name"], points_earned_item))
 
         # Make everything an int if we can
         if int(points_earned) == points_earned:
@@ -395,7 +503,7 @@ class SubmissionGrade:
         """
         return self._get_subset_score(self._grade_structure, self._grade_data)
 
-    def _get_subset_feedback(self, grade_structure, grade_data):
+    def _get_subset_feedback(self, grade_structure, grade_data, depth=0):
         """
         Get the feedback for a subset of a grade structure.
         
@@ -403,6 +511,8 @@ class SubmissionGrade:
             dict)
         :param grade_data: The subset of self._grade_data that corresponds with
             `grade_structure`
+        :param depth: How deep we are in the grade structure (used to vary
+            style)
         :return: The feedback, including score and comments, for this subset
         """
         feedback = ""
@@ -414,52 +524,64 @@ class SubmissionGrade:
                 points_earned, points_possible, _ = self._get_subset_score(
                     structure["grades"], data["grades"])
                 # Add the name of this grading section and the total score
-                feedback += FEEDBACK_HTML_TEMPLATES["section_header"] % (
-                    structure["name"],
+                header_name = "section_header"
+                if depth < 2: header_name += "_top"
+                feedback += FEEDBACK_HTML_TEMPLATES[header_name] % (
+                    self._md(structure["name"]),
                     points_earned,
                     points_possible
                 )
 
+                # Check for any deductions
+                for dindex, deduction, is_set in \
+                        SubmissionGrade.enumerate_boolean_list("deductions",
+                                                               structure, data):
+                    if is_set:
+                        feedback += FEEDBACK_HTML_TEMPLATES["credit"] % \
+                                    ("-" + str(deduction["minus"]),
+                                     self._md(deduction["name"]))
+
                 # Check if it was late and, if so, add that deduction
-                if "deductPercentIfLate" in structure and self.is_late:
+                if "deduct percent if late" in structure and self.is_late:
                     # Add the "late" message
                     feedback += FEEDBACK_HTML_TEMPLATES["section_deduction"] % \
                         (
                             self._get_late_deduction(
                                 points_earned,
-                                structure["deductPercentIfLate"]),
-                            structure["deductPercentIfLate"])
+                                structure["deduct percent if late"]),
+                            structure["deduct percent if late"])
 
                 # Add the feedback for all the sub-grades
                 feedback += FEEDBACK_HTML_TEMPLATES["section_body"] % \
                     self._get_subset_feedback(structure["grades"],
-                                              data["grades"])
+                                              data["grades"],
+                                              depth + 1)
             else:
                 # Just a normal grade item
-                earned_points = structure["points"]
-                if "_earned_points" in data:
-                    earned_points = data["_earned_points"]
+                points_earned = structure["points"]
+                if "_points_earned" in data:
+                    points_earned = data["_points_earned"]
 
-                feedback += FEEDBACK_HTML_TEMPLATES["item_header"] % \
-                    (structure["name"], earned_points, structure["points"])
+                header_name = "item_header"
+                if depth < 2: header_name += "_top"
+                feedback += FEEDBACK_HTML_TEMPLATES[header_name] % \
+                    (self._md(structure["name"]), points_earned,
+                     structure["points"])
 
-                # Add deductions, if applicable
-                if "deductions" in structure:
-                    # Make sure we have data["deductions"]
-                    if "deductions" not in data:
-                        data["deductions"] = {}
-                    for dindex, deduction in enumerate(structure["deductions"]):
-                        if dindex in data["deductions"] and \
-                                "_set" in data["deductions"][dindex] and \
-                                data["deductions"][dindex]["_set"]:
-                            feedback += FEEDBACK_HTML_TEMPLATES[
-                                            "item_deduction"] % \
-                                (deduction["minus"], deduction["name"])
+                # Add point hints, if applicable
+                for dindex, item, is_set in \
+                        SubmissionGrade.enumerate_boolean_list("point hints",
+                                                               structure, data):
+                    if is_set:
+                        feedback += FEEDBACK_HTML_TEMPLATES["credit"] % \
+                                    (item["value"], self._md(item["name"]))
 
                 # Now, add any comments
-                if "_comments" in data and data["_comments"]:
+                comments = SubmissionGrade.get_comments(structure, data)
+                if comments:
                     feedback += FEEDBACK_HTML_TEMPLATES["item_body"] % \
-                        "<br>".join(data["_comments"].splitlines())
+                        self._md(comments)
+                        #"<br>".join(comments.splitlines())
         return feedback
 
     def get_feedback(self):
@@ -468,7 +590,8 @@ class SubmissionGrade:
         """
         return FEEDBACK_HTML_TEMPLATES["base"] % (
             self._get_subset_feedback(self._grade_structure, self._grade_data),
-            "<br>".join(self.overall_comments.splitlines()))
+            self._md(self.overall_comments))
+            #"<br>".join(self.overall_comments.splitlines()))
 
 
 class GradeBook:
@@ -487,35 +610,68 @@ class GradeBook:
 
         # Check validity of _grade_structure
         self._grade_structure = grade_structure
-        self._max_score = self._check_grade_structure()
+        self._check_grade_structure()
 
         self._grades = []
         self._subscriptions = []
         self._is_done = False
+
+        # Set up Mistune (Markdown)
+        renderer = mistune.Renderer(hard_wrap=True)
+        self._md = mistune.Markdown(renderer=renderer)
 
         app = Flask(__name__)
         self._app = app
 
         # Now, initialize the routes for the app
 
-        # Index page
+        @app.route("/gradefast/")
+        def _gradefast_():
+            return redirect(url_for("_gradefast_gradebook_"))
+
+        # Index pages (redirect to current gradebook)
         @app.route("/gradefast/gradebook/")
-        def index():
-            # The "current submission" is the most recent grade
-            current_submission_id_json = "null"
+        def _gradefast_gradebook_():
+            current_submission_id = 0
             if len(self._grades) > 0:
-                current_submission_id_json = json.dumps(len(self._grades) - 1)
+                current_submission_id = len(self._grades) - 1
+            return redirect(url_for("_gradefast_gradebook__",
+                                    grade_id=str(current_submission_id)))
+
+        # Gradebook page
+        @app.route("/gradefast/gradebook/<grade_id>")
+        def _gradefast_gradebook__(grade_id):
+            current_submission_id_json = "null"
+            # If nothing has been started, keep the default of null
+            if len(self._grades) != 0:
+                grade = self._get_grade(grade_id)
+                if grade is None:
+                    abort(404)
+                    return
+                current_submission_id_json = json.dumps(grade_id)
 
             return render_template(
                 "gradebook.html",
                 gradeStructure=json.dumps(self._grade_structure),
-                maxScore=json.dumps(self._max_score),
                 isDone=json.dumps(self._is_done),
                 currentSubmissionID=current_submission_id_json)
 
+        # Log page
+        @app.route("/gradefast/log/<grade_id>")
+        def _gradefast_log__(grade_id):
+            grade = self._get_grade(grade_id)
+            if grade is None:
+                abort(404)
+            else:
+                return render_template(
+                    "log.html",
+                    title="Log for %s" % grade.name,
+                    content=grade.log
+                )
+
         # AJAX calls regarding grades
-        @app.route("/gradefast/gradebook/_/<command>", methods=["POST"])
-        def gradebook_ajax(command):
+        @app.route("/gradefast/_/<command>", methods=["POST"])
+        def _gradefast_ajax__(command):
             try:
                 grade = self._get_grade(request.form["id"])
                 if grade is None:
@@ -528,28 +684,49 @@ class GradeBook:
                     grade.is_late = request.form["is_late"] == "true"
                 elif command == "overall_comments":
                     grade.overall_comments = request.form["value"]
+                elif command == "enabled":
+                    grade.set_enabled(request.form["path"],
+                                      request.form["value"] == "true")
                 elif command == "points":
                     grade.set_points(request.form["path"],
                                      request.form["value"])
                 elif command == "comments":
                     grade.set_comments(request.form["path"],
                                        request.form["value"])
+                elif command == "point_hint":
+                    grade.set_point_hint(request.form["path"],
+                                         request.form["value"] == "true")
                 elif command == "deduction":
                     grade.set_deduction(request.form["path"],
                                         request.form["value"] == "true")
+                elif command == "add_point_hint":
+                    # Change the grade structure (MUA HA HA HA)
+                    grade.add_item_to_all_grades(
+                        request.form["path"],
+                        "point hints",
+                        {
+                            "name": request.form["name"],
+                            "value": make_number(request.form["value"])
+                        })
                 elif command == "add_deduction":
                     # Change the grade structure (MUA HA HA HA)
-                    grade.add_deduction_to_all_grades(request.form["path"],
-                                                      request.form["name"],
-                                                      request.form["minus"])
+                    grade.add_item_to_all_grades(
+                        request.form["path"],
+                        "deductions",
+                        {
+                            "name": request.form["name"],
+                            "minus": -1 * make_number(request.form["value"])
+                        })
 
                 # Return the current state of this grade
+                points_earned, points_total, _ = grade.get_score()
                 return json.dumps({
                     "status": "Aight",
                     "name": grade.name,
                     "is_late": grade.is_late,
                     "overallComments": grade.overall_comments,
-                    "currentScore": grade.get_score()[0],
+                    "currentScore": points_earned,
+                    "maxScore": points_total,
                     "values": grade.get_values()
                 })
             except BadPathException:
@@ -570,8 +747,8 @@ class GradeBook:
                 })
 
         # Grades CSV file
-        @app.route("/gradefast/gradebook/grades.csv")
-        def gradebook_csv():
+        @app.route("/gradefast/grades.csv")
+        def _gradefast_grades_csv():
             csv_stream = self._get_csv()
 
             def gen():
@@ -591,13 +768,13 @@ class GradeBook:
             return resp
 
         # Grades JSON file
-        @app.route("/gradefast/gradebook/grades.json")
-        def gradebook_json():
+        @app.route("/gradefast/grades.json")
+        def _gradefast_grades_json():
             return Response(self._get_json(), mimetype="application/json")
 
         # Event stream
-        @app.route("/gradefast/gradebook/events")
-        def gradebook_events():
+        @app.route("/gradefast/events.stream")
+        def _gradefast_events_stream():
             def gen():
                 q = queue.Queue()
                 self._subscriptions.append(q)
@@ -634,14 +811,6 @@ class GradeBook:
             if not isinstance(grade["name"], str) or not grade["name"]:
                 raise BadStructureException("Grade item missing a name")
             if "grades" in grade:
-                if "deductPercentIfLate" in grade:
-                    if grade["deductPercentIfLate"] < 0 or \
-                       grade["deductPercentIfLate"] > 100:
-                        raise BadStructureException(
-                            "Grade item has an invalid deductPercentIfLate")
-                max_score += self._check_grade_structure(grade["grades"])
-            elif "points" in grade:
-                max_score += grade["points"]
                 if "deductions" in grade:
                     for deduction in grade["deductions"]:
                         if "name" not in deduction:
@@ -650,23 +819,50 @@ class GradeBook:
                         if "minus" not in deduction:
                             raise BadStructureException(
                                 "Deduction missing points")
+                if "deduct percent if late" in grade:
+                    if grade["deduct percent if late"] < 0 or \
+                       grade["deduct percent if late"] > 100:
+                        raise BadStructureException(
+                            "Grade item has an invalid \"deduct percent if "
+                            "late\"")
+                max_score += self._check_grade_structure(grade["grades"])
+            elif "points" in grade:
+                if grade["points"] < 0:
+                    raise BadStructureException("Points must be greater than "
+                                                "zero")
+                max_score += grade["points"]
+                if "default points" in grade:
+                    if grade["default points"] < 0:
+                        raise BadStructureException("Default points must be "
+                                                    "greater than zero")
+                    if grade["default points"] > grade["points"]:
+                        raise BadStructureException("Default points must be "
+                                                    "less than total points")
+                if "point hints" in grade:
+                    for point_hint in grade["point hints"]:
+                        if "name" not in point_hint:
+                            raise BadStructureException(
+                                "Point hint missing name")
+                        if "value" not in point_hint:
+                            raise BadStructureException(
+                                "Point hint missing value")
             else:
                 raise BadStructureException(
-                    "Grade item needs one of points or grades")
+                    "Grade item needs one of either points or grades")
 
         return max_score
 
-    def _get_grade(self, id_):
+    def _get_grade(self, grade_id):
         """
         Test whether an ID is valid and, if so, get the Grade corresponding to
         it.
         
-        :param id_: The ID to test (can be any type)
+        :param grade_id: The ID to test (can be any type)
         :return: a Grade if valid, or None otherwise
         """
         int_id = None
         try:
-            int_id = int(id_)
+            int_id = int(grade_id)
         except ValueError:
             pass
         if int_id is None:
@@ -703,12 +899,22 @@ class GradeBook:
         :param name: The name of the owner of the submission.
         """
         # Make a new Grade object for this submission
-        grade = SubmissionGrade(name, self._grade_structure)
-        id_ = len(self._grades)
+        grade = SubmissionGrade(name, self._grade_structure, self._md)
+        grade_id = len(self._grades)
         self._grades.append(grade)
         self._send_event("start_submission", {
-            "id": id_
+            "id": grade_id
         })
+
+    def log_submission(self, log):
+        """
+        Add log info for the last-started submission.
+
+        :param log: The HTML log info
+        """
+        if len(self._grades):
+            grade_id = len(self._grades) - 1
+            self._grades[grade_id].log += log
 
     def end_of_submissions(self):
         """

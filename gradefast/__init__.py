@@ -14,7 +14,7 @@ Author: Jake Hartz <jhartz@mail.rit.edu>
 
 from .grader import Grader
 from .gradebook import GradeBook
-from .__main__ import run
+from .runyaml import run
 
 __author__ = "Jake Hartz"
 __copyright__ = "Copyright (C) 2015 Jake Hartz"

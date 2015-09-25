@@ -11,10 +11,11 @@
 
 <header>
     <h2 id="score_container" style="display: none;"><span>
-        <label>Current Score: </label><span id="current_score">0</span> &emsp;
+        <label>Current Score: </label><span id="current_score">0</span>&nbsp;/&nbsp;<span id="max_score">0</span> &emsp;
         <input id="late" type="checkbox" tabindex="1"><label for="late"> Late?</label>
     </span></h2>
-    <h1 id="name">GradeFast</h1>
+    <h1 id="title">GradeFast</h1>
+    <h1 id="name" style="display: none;"></h1>
 </header>
 
 <section id="loading">
@@ -28,7 +29,8 @@
 <section id="main" style="display: none;"></section>
 
 <footer id="main_footer" style="display: none;">
-    <textarea id="overall_comments" style="height: 100%;" placeholder="Overall Comments (HTML Allowed)"></textarea>
+    <textarea id="overall_comments" style="height: 100%;"
+              placeholder="Overall Comments (Markdown-parsed)"></textarea>
 </footer>
 
 <section id="done" style="display: none;">
@@ -46,11 +48,12 @@
 <script type="text/javascript">
 // Server variables
 var gradeStructure = {{ gradeStructure|safe }};
-var maxScore = {{ maxScore|safe }};
 var isDone = {{ isDone|safe }};
 var currentSubmissionID = {{ currentSubmissionID|safe }};
-// usually /gradefast/gradebook/
-var base = location.pathname.substring(0, location.pathname.indexOf("gradebook")) + "gradebook/";
+
+// usually /gradefast/
+var base = location.pathname.substring(0, location.pathname.indexOf("gradebook"));
+var docTitle = document.title;
 </script>
 <script type="text/javascript" src="/static/jquery-2.1.4.min.js"></script>
 <script>
