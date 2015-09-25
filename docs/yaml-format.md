@@ -159,84 +159,86 @@ or `~` in YAML.
 
 # Example
 
-    ---
-    grades:
-    - name: Problem Solving
-      points: 15
+```yaml
+---
+grades:
+- name: Problem Solving
+  points: 15
 
-    - name: Attendance
-      points: 5
+- name: Attendance
+  points: 5
 
-    - name: Functionality
-      deduct percent if late: 20
-      deductions:
-      - name: "Not enough test cases"
-        minus: 5
-      - name: "Not enough test cases"
-        minus: 10
-      - name: "First test case failed"
-        minus: 5
-      - name: "Second test case failed"
-        minus: 5
-      grades:
-      - name: "Part 1: Class"
-        points: 20
-        point hints:
-        - name: "Missing constructor"
-          value: -5
-        - name: "Private state not properly encapsulated"
-          value: -10
-      - name: "Part 2: Main Method"
-        points: 10
-        default points: 4
-        point hints:
-        - name: "[0] outputs 1.0"
-          value: 3
-        - name: "[1] is True"
-          value: 2
-        - name: "[2] is False"
-          value: 1
-      - name: Code Style
-        points: 35
+- name: Functionality
+  deduct percent if late: 20
+  deductions:
+  - name: "Not enough test cases"
+    minus: 5
+  - name: "Not enough test cases"
+    minus: 10
+  - name: "First test case failed"
+    minus: 5
+  - name: "Second test case failed"
+    minus: 5
+  grades:
+  - name: "Part 1: Class"
+    points: 20
+    point hints:
+    - name: "Missing constructor"
+      value: -5
+    - name: "Private state not properly encapsulated"
+      value: -10
+  - name: "Part 2: Main Method"
+    points: 10
+    default points: 4
+    point hints:
+    - name: "[0] outputs 1.0"
+      value: 3
+    - name: "[1] is True"
+      value: 2
+    - name: "[2] is False"
+      value: 1
+  - name: Code Style
+    points: 35
 
-    submissions:
-      # The directory full of folders for each submission.
-    - path: "C:\\Users\\Me\\Downloads\\Lab1 Download"
-      # The regular expression to match with the folders.
-      regex: "^[0-9]+-[0-9]+ - (.+) - .+$"
+submissions:
+  # The directory full of folders for each submission.
+- path: "C:\\Users\\Me\\Downloads\\Lab1 Download"
+  # The regular expression to match with the folders.
+  regex: "^[0-9]+-[0-9]+ - (.+) - .+$"
 
-    commands:
-    - name: Test Opener
-      command: echo "Hey, there!"
-    - folder: ["^[A-Za-z]{3}[0-9]{4}$"]
-      environment:
-        # Add an environmental variable to the environment for all these
-        # sub-commands
-        IN_PROJECT: my grading project
-      commands:
-      - name: Setup
-        command: >
-          cp -R $HELPER_DIRECTORY/template . &&
-          mv Poly{String,Eval,Derive,Root}.java poly/stu/
-      - name: Compile PolyTest
-        command: "javac -Xlint PolyTest.java"
-      - name: Run PolyTest
-        command: "java PolyTest"
-        # Compare the output against this diff file
-        diff: "polytest-expected-output.txt"
-      - name: View Code
-        command: "vim -p poly/stu/Poly{Eval,Derive,Root}.java"
-    - name: Test Closing
-      command: "echo 'All done!'"
+commands:
+- name: Test Opener
+  command: echo "Hey, there!"
+- folder: ["^[A-Za-z]{3}[0-9]{4}$"]
+  environment:
+    # Add an environmental variable to the environment for all these
+    # sub-commands
+    IN_PROJECT: my grading project
+  commands:
+  - name: Setup
+    command: >
+      cp -R $HELPER_DIRECTORY/template . &&
+      mv Poly{String,Eval,Derive,Root}.java poly/stu/
+  - name: Compile PolyTest
+    command: "javac -Xlint PolyTest.java"
+  - name: Run PolyTest
+    command: "java PolyTest"
+    # Compare the output against this diff file
+    diff: "polytest-expected-output.txt"
+  - name: View Code
+    command: "vim -p poly/stu/Poly{Eval,Derive,Root}.java"
+- name: Test Closing
+  command: "echo 'All done!'"
 
-    config:
-      # Save file relative to the YAML file
-      save file: "yaml test.data"
-      # Parse commands using git bash (MinGW) rather than cmd
-      command shell: ["C:\\Program Files (x86)\\Git\\bin\\bash.exe", "-c", ~]
-      # Open bash terminals instead of normal windows command prompts
-      terminal shell:
-      - "cmd"
-      - "/C"
-      - "start C:\\PROGRA~2\\Git\\bin\\bash.exe --login"
+config:
+  # Save file relative to the YAML file
+  save file: "yaml test.data"
+  # Parse commands using git bash (MinGW) rather than cmd
+  command shell: ["C:\\Program Files (x86)\\Git\\bin\\bash.exe", "-c", ~]
+  # Open bash terminals instead of normal windows command prompts
+  terminal shell:
+  - "cmd"
+  - "/C"
+  - "start C:\\PROGRA~2\\Git\\bin\\bash.exe --login"
 
+```
