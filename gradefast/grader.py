@@ -182,7 +182,7 @@ class FancyIO:
 
         # Set up readline
         if readline is not None:
-            readline.parse_and_bind('tab: complete')
+            readline.parse_and_bind("tab: complete")
 
         # Set up colorama
         init()
@@ -890,10 +890,13 @@ class CommandRunner:
             kwargs["stderr"] = subprocess.STDOUT
 
         # START THE COMMAND ALREADY
-        process = subprocess.Popen(args, **kwargs)
-        # The output will only be collected here if we have stdout set above
-        # (i.e. if we're planning on running it through diff)
-        output, _ = process.communicate(input=cmd_input)
+        try:
+            process = subprocess.Popen(args, **kwargs)
+            # The output will only be collected here if we have stdout set above
+            # (i.e. if we're planning on running it through diff)
+            output, _ = process.communicate(input=cmd_input)
+        except KeyboardInterrupt:
+            self._io.error("Process interrupted")
 
         # Check the return code
         if process.returncode:
