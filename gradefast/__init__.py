@@ -4,7 +4,7 @@ Package to grade a shitton of CS labs or something similar.
 
 The class Grader controls the grading process.
 
-To use a YAML file as imput, use the run function. The YAML file details the
+To use a YAML file as input, use the run function. The YAML file details the
 structure of the grading and the commands to run.
 
 Licensed under the MIT License. For more, see the LICENSE file.
