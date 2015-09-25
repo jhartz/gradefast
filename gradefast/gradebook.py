@@ -483,7 +483,8 @@ class SubmissionGrade:
                 points_earned_item = SubmissionGrade.get_points_earned(
                     structure, data)
                 points_earned += points_earned_item
-                individual_points.append((structure["name"], points_earned_item))
+                individual_points.append((structure["name"],
+                                          points_earned_item))
 
         # Make everything an int if we can
         if int(points_earned) == points_earned:
