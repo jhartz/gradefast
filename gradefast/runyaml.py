@@ -54,11 +54,11 @@ class SaveFile:
         self.path = path
         self.overwrite = overwrite
 
-    def save_submission_grade(self, id, grade):
+    def save_submission_grade(self, grade_id, grade):
         """
         Save a SubmissionGrade.
 
-        :param id: The ID (or index) of the SubmissionGrade.
+        :param grade_id: The ID (or index) of the SubmissionGrade.
         :param grade: The SubmissionGrade object.
         """
         pass
@@ -116,7 +116,8 @@ def _run_grader(yaml_data, yaml_directory, *args, **kwargs):
             grader.add_submissions(
                 os.path.join(yaml_directory, submission["path"]),
                 submission["regex"],
-                "check zipfiles" in submission and submission["check zipfiles"])
+                "check zipfiles" in submission and submission["check zipfiles"],
+                "check files" in submission and submission["check files"])
         print("")
 
         # A function to open a shell window

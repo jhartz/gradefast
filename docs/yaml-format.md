@@ -81,6 +81,11 @@ with the following elements:
  - `check zipfiles` (boolean) - OPTIONAL (default: false) - Whether to check if
    any zipfiles in the directory also match `regex` (without the trailing
    `.zip`) and, if there isn't already a matching folder, extract the zipfiles.
+ - `check files` (list) - OPTIONAL (default: []) - Whether to check if
+   any normal files in the directory also match `regex`. This should be a list
+   of file extensions that are appended on to the end of `regex` to indicate
+   files to look for. If matching files are found, they are *moved* to a folder
+   that matches the name of the file, unless such a folder already exists.
 
 ## Commands section
 
@@ -205,6 +210,10 @@ submissions:
 - path: "C:\\Users\\Me\\Downloads\\Lab1 Download"
   # The regular expression to match with the folders.
   regex: "^[0-9]+-[0-9]+ - (.+) - .+$"
+  # If anything matching zip folder isn't unzipped, unzip it
+  check zipfiles: true
+  # If any loose .java files are lying around, move them into folders
+  check files: ["java"]
 
 commands:
 - name: Test Opener

@@ -65,35 +65,6 @@ def _default_shell_windows(path):
     os.system("start cmd /K \"cd " + path + "\"")
 
 
-def extract_zipfile(path):
-    """
-    Extract a zipfile into a new folder in the same directory with a matching
-    name (same name as zipile, but without ".zip").
-    
-    :param path: The path to the zipfile
-    :return: True if we unzipped it, False if the folder already exists.
-    """
-    base = os.path.dirname(path)
-    zipfile_name = os.path.basename(path)
-    
-    # Find the folder
-    folder_name = zipfile_name
-    if folder_name[-4:] == ".zip":
-        folder_name = folder_name[:-4]
-    folder = os.path.join(base, folder_name)
-    if os.path.exists(folder):
-        # Already exists!
-        return False
-    
-    # Make the folder
-    os.mkdir(folder)
-    
-    # Extract the zipfile
-    zfile = zipfile.ZipFile(path, "r")
-    zfile.extractall(folder)
-    return True
-
-
 def open_file(path):
     """Open a file (or folder) using the OS's default program"""
     if platform.system() == "Windows":
@@ -145,6 +116,7 @@ class InputCompleter:
             self.options = sorted(options)
         else:
             self.options = options
+        self.matches = None
 
     def complete(self, text, state):
         """
@@ -448,7 +420,7 @@ class Grader:
             self._on_end_of_submissions = lambda: None
 
     def add_submissions(self, submissions_directory, folder_regex,
-                        check_zipfiles=False, print_found_submissions=True):
+                        check_zipfiles=False, check_files=None):
         """
         Add a directory of submissions to our list of submissions.
         
@@ -461,9 +433,12 @@ class Grader:
         :param folder_regex: Regular expression to use to match subfolders
             (see the YAML format documentation for more info).
         :param check_zipfiles: Whether to check zipfiles in the directory to
-            see if any match (see the YAML format documentation for more).
-        :param print_found_submissions: Whether to print a list of all the
-            submissions we've found. Also prints when we've extracted a zipfile.
+            see if any match folder_regex (see the YAML format documentation
+            for more information).
+        :param check_files: Whether to check files in the directory to see if
+            any with specific extensions match folder_regex. This is a LIST of
+            file extensions to check (see the YAML format documentation for
+            more information). Both [] and None skip this check.
         """
         
         # Step 1: Make sure "submissions_directory" exists and is a directory
@@ -473,17 +448,32 @@ class Grader:
         
         regex = re.compile(folder_regex)
         
-        # Step 2: Check zipfiles (if necessary)
-        if check_zipfiles:
+        # Step 2: Check zipfiles or other files (if necessary)
+        if check_zipfiles or (check_files is not None and len(check_files)):
             for item in os.listdir(submissions_directory):
-                # Is it a zipfile?
+                # Split the file name and extension
+                name, ext = os.path.splitext(item)
+                # Make sure it's not a directory and it matches our regex
                 if os.path.isfile(os.path.join(submissions_directory, item)) \
-                   and item[-4:] == ".zip":
-                    # Unzip it! (will return False if folder already exists)
-                    if extract_zipfile(os.path.join(submissions_directory,
-                                                    item)):
-                        # We unzipped it
-                        self._io.print("Unzipped: " + item)
+                        and regex.fullmatch(name) is not None:
+                    # "from path" is the file, "to path" is the new directory
+                    from_path = os.path.join(submissions_directory, item)
+                    to_path = os.path.join(submissions_directory, name)
+                    # Make sure the directory doesn't already exist
+                    if not os.path.exists(to_path):
+                        # Is it a zipfile?
+                        if check_zipfiles and ext == ".zip":
+                            # Make the directory
+                            os.mkdir(to_path)
+                            # Extract the zipfile
+                            zfile = zipfile.ZipFile(from_path, "r")
+                            zfile.extractall(to_path)
+                            self._io.print("Unzipped: %s" % item)
+                        elif check_files and ext[1:] in check_files:
+                            # Make a folder and move it there
+                            os.mkdir(to_path)
+                            os.rename(from_path, os.path.join(to_path, item))
+                            self._io.print("Moved to folder: %s" % item)
         
         # Step 3: Get a list of folders that match folder_regex
         for item in os.listdir(submissions_directory):
@@ -506,8 +496,7 @@ class Grader:
                     break
             
             # Add this submission to our list
-            if print_found_submissions:
-                self._io.print("Found submission: " + submission.name)
+            self._io.print("Found submission: " + submission.name)
             self._submissions.append(submission)
 
         # Sort the submissions by name
@@ -654,9 +643,9 @@ class CommandRunner:
         # Get list of folders in working_dir (for autocomplete)
         folders = []
         for root, dirs, files in os.walk(working_dir):
-            for dir in sorted(dirs):
+            for directory in sorted(dirs):
                 folders.append(
-                    without_base(os.path.join(root, dir), working_dir))
+                    without_base(os.path.join(root, directory), working_dir))
 
         # Check the folder, and make sure it's what the user wants
         user_happy = False
@@ -703,7 +692,7 @@ class CommandRunner:
         if new_path is None:
             return None
         else:
-            return (new_path, without_base(new_path))
+            return new_path, without_base(new_path)
 
     def run_on_submission(self, submission, path, environment):
         """
@@ -762,7 +751,8 @@ class CommandRunner:
 
             self._io.print("")
             if new_path_pretty is not None:
-                self._io.status("Running commands for folder: " + new_path_pretty)
+                self._io.status("Running commands for folder: " +
+                                new_path_pretty)
             self._io.print("")
 
             # Make new environment dictionary
