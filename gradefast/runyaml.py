@@ -195,15 +195,20 @@ def run(yaml_file, hostname, port):
     # TODO: Find a better solution
     if "MSYSTEM" in os.environ and os.environ["MSYSTEM"] == "MINGW32" and \
             os.path.exists("C:\\Program Files (x86)\\Git\\bin\\sed.exe"):
-        def hackish_output_wrapper(*args, sep=" ", end="\n", **kwargs):
-            p = subprocess.Popen(
-                [
-                    "C:\\Program Files (x86)\\Git\\bin\\sed.exe",
-                    r's/(?<=\\e\\[)2;//g'
-                ],
-                stdin=subprocess.PIPE,
-                universal_newlines=True)
-            p.communicate(input=sep.join(args) + end)
+        def hackish_output_wrapper(*args, sep=" ", end="\n", file=None,
+                                   **kwargs):
+            # If file is set, then skip our hackery
+            if file is not None:
+                print(*args, sep=sep, end=end, file=file, **kwargs)
+            else:
+                p = subprocess.Popen(
+                    [
+                        "C:\\Program Files (x86)\\Git\\bin\\sed.exe",
+                        r's/(?<=\\e\\[)2;//g'
+                    ],
+                    stdin=subprocess.PIPE,
+                    universal_newlines=True)
+                p.communicate(input=sep.join(args) + end)
         grader_kwargs["output_func"] = hackish_output_wrapper
 
     # Load up the Grader in its own thread
