@@ -163,38 +163,39 @@ or `~` in YAML.
     grades:
     - name: Problem Solving
       points: 15
+
     - name: Attendance
       points: 5
+
     - name: Functionality
       deduct percent if late: 20
+      deductions:
+      - name: "Not enough test cases"
+        minus: 5
+      - name: "Not enough test cases"
+        minus: 10
+      - name: "First test case failed"
+        minus: 5
+      - name: "Second test case failed"
+        minus: 5
       grades:
       - name: "Part 1: Class"
         points: 20
-        deductions:
+        point hints:
         - name: "Missing constructor"
-          minus: 5
+          value: -5
         - name: "Private state not properly encapsulated"
-          minus: 10
+          value: -10
       - name: "Part 2: Main Method"
         points: 10
-        deductions:
-        - name: "[0] should output 1.0"
-          minus: 3
-        - name: "[1] should be True"
-          minus: 2
-        - name: "[2] should be False"
-          minus: 1
-      - name: "Part 3: Test Cases"
-        points: 15
-        deductions:
-        - name: "Not enough test cases"
-          minus: 5
-        - name: "Not enough test cases"
-          minus: 10
-        - name: "First test case failed"
-          minus: 5
-        - name: "Second test case failed"
-          minus: 5
+        default points: 4
+        point hints:
+        - name: "[0] outputs 1.0"
+          value: 3
+        - name: "[1] is True"
+          value: 2
+        - name: "[2] is False"
+          value: 1
       - name: Code Style
         points: 35
 
@@ -208,6 +209,10 @@ or `~` in YAML.
     - name: Test Opener
       command: echo "Hey, there!"
     - folder: ["^[A-Za-z]{3}[0-9]{4}$"]
+      environment:
+        # Add an environmental variable to the environment for all these
+        # sub-commands
+        IN_PROJECT: my grading project
       commands:
       - name: Setup
         command: >
@@ -217,6 +222,7 @@ or `~` in YAML.
         command: "javac -Xlint PolyTest.java"
       - name: Run PolyTest
         command: "java PolyTest"
+        # Compare the output against this diff file
         diff: "polytest-expected-output.txt"
       - name: View Code
         command: "vim -p poly/stu/Poly{Eval,Derive,Root}.java"
@@ -226,8 +232,11 @@ or `~` in YAML.
     config:
       # Save file relative to the YAML file
       save file: "yaml test.data"
-      # Parse commands using bash (git bash) rather than cmd
+      # Parse commands using git bash (MinGW) rather than cmd
       command shell: ["C:\\Program Files (x86)\\Git\\bin\\bash.exe", "-c", ~]
       # Open bash terminals instead of normal windows command prompts
-      terminal shell: ["cmd", "/C", 'start C:\PROGRA~2\Git\bin\bash.exe --login']
+      terminal shell:
+      - "cmd"
+      - "/C"
+      - "start C:\\PROGRA~2\\Git\\bin\\bash.exe --login"
 
