@@ -859,41 +859,50 @@ class CommandRunner:
         if "environment" in cmd:
             env.update(cmd["environment"])
 
-        # Run the command!
-        output = None
-        try:
-            kwargs = {
-                "cwd": path,
-                "env": env,
-                "stderr": subprocess.STDOUT,
-                "universal_newlines": True
-            }
+        # kwargs for subprocess.Popen
+        kwargs = {
+            "cwd": path,
+            "env": env,
+            "universal_newlines": True
+        }
 
-            # args is the first argument for subprocess.Popen
-            args = cmd["command"]
-            if self.shell_command is None:
-                # Use platform shell
-                kwargs["shell"] = True
-            else:
-                # Reformat args to use the provided shell command
-                args = [cmd["command"] if arg is None else arg
-                        for arg in self.shell_command]
+        # args is the first argument for subprocess.Popen
+        args = cmd["command"]
+        if self.shell_command is None:
+            # Use platform shell
+            kwargs["shell"] = True
+        else:
+            # Reformat args to use the provided shell command
+            args = [cmd["command"] if arg is None else arg
+                    for arg in self.shell_command]
 
-            # RUN THE COMMAND ALREADY
-            if "diff" in cmd and os.path.exists(os.path.join(
-                    self.config_directory, cmd["diff"])):
-                # Run with check_output so we can compare the output
-                output = subprocess.check_output(args, **kwargs)
-            else:
-                # Just run with check_call
-                subprocess.check_call(args, **kwargs)
-        except subprocess.CalledProcessError as ex:
+        # Check if we have input to throw at stdin
+        cmd_input = None
+        if "input" in cmd:
+            cmd_input = cmd["input"]
+            kwargs["stdin"] = subprocess.PIPE
+
+        # Check whether we have a diff file to check
+        has_diff = "diff" in cmd and os.path.exists(os.path.join(
+                    self.config_directory, cmd["diff"]))
+        if has_diff:
+            kwargs["stdout"] = subprocess.PIPE
+            kwargs["stderr"] = subprocess.STDOUT
+
+        # START THE COMMAND ALREADY
+        process = subprocess.Popen(args, **kwargs)
+        # The output will only be collected here if we have stdout set above
+        # (i.e. if we're planning on running it through diff)
+        output, _ = process.communicate(input=cmd_input)
+
+        # Check the return code
+        if process.returncode:
             self._io.print("")
             self._io.error("Command had nonzero return code: %s" %
-                           ex.returncode)
+                           process.returncode)
             self._io.print("")
 
-        if output is not None:
+        if has_diff:
             # Run diff
             with open(os.path.join(self.config_directory, cmd["diff"]),
                       "r") as ref:

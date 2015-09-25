@@ -101,7 +101,11 @@ Actual command:
    `config["command shell"]` or the system's default shell)
  - `environment` (dictionary) - Environmental variables for this command
  - `diff` (string) - OPTIONAL - A file to compare the output of the command to
-   (either an absolute path or a path relative to the YAML file)
+   (either an absolute path or a path relative to the YAML file). **NOTE:** If
+   `diff` is set, then all output for the command is buffered until the command
+   terminates! If the command requires input from the user, you will not be
+   able to enter it yourself, so you will need to use `input` (below).
+ - `input` (string) - OPTIONAL - Some input to use for stdin for the command
 
 Collection of other commands:
 
