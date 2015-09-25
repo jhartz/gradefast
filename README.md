@@ -4,6 +4,10 @@ Python program to grade a shitton of CS labs or something similar.
 
 ## Dependencies
 
+GradeFast requires **Python *3.4*** or later!
+
+Additionally, these packages are required:
+
  - [Colorama](https://pypi.python.org/pypi/colorama) to make it look pretty
  - [YAML](https://pypi.python.org/pypi/PyYAML) to... I don't know... parse the
    input files, or something silly like that
