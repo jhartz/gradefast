@@ -105,7 +105,9 @@ Actual command:
    `diff` is set, then all output for the command is buffered until the command
    terminates! If the command requires input from the user, you will not be
    able to enter it yourself, so you will need to use `input` (below).
- - `input` (string) - OPTIONAL - Some input to use for stdin for the command
+ - `input` (string) - OPTIONAL - Some input to use for stdin for the command.
+   **NOTE:** If `input` is set, you will not be able to provide program input
+   through the terminal!
 
 Collection of other commands:
 
