@@ -194,7 +194,8 @@ def run(yaml_file, hostname, port):
     # an ugly `sed` call to make our colored output work
     # TODO: Find a better solution
     if "MSYSTEM" in os.environ and os.environ["MSYSTEM"] == "MINGW32" and \
-            os.path.exists("C:\\Program Files (x86)\\Git\\bin\\sed.exe"):
+            "config" in yaml_data and "sed path" in yaml_data["config"] and \
+            os.path.exists(yaml_data["config"]["sed path"]):
         def hackish_output_wrapper(*args, sep=" ", end="\n", file=None,
                                    **kwargs):
             # If file is set, then skip our hackery
@@ -203,7 +204,7 @@ def run(yaml_file, hostname, port):
             else:
                 p = subprocess.Popen(
                     [
-                        "C:\\Program Files (x86)\\Git\\bin\\sed.exe",
+                        yaml_data["config"]["sed path"],
                         r's/(?<=\\e\\[)2;//g'
                     ],
                     stdin=subprocess.PIPE,
