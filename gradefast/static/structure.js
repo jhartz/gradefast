@@ -261,19 +261,11 @@ function makeCheckboxTable(items, type, currentPath, $input) {
         event.preventDefault();
         var name = prompt("Name (Markdown-parsed):");
         if (!name) return;
-        var value;
 
-        if ($input) {
-            value = prompt("Points to add (or negative number to deduct):",
-                "0");
-            if (!value) return;
-            value = Number(value);
-        } else {
-            value = prompt("Points to deduct:", "0");
-            if (!value) return;
-            value = -1 * Number(value);
-        }
-
+        var value = prompt("Point delta (positive number to ADD POINTS;" +
+            " negative number to DEDUCT POINTS)", "0");
+        if (!value) return;
+        value = Number(value);
         if (isNaN(value)) return;
 
         // Show "loading"
