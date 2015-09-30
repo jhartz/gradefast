@@ -264,24 +264,29 @@ function makeCheckboxTable(items, type, currentPath, $input) {
         var value;
 
         if ($input) {
-            value = Number(prompt("Points to add (or negative number to" +
-                " deduct):", "0"));
+            value = prompt("Points to add (or negative number to deduct):",
+                "0");
+            if (!value) return;
+            value = Number(value);
         } else {
-            value = -1 * Number(prompt("Points to deduct:", "0"));
+            value = prompt("Points to deduct:", "0");
+            if (!value) return;
+            value = -1 * Number(value);
         }
-        if (!isNaN(value)) {
-            // Show "loading"
-            section("loading");
-            // Tell the server about this guy
-            post("add_" + type, {
-                path: currentPath,
-                name: name,
-                value: value
-            }, function () {
-                // We need to reload the grading structure
-                location.reload();
-            });
-        }
+
+        if (isNaN(value)) return;
+
+        // Show "loading"
+        section("loading");
+        // Tell the server about this guy
+        post("add_" + type, {
+            path: currentPath,
+            name: name,
+            value: Number(value)
+        }, function () {
+            // We need to reload the grading structure
+            location.reload();
+        });
     });
     $dRow.append($("<td />").attr("colspan", "2").append($a));
     // Add the "New _______" row to the table
