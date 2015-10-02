@@ -449,7 +449,7 @@ class Grader:
         regex = re.compile(folder_regex)
         
         # Step 2: Check zipfiles or other files (if necessary)
-        if check_zipfiles or (check_files is not None and len(check_files)):
+        if check_zipfiles or (check_files and len(check_files)):
             for item in os.listdir(submissions_directory):
                 # Split the file name and extension
                 name, ext = os.path.splitext(item)

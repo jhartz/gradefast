@@ -234,16 +234,16 @@ class SubmissionGrade:
         of _get_grades_score.
 
         :param grade_structure: The grade structure to get item titles from
-        :return: A list of item titles
+        :return: A list of item titles represented by a tuple: (name, points)
         """
         items = []
         for grade in grade_structure:
             if "grades" in grade:
                 # We have sub-grades
-                items += [grade["name"] + ": " + name for name in
+                items += [(grade["name"] + ": " + name, pts) for name, pts in
                           SubmissionGrade.get_point_titles(grade["grades"])]
             else:
-                items.append(grade["name"])
+                items.append((grade["name"], grade["points"]))
         return items
 
     @staticmethod
@@ -619,7 +619,15 @@ class GradeBook:
 
         # Set up Mistune (Markdown)
         renderer = mistune.Renderer(hard_wrap=True)
-        self._md = mistune.Markdown(renderer=renderer)
+        markdown = mistune.Markdown(renderer=renderer)
+
+        def parse_md(*args, **kwargs):
+            text = markdown(*args, **kwargs).strip()
+            # Convert paragraphs to <br> tags
+            if text.startswith("<p>") and text.endswith("</p>"):
+                text = text[3:-4].replace("</p>\n<p>", "<br>")
+            return text
+        self._md = parse_md
 
         app = Flask(__name__)
         self._app = app
@@ -954,7 +962,8 @@ class GradeBook:
 
         # Make the header row
         point_titles = SubmissionGrade.get_point_titles(self._grade_structure)
-        row_titles = ["Name", "Total Score", "Feedback", ""] + point_titles
+        row_titles = ["Name", "Total Score", "Feedback", ""] + \
+                     ["(%s) %s" % (pts, title) for title, pts in point_titles]
         csv_writer.writerow(row_titles)
 
         # Make the value rows
@@ -964,7 +973,8 @@ class GradeBook:
                 grade["score"],
                 grade["feedback"],
                 ""
-            ] + [grade[title] for title in point_titles])
+            ] + ["" if title not in grade else grade[title]
+                 for title, pts in point_titles])
 
         # Return the resulting stream
         csv_stream.seek(0)
