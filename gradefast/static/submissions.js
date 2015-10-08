@@ -18,7 +18,7 @@ function goToSubmission(id, dontPushState) {
     document.title = docTitle;
 
     // Make the request
-    post("get a submission...or is it POST?haha", {
+    post("get a submission...or is it POST a submission?haha", {
         id: id
     }, undefined, dontPushState);
 }
@@ -32,8 +32,8 @@ function goToSubmission(id, dontPushState) {
  * @param {number} [maxScore] - The maximum score for the submission.
  * @param {boolean} [is_late] - Whether the submission is marked as late.
  * @param {string} [overallComments] - The overall comments for the submission.
- * @param {Object} [values] - The values for points, credits, deductions, and
- *        comments for individual grading items.
+ * @param {Object} [values] - The values for points, point hints,
+ *        section deductions, and comments for individual grading items.
  * @param {boolean} [dontPushState] - Whether to skip the history pushstate
  *        (i.e. if we're coming from a popstate).
  */
@@ -68,7 +68,7 @@ function startSubmission(id, name, currentScore, maxScore, is_late, overallComme
         $(this).val("" + val);
     });
     // Reset boolean inputs (checkboxes)
-    $(".point_hint-input, .deduction-input, .enabled-input").each(function () {
+    $(".point_hint-input, .section_deduction-input, .enabled-input").each(function () {
         $(this).prop("checked", !!values[this.id]);
     });
 

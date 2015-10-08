@@ -61,13 +61,13 @@ function createGradeStructure(table, grades, depth, path) {
             }
             $(table).append($titleRow);
 
-            // Next, put in the deductions table
+            // Next, put in the section deductions table
             $(table).append(
                 $("<tr />").addClass("has-path").attr("data-path", currentPath).append(
                     $("<td />").attr("colspan", "2")
                                .css("padding-left", (depth * 20) + "px")
                                .append(
-                        makeCheckboxTable(grade.deductions, "deduction", currentPath))
+                        makeCheckboxTable(grade["section deductions"], "section_deduction", currentPath))
                 )
             );
 
@@ -173,8 +173,8 @@ function createGradeStructure(table, grades, depth, path) {
  * Make a table of checkboxes and labels.
  * @param {Array} items - The list of items to make checkboxes for. Each must
  *        have a `name` and either `value` or `minus`.
- * @param {string} type - What these items are, usually either "deduction" or
- *        "point_hint".
+ * @param {string} type - What these items are, usually either
+ *        "section_deduction" or "point_hint".
  * @param {string} currentPath - The position within the grade structure where
  *        we are.
  * @param [$input] - The jQuery object representing the element holding the
@@ -229,7 +229,7 @@ function makeCheckboxTable(items, type, currentPath, $input) {
             });
             $dRow.append($("<td />").append($dInput));
 
-            // Make the deduction labels
+            // Make the section deduction labels
             var value = $input ? dValue.value : (-1 * dValue.minus);
             var $dLabel = $(document.createElement("label"));
             $dLabel.attr("for", $dInput.attr("id"));
