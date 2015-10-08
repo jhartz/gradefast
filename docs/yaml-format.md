@@ -25,8 +25,8 @@ NOTE: Many of the strings in this section are parsed as Markdown, which means
 that *not all HTML is escaped*. This is marked below as: **Markdown**
 
 The grades section is composed of a list of grading items. Each item represents
-an actual section of the grade, or a collection of other grading items. Each is
-a dictionary that will have one of the following sets of elements:
+either an actual section of the grade, or a collection of other grading items.
+Each is a dictionary that will have one of the following sets of elements:
 
 *Actual section of grade:*
 
@@ -39,9 +39,9 @@ a dictionary that will have one of the following sets of elements:
    points or losing points on this grading item. This assists the grader when
    determining the points. Each list item is a dictionary with a "name"
    (string; **Markdown**) and a "value" amount (int). To indicate losing
-   points, the value should be a negative number. *NOTE: Unlike `deductions`
-   below, these values are not used to calculate actual scores; they are only
-   used for feedback.*
+   points, the value should be a negative number. *NOTE: Unlike
+   `section deductions` (below), these values are not used to calculate actual
+   scores; they are only used for feedback.*
 - `default points` (int; optional) - The default amount of points. If not
   provided, defaults to `points`.
 - `default comments` (string; optional; **Markdown**) - Default comments for
@@ -56,16 +56,28 @@ a dictionary that will have one of the following sets of elements:
    grading items.
  - `disabled` (boolean; optional) - Whether this section is disabled by default.
  - `grades` (list; required) - A list of other grading items.
- - `deductions` (list; optional) - A list of reasons for points being deducted
-   from this grading section. Each list item is a dictionary with a "name"
-   (string; **Markdown**) and a "minus" amount (int). *NOTE: Unlike `point
-   hints` above, these ARE used in both calculating the score AND feedback!*
+ - `section deductions` (list; optional) - A list of reasons for points being
+   deducted from this grading section. Each list item is a dictionary with a
+   "name" (string; **Markdown**) and a "minus" amount (int). *NOTE: Unlike
+   `point hints` above, these ARE used in both calculating the score AND
+   feedback!*
  - `deduct percent if late` (int; optional) - A value from 0 to 100 that
    indicates how much to deduct from this section if the submission is marked
    as late.
 - `note` or `notes` (string; optional; **Markdown**) - Any notes for the
   grader. These show up in the gradebook interface, but are never added to the
   feedback that is meant for the owner of the submission.
+
+**Section Deductions vs. Point Hints**
+
+Point hints are available on individual grading items. They are only hints;
+they automatically update the point value when they are selected and deselected
+in the gradebook, but the user is free to change the point value at will for a
+grading item. The point value is what matters in the end, not the point hints.
+(If a point hint is checked, though, it will show up in the feedback.)
+
+Section deductions affect the section score. Unlike point hints, they are
+always negative (always deductions).
 
 ## Submissions section
 
@@ -101,13 +113,14 @@ Actual command:
    `config["command shell"]` or the system's default shell)
  - `environment` (dictionary) - Environmental variables for this command
  - `diff` (string) - OPTIONAL - A file to compare the output of the command to
-   (either an absolute path or a path relative to the YAML file). **NOTE:** If
+   (either an absolute path or a path relative to the YAML file). **NOTE:** *If
    `diff` is set, then all output for the command is buffered until the command
    terminates! If the command requires input from the user, you will not be
-   able to enter it yourself, so you will need to use `input` (below).
+   able to enter it yourself.* (See `input` below.)
  - `input` (string) - OPTIONAL - Some input to use for stdin for the command.
-   **NOTE:** If `input` is set, you will not be able to provide program input
-   through the terminal!
+   **NOTE:** *If `input` is set, you will not be able to provide program input
+   through the terminal!* One alternative is to use input redirection in
+   `command` (depending on your shell).
 
 Collection of other commands:
 
@@ -176,12 +189,15 @@ grades:
 - name: Problem Solving
   points: 15
 
-- name: Attendance
+- name: Lab Attendance
   points: 5
 
+# This is a section that contains other grading items
 - name: Functionality
   deduct percent if late: 20
-  deductions:
+
+  # These deductions apply to this entire section
+  section deductions:
   - name: "Not enough test cases"
     minus: 5
   - name: "Not enough test cases"
@@ -190,24 +206,34 @@ grades:
     minus: 5
   - name: "Second test case failed"
     minus: 5
+
   grades:
-  - name: "Part 1: Class"
+  - name: "Part 1: Class Design"
     points: 20
+    # These point hints are used by the gradebook to try to assist you
     point hints:
     - name: "Missing constructor"
       value: -5
     - name: "Private state not properly encapsulated"
       value: -10
-  - name: "Part 2: Main Method"
-    points: 10
-    default points: 4
-    point hints:
-    - name: "[0] outputs 1.0"
-      value: 3
-    - name: "[1] is True"
-      value: 2
-    - name: "[2] is False"
-      value: 1
+
+  - name: "Part 2"
+    grades:
+    # Here we have another section of grading items
+    - name: "Main Method"
+      points: 10
+      default points: 4
+      # These point hints are positive to add to the default point value
+      point hints:
+      - name: "[0] outputs 1.0"
+        value: 3
+      - name: "[1] is True"
+        value: 2
+      - name: "[2] is False"
+        value: 1
+    - name: "Auxiliary Methods"
+      points: 15
+
   - name: Code Style
     points: 35
 

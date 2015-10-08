@@ -15,8 +15,6 @@ TODO
   page to allow users to go back to previous submissions. The drop-down list
   should include the score next to each name, and for submissions other than
   the latest one, a link to the log HTML page (/gradefast/log/<id>)
-- Store grades and shit as we go in a location spec'd in the YAML file (store
-  it using pickle)
 - Make separate shell script or something to parse the index.html from
   Desire2Learn platforms to add "pre-data" into the YAML file somehow (so we
   can take the comments they wrote when uploading, and also possibly whether
