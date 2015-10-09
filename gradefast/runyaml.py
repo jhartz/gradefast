@@ -7,6 +7,7 @@ Licensed under the MIT License. For more, see the LICENSE file.
 Author: Jake Hartz <jhartz@mail.rit.edu>
 """
 import os
+import sys
 import threading
 import webbrowser
 import time
@@ -14,7 +15,14 @@ import _thread
 import traceback
 import subprocess
 
-import yaml
+try:
+    import yaml
+except ImportError:
+    print("")
+    print("*** Couldn't find YAML package!")
+    print("    Please install 'PyYAML' and try again.")
+    print("")
+    sys.exit(1)
 
 from .grader import Grader
 from .gradebook import GradeBook

@@ -6,6 +6,7 @@ Licensed under the MIT License. For more, see the LICENSE file.
 
 Author: Jake Hartz <jhartz@mail.rit.edu>
 """
+import sys
 import os
 import platform
 import re
@@ -22,7 +23,14 @@ except ImportError:
     #except ImportError:
         readline = None
 
-from colorama import init, Fore, Back, Style
+try:
+    from colorama import init, Fore, Back, Style
+except ImportError:
+    print("")
+    print("*** Couldn't find Colorama package!")
+    print("    Please install 'colorama' and try again.")
+    print("")
+    sys.exit(1)
 
 
 def _cmd_exists(cmd):

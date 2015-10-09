@@ -6,6 +6,7 @@ Licensed under the MIT License. For more, see the LICENSE file.
 
 Author: Jake Hartz <jhartz@mail.rit.edu>
 """
+import sys
 import json
 import queue
 import logging
@@ -14,9 +15,20 @@ import io
 from collections import OrderedDict
 import traceback
 
-import mistune
-from flask import Flask, request, Response, render_template, abort, redirect,\
-    url_for
+try:
+    import mistune
+except ImportError:
+    mistune = None
+
+try:
+    from flask import Flask, request, Response, render_template, abort,\
+        redirect, url_for
+except ImportError:
+    print("")
+    print("*** Couldn't find Flask package!")
+    print("    Please install 'flask' and try again.")
+    print("")
+    sys.exit(1)
 
 
 FEEDBACK_HTML_TEMPLATES = {
@@ -627,15 +639,30 @@ class GradeBook:
         self._is_done = False
 
         # Set up Mistune (Markdown)
-        renderer = mistune.Renderer(hard_wrap=True)
-        markdown = mistune.Markdown(renderer=renderer)
+        if mistune is None:
+            print("")
+            print("*** Couldn't find flask package!")
+            print("    Please install Flask and try again.")
+            print("")
+            sys.exit(1)
+            print("")
+            print("*** Couldn't find mistune package!")
+            print("    Items will not be Markdown-parsed.")
+            print("")
 
-        def parse_md(*args, **kwargs):
-            text = markdown(*args, **kwargs).strip()
-            # Convert paragraphs to <br> tags
-            if text.startswith("<p>") and text.endswith("</p>"):
-                text = text[3:-4].replace("</p>\n<p>", "<br>")
-            return text
+            def parse_md(*args, **kwargs):
+                return args[0]
+        else:
+            markdown = mistune.Markdown(
+                renderer=mistune.Renderer(hard_wrap=True))
+
+            def parse_md(*args, **kwargs):
+                text = markdown(*args, **kwargs).strip()
+                # Convert paragraphs to <br> tags
+                if text.startswith("<p>") and text.endswith("</p>"):
+                    text = text[3:-4].replace("</p>\n<p>", "<br>")
+                return text
+
         self._md = parse_md
 
         app = Flask(__name__)
