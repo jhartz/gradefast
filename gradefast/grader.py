@@ -891,13 +891,20 @@ class CommandRunner:
             kwargs["stdin"] = subprocess.PIPE
 
         # Check whether we have a diff file to check
-        has_diff = "diff" in cmd and os.path.exists(os.path.join(
-                    self.config_directory, cmd["diff"]))
-        if has_diff:
+        diff_file = None
+        if "diff" in cmd:
+            diff_file = os.path.join(self.config_directory, cmd["diff"])
+            if not os.path.exists(diff_file):
+                self._io.error("Diff file not found: %s" % diff_file)
+                diff_file = None
+
+        if diff_file is not None:
             kwargs["stdout"] = subprocess.PIPE
             kwargs["stderr"] = subprocess.STDOUT
 
         # START THE COMMAND ALREADY
+        process = None
+        output = None
         try:
             process = subprocess.Popen(args, **kwargs)
             # The output will only be collected here if we have stdout set above
@@ -907,16 +914,19 @@ class CommandRunner:
             self._io.error("Process interrupted")
 
         # Check the return code
-        if process.returncode:
+        if not process:
+            self._io.print("")
+            self._io.error("Command did not complete successfully")
+            self._io.print("")
+        elif process.returncode:
             self._io.print("")
             self._io.error("Command had nonzero return code: %s" %
                            process.returncode)
             self._io.print("")
 
-        if has_diff:
+        if diff_file is not None and output is not None:
             # Run diff
-            with open(os.path.join(self.config_directory, cmd["diff"]),
-                      "r") as ref:
+            with open(diff_file, "r") as ref:
                 diff = difflib.ndiff(
                     [line for line in ref],
                     output.splitlines(keepends=True))
