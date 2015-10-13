@@ -136,10 +136,10 @@ def _run_grader(yaml_data, yaml_directory, *args, **kwargs):
         if "config" in yaml_data:
             # Check if they've provided a command to open a shell window
             if "terminal shell" in yaml_data["config"]:
-                terminal_shell = lambda path: subprocess.Popen([
+                terminal_shell = lambda path, env: subprocess.Popen([
                     path if arg is None else arg
                     for arg in yaml_data["config"]["terminal shell"]
-                ], cwd=path)
+                ], cwd=path, env=env)
             # Check if they've provided a command to execute a command
             if "command shell" in yaml_data["config"]:
                 command_shell = yaml_data["config"]["command shell"]

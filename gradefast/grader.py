@@ -39,32 +39,32 @@ def _cmd_exists(cmd):
                            stderr=subprocess.DEVNULL) == 0
 
 
-def _default_shell_unix(path):
-    """Default function to open a terminal in a Unix-like environment"""    
+def _default_shell_unix(path, env):
+    """Default function to open a terminal in a Unix-like environment"""
     if _cmd_exists("gnome-terminal"):
         # We have gnome-terminal
         subprocess.Popen([
             "gnome-terminal",
             "--working-directory=" + path
-        ])
+        ], env=env)
     elif _cmd_exists("xfce4-terminal"):
         # We have xfce4-terminal
         subprocess.Popen([
             "xfce4-terminal",
             "--default-working-directory=" + path
-        ])
+        ], env=env)
     elif _cmd_exists("xterm"):
         # We have xterm (WARNING: DANGEROUS if the path is malformed)
         subprocess.Popen([
             "xterm",
             "-e",
             "cd \"" + path + "\" && /bin/bash"
-        ])
+        ], env=env)
     else:
-        print("No shell found")
+        print("No terminal emulator found")
 
 
-def _default_shell_windows(path):
+def _default_shell_windows(path, env):
     """Default function to open a command prompt on Windows"""
     if path.find("\"") != -1:
         # Just get rid of parts with double-quotes
@@ -533,8 +533,10 @@ class Grader:
             commands. If not provided, the OS default is used. If provided,
             should contain at least one list item whose value is None; this
             will be replaced with the command.
-        :param open_shell: A function to open a shell in a certain directory
-            (passed as a string). If "None", then a platform default is used.
+        :param open_shell: A function to open a shell in a certain directory.
+            This function is passed 2 arguments: the working directory, and a
+            dictionary of environmental variables. If "None", then a platform
+            default is used.
         """
         if open_shell is None:
             if platform.system() == "Windows":
@@ -584,8 +586,9 @@ class CommandRunner:
         :param config_directory: The location for relative diff files
         :param shell_command: The command to run commands (see
             Grader::run_commands)
-        :param open_shell: A function to open a shell in a certain directory
-            (passed as a string).
+        :param open_shell: A function to open a shell in a certain directory.
+            This function is passed 2 arguments: the working directory, and a
+            dictionary of environmental variables.
         """
         self._io = io
         self.commands = commands
@@ -795,13 +798,29 @@ class CommandRunner:
         self._io.print_bright("    " + cmd["command"])
         self._io.print("")
 
+        # Set up the command environment dictionary
+        # (This is used for running the command, and if we open a shell)
+        # Start off with this process's environment
+        env = dict(os.environ)
+        # Add some specific environmental variables
+        env.update({
+            "SUBMISSION_DIRECTORY": submission.path,
+            "CURRENT_DIRECTORY": path,
+            "SUBMISSION_NAME": submission.name
+        })
+        # Add any environmental variables from parents of this command
+        env.update(environment)
+        # Add this command's specific environmental variables
+        if "environment" in cmd:
+            env.update(cmd["environment"])
+
         # Before starting, ask the user what they want to do
         while True:
             choice = self._io.prompt("What now?",
                                      ["o", "f", "m", "s", "ss", "?", ""])
             if choice == "o":
                 # Open a shell in the current folder
-                self.open_shell(path)
+                self.open_shell(path, env)
             elif choice == "f":
                 # Open the current folder
                 open_file(path)
@@ -830,7 +849,7 @@ class CommandRunner:
                 break
 
         # Alrighty, it's command-running time!
-        self._exec_command(cmd, submission, path, environment)
+        self._exec_command(cmd, submission, path, env)
 
         # All done with the command!
         # Ask user what they want to do
@@ -856,21 +875,10 @@ class CommandRunner:
             command
         :return:
         """
-        env = dict(os.environ)
-        # Set command environment
-        env.update({
-            "SUBMISSION_DIRECTORY": submission.path,
-            "CURRENT_DIRECTORY": path,
-            "SUBMISSION_NAME": submission.name
-        })
-        env.update(environment)
-        if "environment" in cmd:
-            env.update(cmd["environment"])
-
         # kwargs for subprocess.Popen
         kwargs = {
             "cwd": path,
-            "env": env,
+            "env": environment,
             "universal_newlines": True
         }
 
