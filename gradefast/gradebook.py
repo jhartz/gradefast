@@ -641,11 +641,6 @@ class GradeBook:
         # Set up Mistune (Markdown)
         if mistune is None:
             print("")
-            print("*** Couldn't find flask package!")
-            print("    Please install Flask and try again.")
-            print("")
-            sys.exit(1)
-            print("")
             print("*** Couldn't find mistune package!")
             print("    Items will not be Markdown-parsed.")
             print("")
