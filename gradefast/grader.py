@@ -910,7 +910,7 @@ class CommandRunner:
             # The output will only be collected here if we have stdout set above
             # (i.e. if we're planning on running it through diff)
             output, _ = process.communicate(input=cmd_input)
-        except KeyboardInterrupt:
+        except (InterruptedError, KeyboardInterrupt):
             self._io.error("Process interrupted")
 
         # Check the return code
