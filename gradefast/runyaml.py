@@ -198,28 +198,6 @@ def run(yaml_file, hostname, port):
         "on_end_of_submissions": lambda: gradebook.end_of_submissions()
     }
 
-    # If we're using git bash (MinGW) on Windows, wrap everything with
-    # an ugly `sed` call to make our colored output work
-    # TODO: Find a better solution
-    if "MSYSTEM" in os.environ and os.environ["MSYSTEM"] == "MINGW32" and \
-            "config" in yaml_data and "sed path" in yaml_data["config"] and \
-            os.path.exists(yaml_data["config"]["sed path"]):
-        def hackish_output_wrapper(*args, sep=" ", end="\n", file=None,
-                                   **kwargs):
-            # If file is set, then skip our hackery
-            if file is not None:
-                print(*args, sep=sep, end=end, file=file, **kwargs)
-            else:
-                p = subprocess.Popen(
-                    [
-                        yaml_data["config"]["sed path"],
-                        r's/(?<=\\e\\[)2;//g'
-                    ],
-                    stdin=subprocess.PIPE,
-                    universal_newlines=True)
-                p.communicate(input=sep.join(args) + end)
-        grader_kwargs["output_func"] = hackish_output_wrapper
-
     # Load up the Grader in its own thread
     grader_thread = threading.Thread(
         target=_run_grader,
