@@ -1,6 +1,6 @@
 # GradeFast
 
-Python program to grade a shitton of CS labs or something similar.
+Python program to grade lots of programming labs or similar projects.
 
 ## Dependencies
 
@@ -19,7 +19,8 @@ Additionally, these packages are required:
 
  - [pyreadline](https://pypi.python.org/pypi/pyreadline) - if you want
    autocomplete support but your system doesn't have GNU readline (e.g.
-   Windows and Mac OS X)
+   Windows and Mac OS X). Even with this module, readline support is still
+   rather buggy on non-GNU-like platforms.
 
 Also, use Python 3 (in case you, like me, still live in ye olden days of
 having `python` symlinked to Python 2)
@@ -34,17 +35,17 @@ or, for more detailed usage:
 
 ## But... how do I use this thing?
 
-Look in the `docs/` folder for the YAML spec. Use that to make your own YAML
-file representing the shit you want to grade.
+First, you must make a YAML file for whatever you want to grade that includes
+the structure of the grades and the commands to run on each submission.
+For more info, see the
+[YAML Format page][https://github.com/jhartz/gradefast/wiki/YAML-Format]
+on the GradeFast wiki.
 
 Want to delve deeper or use individual parts of GradeFast as part of your
 larger, superior project? Check out the individual `grader.py`, `gradebook.py`,
-and `runyaml.py` modules, and look in `__main__.py` to see how they're used.
-
-## I think your program is shitty
-
-Then help me improve it. I guarantee you, this isn't the most thought-out
-project.
+and `runyaml.py` modules. Also, look at the
+[other pages on the GradeFast wiki][https://github.com/jhartz/gradefast/wiki]
+for lots more information.
 
 ## License
 
