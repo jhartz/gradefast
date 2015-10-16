@@ -622,10 +622,12 @@ class GradeBook:
         """
         Create a WSGI app representing a grade book.
         
-        A grading structure is composed of a list of grading items. This is
-        detailed in the documentation for the YAML format.
+        A grade structure is a list of grade items and/or other grade
+        structures. For more, see the GradeFast wiki:
+        https://github.com/jhartz/gradefast/wiki/Grade-Structure
         
-        :param grade_structure: A list of grading items
+        :param grade_structure: A list of grade items and/or other grade
+            structures
         :param grade_name: A name for whatever we're grading
         """
         self._grade_name = grade_name or "grades"
