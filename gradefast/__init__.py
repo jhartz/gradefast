@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Package to grade a shitton of CS labs or something similar.
+Python program to grade lots of programming labs or similar projects.
 
 The class Grader controls the grading process.
 
 To use a YAML file as input, use the run function. The YAML file details the
-structure of the grading and the commands to run.
+structure of the grading and the commands to run. For more, see README.md.
 
 Licensed under the MIT License. For more, see the LICENSE file.
 
