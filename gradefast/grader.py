@@ -981,21 +981,27 @@ class CommandRunner:
 
         # Only continue if we need to diff the output
         if diff_reference is not None and output is not None:
+            # Nothing ain't anything without a reference
+            self._io.print_bright("- ", end="")
+            self._io.print_happy("Reference")
+            self._io.print_bright("+ ", end="")
+            self._io.print_sad("Output")
+            self._io.print_bright("  ", end="")
+            self._io.print_highlighted("Both")
+            self._io.print("-----------")
+            self._io.print("")
+
             # Split the output by lines
             output = output.splitlines()
 
-            # Try some hackery to ignore case
+            # Try some hackery to ignore case and clean up a bit
             reference_clean, reference_orig = CommandRunner._clean_lines(
                 diff_reference, diff_options["collapse whitespace"])
             output_clean, output_orig = CommandRunner._clean_lines(
                 output, diff_options["collapse whitespace"])
 
-            # Run the diff
-            diff = difflib.ndiff(reference_clean, output_clean)
-            self._io.print_happy("--- Reference")
-            self._io.print_sad("+++ Output")
-            self._io.print("")
-            for line in diff:
+            # Print that diff!
+            for line in difflib.ndiff(reference_clean, output_clean):
                 signal = line[0]
                 content = line[2:]
                 self._io.print_bright(line[0:2], end="")
