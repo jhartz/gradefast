@@ -328,6 +328,13 @@ class FancyIO:
             msg = Style.BRIGHT + msg + Style.NORMAL
         self._out(msg, *args, **kwargs)
 
+    def print_highlighted(self, msg, *args, **kwargs):
+        """Print a message with a blue background"""
+        if self._use_color:
+            msg = Style.BRIGHT + Fore.WHITE + Back.BLUE + msg + \
+                  Back.RESET + Fore.RESET + Style.NORMAL
+        self._out(msg, *args, **kwargs)
+
     def input(self, msg, completer=None):
         """Ask the user for input in cyan"""
         msg = msg.rstrip()
@@ -435,18 +442,19 @@ class Grader:
         The regular expression is used to limit which folders are picked up.
         Also, the first matched group in the regex is used as the name of the
         submission.
+
+        For more info on some of the parameters, see the YAML format
+        documentation on the GradeFast wiki:
+        https://github.com/jhartz/gradefast/wiki/YAML-Format
         
         :param submissions_directory: Path to the directory containing
             submissions
         :param folder_regex: Regular expression to use to match subfolders
-            (see the YAML format documentation for more info).
         :param check_zipfiles: Whether to check zipfiles in the directory to
-            see if any match folder_regex (see the YAML format documentation
-            for more information).
+            see if any match folder_regex
         :param check_files: Whether to check files in the directory to see if
             any with specific extensions match folder_regex. This is a LIST of
-            file extensions to check (see the YAML format documentation for
-            more information). Both [] and None skip this check.
+            file extensions to check. Both [] and None skip this check.
         """
         
         # Step 1: Make sure "submissions_directory" exists and is a directory
@@ -513,19 +521,18 @@ class Grader:
     def run_commands(self, commands, helper_directory=None, shell_command=None,
                      open_shell=None):
         """
-        Run some commands for each of our submissions. The command list is
-        detailed in the documentation for the YAML format.
+        Run some commands for each of our submissions. For details on what
+        should be in the list of commands, see the GradeFast wiki:
+        https://github.com/jhartz/gradefast/wiki/Command-Structure
         
-        Each command has certain environmental variables available to it. For
-        details, see the documentation for the YAML format.
-        
+        Each command has certain environmental variables available to it.
         By default (i.e. for top-level commands), the working directory is the
         folder at the root of the submission it's running in.
         
         Before and after each command is run, the user will be prompted as to
         what they want to do.
         
-        :param commands: The command list to run.
+        :param commands: The command list to run (see GradeFast wiki page).
         :param helper_directory: If specified, available to the client as an
             environmental variable and used as the default location for diff
             files.
@@ -576,14 +583,15 @@ class CommandRunner:
     """
     Class that actually handles running commands on a bunch of submissions.
     """
-    def __init__(self, io, commands, config_directory, shell_command,
-                 open_shell):
+    _command_modified_re = re.compile(r'^(.*)( \(modified ([0-9]+)\))$')
+
+    def __init__(self, io, commands, diff_directory, shell_command, open_shell):
         """
         Initialize a CommandRunner with a bunch of commands.
 
         :param io: A FancyIO instance used for input/output
         :param commands: The command list to run
-        :param config_directory: The location for relative diff files
+        :param diff_directory: The location for relative diff files
         :param shell_command: The command to run commands (see
             Grader::run_commands)
         :param open_shell: A function to open a shell in a certain directory.
@@ -592,21 +600,35 @@ class CommandRunner:
         """
         self._io = io
         self.commands = commands
-        self.config_directory = config_directory
+        self.diff_directory = diff_directory
         self.shell_command = shell_command
         self.open_shell = open_shell
 
     def get_modified_command(self, cmd):
         """
         Prompt the user for a modified version of a command.
+
+        :param cmd: The command to modify
+        :return: A copy of cmd with "name" and "command" changed
         """
         self._io.print("Existing command: " + cmd["command"])
         completer = InputCompleter([cmd["command"]])
-        return {
-            "name": cmd["name"] + " (modified)",
+        cmd = cmd.copy()
+
+        result = CommandRunner._command_modified_re.match(cmd["name"])
+        if result is None:
+            name = cmd["name"]
+            modified_num = 1
+        else:
+            name = result.group(1)
+            modified_num = int(result.group(3)) + 1
+
+        cmd.update({
+            "name": "%s (modified %s)" % (name, modified_num),
             "command": self._io.input("Enter new command (TAB to input old): ",
                                       completer.complete)
-        }
+        })
+        return cmd
 
     def find_path(self, working_dir, folder, base=""):
         """
@@ -715,10 +737,10 @@ class CommandRunner:
             commands
         :return: False if part of this submission was skipped
         """
-        return self._run_command_set(self.commands, submission, path,
-                                     environment)
+        return self._do_command_set(self.commands, submission, path,
+                                    environment)
 
-    def _run_command_set(self, commands, submission, path, environment):
+    def _do_command_set(self, commands, submission, path, environment):
         """
         Run some commands from a command set for a specific submission.
 
@@ -734,8 +756,8 @@ class CommandRunner:
                 # It's an actual command
                 if "name" in cmd and "command" in cmd:
                     # If False, then we want to skip the rest of this submission
-                    if not self._run_command(cmd, submission, path,
-                                             environment):
+                    if not self._do_command(cmd, submission, path,
+                                            environment):
                         return False
                     # Otherwise, just continue on to the next command
                     continue
@@ -773,15 +795,15 @@ class CommandRunner:
 
             # Run the command set
             # If False, then we want to skip the rest of this submission
-            if not self._run_command_set(cmd["commands"], submission, new_path,
-                                         new_environment):
+            if not self._do_command_set(cmd["commands"], submission, new_path,
+                                        new_environment):
                 return False
 
             if new_path_pretty is not None:
                 self._io.status("End commands for folder: " + new_path_pretty)
             self._io.print("")
     
-    def _run_command(self, cmd, submission, path, environment):
+    def _do_command(self, cmd, submission, path, environment):
         """
         Run an individual command.
         
@@ -849,7 +871,7 @@ class CommandRunner:
                 break
 
         # Alrighty, it's command-running time!
-        self._exec_command(cmd, submission, path, env)
+        self._run_command(cmd, path, env)
 
         # All done with the command!
         # Ask user what they want to do
@@ -859,21 +881,152 @@ class CommandRunner:
             self._io.print("")
             if choice == "y":
                 # Repeat the command
-                return self._run_command(cmd, submission, path, environment)
+                return self._do_command(cmd, submission, path, environment)
             else:
                 # Move on to the next command
                 return True
 
-    def _exec_command(self, cmd, submission, path, environment):
+    @staticmethod
+    def _clean_lines(lines, collapse_whitespace=False):
         """
-        Actually execute an individual command.
+        Clean up some lines of output to make diffing work better.
+        In particular, make an entirely-lowercase version and optionally
+        collapsing whitespace.
+
+        :param lines: The lines to clean up (list of str)
+        :return: A tuple with (list of str, dict) representing the list of
+            cleaned-up lines (each ending with a newline) and a dictionary
+            mapping each cleaned-up line to a list of the original line(s) that
+            it came from (none ending with a newline).
+        """
+        clean_to_orig = {}
+        clean_lines = []
+        for line in lines:
+            if collapse_whitespace:
+                line = re.sub(r'\s+', " ", line.strip())
+            else:
+                line = line.rstrip()
+
+            clean_line = line.lower() + "\n"
+            clean_lines.append(clean_line)
+
+            if clean_line not in clean_to_orig:
+                clean_to_orig[clean_line] = []
+            clean_to_orig[clean_line].append(line)
+        return clean_lines, clean_to_orig
+
+    def _run_command(self, cmd, path, environment):
+        """
+        Run an individual command, handling the output if necessary.
 
         :param cmd: The command to run
-        :param submission: The submission that we're running these commands on
         :param path: The working directory for the command
         :param environment: A dictionary of environmental variables for the
             command
-        :return:
+        """
+        # Filled with the text content to compare to, if any
+        diff_reference = None
+
+        # Default diff options
+        diff_options = {
+            "collapse whitespace": False
+        }
+
+        if "diff" in cmd:
+            # The location of a reference diff file, if we have one
+            diff_file = None
+            # The location of a reference diff command, if we have one
+            diff_command = None
+
+            # Check if we have the diff represented as a string or a dict
+            if isinstance(cmd["diff"], str):
+                # It's a string (so, just a file path)
+                diff_file = cmd["diff"]
+            else:
+                # It's a dict
+                if "command" in cmd["diff"] and cmd["diff"]["command"]:
+                    diff_command = cmd["diff"]["command"]
+                elif "file" in cmd["diff"] and cmd["diff"]["file"]:
+                    diff_file = cmd["diff"]["file"]
+                else:
+                    self._io.error("Diff options do not include either \""
+                                   "command\" or \"file\".")
+                # Initialize any other options
+                for key in diff_options.keys():
+                    if key in cmd["diff"]:
+                        diff_options[key] = cmd["diff"][key]
+
+            # If we have a reference file, load that
+            if diff_file is not None:
+                diff_file = os.path.join(self.diff_directory, diff_file)
+                if os.path.exists(diff_file):
+                    with open(diff_file, "r") as ref:
+                        diff_reference = [line for line in ref]
+                else:
+                    self._io.error("Diff file not found: %s" % diff_file)
+
+            # If we have a reference command, load that
+            if diff_command is not None:
+                self._io.print("Running command to get diff reference: %s" %
+                               diff_command)
+                diff_reference = self._exec_command(diff_command, path,
+                                                    environment,
+                                                    capture_output=True)
+
+        # RUN THE COMMAND ALREADY
+        output = self._exec_command(
+            cmd["command"], path, environment,
+            input=None if "input" not in cmd else cmd["input"],
+            capture_output=diff_reference is not None)
+
+        # Only continue if we need to diff the output
+        if diff_reference is not None and output is not None:
+            # Split the output by lines
+            output = output.splitlines()
+
+            # Try some hackery to ignore case
+            reference_clean, reference_orig = CommandRunner._clean_lines(
+                diff_reference, diff_options["collapse whitespace"])
+            output_clean, output_orig = CommandRunner._clean_lines(
+                output, diff_options["collapse whitespace"])
+
+            # Run the diff
+            diff = difflib.ndiff(reference_clean, output_clean)
+            self._io.print_happy("--- Reference")
+            self._io.print_sad("+++ Output")
+            self._io.print("")
+            for line in diff:
+                signal = line[0]
+                content = line[2:]
+                self._io.print_bright(line[0:2], end="")
+                if signal == "-":
+                    # Line from reference only
+                    self._io.print_happy(reference_orig[content].pop(0))
+                elif signal == "+":
+                    # Line from output only
+                    self._io.print_sad(output_orig[content].pop(0))
+                elif signal == "?":
+                    # Extra line (to mark locations, etc.)
+                    self._io.print_bright(content.rstrip("\n"))
+                else:
+                    # Line from both reference and output
+                    # Pop the reference side
+                    reference_orig[content].pop(0)
+                    # Pop and print the output side
+                    self._io.print_highlighted(output_orig[content].pop(0))
+
+    def _exec_command(self, command, path, environment, input=None,
+                      capture_output=False):
+        """
+        Actually execute an individual command.
+
+        :param command: The command to run
+        :param path: The working directory for the command
+        :param environment: A dictionary of environmental variables for the
+            command
+        :param input: Any input to use as stdin
+        :param capture_output: Whether to capture and return the output
+        :return: The output of the process if capture_output, otherwise None
         """
         # kwargs for subprocess.Popen
         kwargs = {
@@ -883,41 +1036,31 @@ class CommandRunner:
         }
 
         # args is the first argument for subprocess.Popen
-        args = cmd["command"]
+        args = command
         if self.shell_command is None:
             # Use platform shell
             kwargs["shell"] = True
         else:
             # Reformat args to use the provided shell command
-            args = [cmd["command"] if arg is None else arg
+            args = [command if arg is None else arg
                     for arg in self.shell_command]
 
         # Check if we have input to throw at stdin
-        cmd_input = None
-        if "input" in cmd:
-            cmd_input = cmd["input"]
+        if input is not None:
             kwargs["stdin"] = subprocess.PIPE
 
-        # Check whether we have a diff file to check
-        diff_file = None
-        if "diff" in cmd:
-            diff_file = os.path.join(self.config_directory, cmd["diff"])
-            if not os.path.exists(diff_file):
-                self._io.error("Diff file not found: %s" % diff_file)
-                diff_file = None
-
-        if diff_file is not None:
+        # Check if we should capture stdout and stderr
+        if capture_output:
             kwargs["stdout"] = subprocess.PIPE
             kwargs["stderr"] = subprocess.STDOUT
 
-        # START THE COMMAND ALREADY
         process = None
         output = None
         try:
             process = subprocess.Popen(args, **kwargs)
             # The output will only be collected here if we have stdout set above
-            # (i.e. if we're planning on running it through diff)
-            output, _ = process.communicate(input=cmd_input)
+            # (i.e. if we're planning on capturing the output)
+            output, _ = process.communicate(input=input)
         except (InterruptedError, KeyboardInterrupt):
             self._io.error("Process interrupted")
 
@@ -932,22 +1075,4 @@ class CommandRunner:
                            process.returncode)
             self._io.print("")
 
-        if diff_file is not None and output is not None:
-            # Run diff
-            with open(diff_file, "r") as ref:
-                diff = difflib.ndiff(
-                    [line for line in ref],
-                    output.splitlines(keepends=True))
-                self._io.print_happy("--- Reference")
-                self._io.print_sad("+++ Output")
-                self._io.print("")
-                for line in diff:
-                    line = line.rstrip("\n")
-                    if line[0] == "-":
-                        self._io.print_happy(line)
-                    elif line[0] == "+":
-                        self._io.print_sad(line)
-                    elif line[0] == "?":
-                        self._io.print_bright(line)
-                    else:
-                        self._io.print(line)
+        return output if capture_output else None
