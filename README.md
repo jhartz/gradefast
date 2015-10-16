@@ -38,13 +38,13 @@ or, for more detailed usage:
 First, you must make a YAML file for whatever you want to grade that includes
 the structure of the grades and the commands to run on each submission.
 For more info, see the
-[YAML Format page][https://github.com/jhartz/gradefast/wiki/YAML-Format]
+[YAML Format page](https://github.com/jhartz/gradefast/wiki/YAML-Format)
 on the GradeFast wiki.
 
 Want to delve deeper or use individual parts of GradeFast as part of your
 larger, superior project? Check out the individual `grader.py`, `gradebook.py`,
 and `runyaml.py` modules. Also, look at the
-[other pages on the GradeFast wiki][https://github.com/jhartz/gradefast/wiki]
+[other pages on the GradeFast wiki](https://github.com/jhartz/gradefast/wiki)
 for lots more information.
 
 ## License
