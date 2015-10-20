@@ -562,10 +562,13 @@ class Grader:
             self._io.status(msg)
             self._io.status("-" * len(msg))
             
-            if self._io.prompt(
-                    "Press Enter to begin, or 's' to skip",
-                    ["s", ""],
-                    show_choices=False) != "s":
+            whattodo = self._io.prompt(
+                "Press Enter to begin, 's' to skip, 'quit' to quit",
+                ["s", "quit", ""], show_choices=False)
+            if whattodo == "quit":
+                # Give up on the rest
+                break
+            if whattodo != "s":
                 self._on_submission_start(submission.name)
                 runner.run_on_submission(submission, submission.path, {
                     "HELPER_DIRECTORY": helper_directory
