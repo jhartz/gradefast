@@ -553,11 +553,12 @@ class Grader:
 
         runner = CommandRunner(self._io, commands, helper_directory,
                                shell_command, open_shell)
-        for submission in self._submissions:
+        total = len(self._submissions)
+        for index, submission in enumerate(self._submissions, start=1):
             # Reset the I/O log so it's good and fresh
             self._io.reset_log()
 
-            msg = "Starting " + submission.name
+            msg = "Starting %s (%s/%s)" % (submission.name, index, total)
             self._io.status("-" * len(msg))
             self._io.status(msg)
             self._io.status("-" * len(msg))

@@ -11,8 +11,14 @@
 
 <header>
     <h2 id="score_container" style="display: none;"><span>
-        <label>Current Score: </label><span id="current_score">0</span>&nbsp;/&nbsp;<span id="max_score">0</span> &emsp;
+        <label>Current Score: </label><span id="current_score">0</span>&nbsp;/&nbsp;<span id="max_score">0</span>
+        &emsp;
         <input id="late" type="checkbox" tabindex="1"><label for="late"> Late?</label>
+        &emsp;
+        <a href="/gradefast/grades.csv" title="Download Grades as CSV"
+           target="_blank"><img src="/static/csv.png"></a>
+        <a href="/gradefast/grades.json" title="Download Grades as JSON"
+           target="_blank"><img src="/static/json.png"></a>
     </span></h2>
     <h1 id="title">GradeFast</h1>
     <h1 id="name" style="display: none;"></h1>

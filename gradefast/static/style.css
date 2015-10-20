@@ -98,6 +98,12 @@ h1, h2 {
 
 header h2 {
     float: right;
+    cursor: default;
+}
+
+header h2 img {
+    max-height: 40px;
+    vertical-align: middle;
 }
 
 section h2 {

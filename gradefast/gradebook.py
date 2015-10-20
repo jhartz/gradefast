@@ -980,6 +980,8 @@ class GradeBook:
             grade_details = OrderedDict()
             grade_details["name"] = grade.name
             grade_details["score"] = points_earned
+            grade_details["possible_score"] = points_possible
+            grade_details["percentage"] = points_earned / points_possible
             grade_details["feedback"] = grade.get_feedback()
             for item_name, item_points in individual_points:
                 grade_details[item_name] = item_points
@@ -995,7 +997,7 @@ class GradeBook:
 
         # Make the header row
         point_titles = SubmissionGrade.get_point_titles(self._grade_structure)
-        row_titles = ["Name", "Total Score", "Feedback", ""] + \
+        row_titles = ["Name", "Total Score", "Percentage", "Feedback", ""] + \
                      ["(%s) %s" % (pts, title) for title, pts in point_titles]
         csv_writer.writerow(row_titles)
 
@@ -1004,6 +1006,7 @@ class GradeBook:
             csv_writer.writerow([
                 grade["name"],
                 grade["score"],
+                grade["percentage"],
                 grade["feedback"],
                 ""
             ] + ["" if title not in grade else grade[title]
