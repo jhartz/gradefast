@@ -518,8 +518,8 @@ class Grader:
         # Sort the submissions by name
         self._submissions.sort(key=lambda s: s.name)
 
-    def run_commands(self, commands, helper_directory=None, shell_command=None,
-                     open_shell=None):
+    def run_commands(self, commands, support_directory=None,
+                     shell_command=None, open_shell=None):
         """
         Run some commands for each of our submissions. For details on what
         should be in the list of commands, see the GradeFast wiki:
@@ -533,7 +533,7 @@ class Grader:
         what they want to do.
         
         :param commands: The command list to run (see GradeFast wiki page).
-        :param helper_directory: If specified, available to the client as an
+        :param support_directory: If specified, available to the client as an
             environmental variable and used as the default location for diff
             files.
         :param shell_command: A list representing a shell used to execute the
@@ -545,9 +545,9 @@ class Grader:
             dictionary of environmental variables. If "None", then a platform
             default is used.
         """
-        # Make sure helper_directory is absolute, if provided
-        if helper_directory is not None:
-            helper_directory = os.path.abspath(helper_directory)
+        # Make sure support_directory is absolute, if provided
+        if support_directory is not None:
+            support_directory = os.path.abspath(support_directory)
 
         # Set up open_shell, if needed
         if open_shell is None:
@@ -557,7 +557,7 @@ class Grader:
                 open_shell = _default_shell_unix
 
         # Create the CommandRunner to run this command set
-        runner = CommandRunner(self._io, commands, helper_directory,
+        runner = CommandRunner(self._io, commands, support_directory,
                                shell_command, open_shell)
 
         # Run the commands on each submission
@@ -580,7 +580,8 @@ class Grader:
             if whattodo != "s":
                 self._on_submission_start(submission.name)
                 runner.run_on_submission(submission, submission.path, {
-                    "HELPER_DIRECTORY": helper_directory
+                    "SUPPORT_DIRECTORY": support_directory,
+                    "HELPER_DIRECTORY": support_directory
                 })
                 # All done! Send the HTML log back up the chain
                 self._on_submission_end(self._io.get_log_as_html())
