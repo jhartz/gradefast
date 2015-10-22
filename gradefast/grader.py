@@ -545,14 +545,22 @@ class Grader:
             dictionary of environmental variables. If "None", then a platform
             default is used.
         """
+        # Make sure helper_directory is absolute, if provided
+        if helper_directory is not None:
+            helper_directory = os.path.abspath(helper_directory)
+
+        # Set up open_shell, if needed
         if open_shell is None:
             if platform.system() == "Windows":
                 open_shell = _default_shell_windows
             else:
                 open_shell = _default_shell_unix
 
+        # Create the CommandRunner to run this command set
         runner = CommandRunner(self._io, commands, helper_directory,
                                shell_command, open_shell)
+
+        # Run the commands on each submission
         total = len(self._submissions)
         for index, submission in enumerate(self._submissions, start=1):
             # Reset the I/O log so it's good and fresh
@@ -842,8 +850,12 @@ class CommandRunner:
 
         # Before starting, ask the user what they want to do
         while True:
-            choice = self._io.prompt("What now?",
-                                     ["o", "f", "m", "s", "ss", "?", ""])
+            try:
+                choice = self._io.prompt("What now?",
+                                         ["o", "f", "m", "s", "ss", "?", ""])
+            except KeyboardInterrupt:
+                # Act as though they want to skip the rest of this submission
+                return False
             if choice == "o":
                 # Open a shell in the current folder
                 self.open_shell(path, env)
