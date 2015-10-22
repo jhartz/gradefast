@@ -31,21 +31,15 @@ from .gradebook import GradeBook
 def print_bordered_message(*msgs):
     """
     Print a message surrounded by a border.
-
     :param msgs: The messages to print.
     """
-    longest = 0
-    for msg in msgs:
-        if len(msg) > longest:
-            longest = len(msg)
-    msgs = ["**  %s%s  **" % (msg, " " * (longest - len(msg))) for msg in msgs]
-    longest += 8
-    print("")
-    print("*" * longest)
+    longest = max((len(msg) for msg in msgs), default=0)
+    msgs = [("**  %-*s  **") % (longest, msg) for msg in msgs]
+    width = longest + 8
+    print("\n" + "*" * width)
     for msg in msgs:
         print(msg)
-    print("*" * longest)
-    print("")
+    print("*" * width + "\n")
 
 
 class SaveFile:
