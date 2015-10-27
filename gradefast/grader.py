@@ -256,14 +256,17 @@ class FancyIO:
             # Do background
             for name, code in Back.__dict__.items():
                 if name == "RESET":
-                    html = html.replace(code, "</i>")
+                    html = html.replace(code, "</span>")
                 else:
                     html = html.replace(
                         code,
-                        "<i style='background-color: %s;'>" % name)
+                        "<span style='background-color: %s;'>" % name)
             # Do style (i.e. bold)
-            html = html.replace(Style.BRIGHT, "<b>")
-            html = html.replace(Style.NORMAL, "</b>")
+            # Haha jk, we don't really need that
+            #html = html.replace(Style.BRIGHT, "<b>")
+            html = html.replace(Style.BRIGHT, "")
+            #html = html.replace(Style.NORMAL, "</b>")
+            html = html.replace(Style.NORMAL, "")
 
         # Finally, return what we got
         return html
