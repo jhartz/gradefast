@@ -171,7 +171,7 @@ def run(yaml_file, hostname, port):
     # Try to load the YAML file
     yaml_data = None
     try:
-        with open(yaml_file) as f:
+        with open(yaml_file, encoding="utf-8") as f:
             yaml_data = yaml.load(f)
     except FileNotFoundError:
         print("YAML file not found: %s" % yaml_file)
