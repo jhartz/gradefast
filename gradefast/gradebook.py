@@ -658,6 +658,10 @@ class GradeBook:
                 # Convert paragraphs to <br> tags
                 if text.startswith("<p>") and text.endswith("</p>"):
                     text = text[3:-4].replace("</p>\n<p>", "<br>")
+                # Stylize code tags
+                text = text.replace(
+                    '<code>', '<code style="background-color: rgba(0, 0, 0, '
+                              '0.04); padding: 1px 3px; border-radius: 5px;">')
                 return text
 
         self._md = parse_md
@@ -981,7 +985,7 @@ class GradeBook:
             grade_details["name"] = grade.name
             grade_details["score"] = points_earned
             grade_details["possible_score"] = points_possible
-            grade_details["percentage"] = points_earned / points_possible
+            grade_details["percentage"] = 100 * points_earned / points_possible
             grade_details["feedback"] = grade.get_feedback()
             for item_name, item_points in individual_points:
                 grade_details[item_name] = item_points
