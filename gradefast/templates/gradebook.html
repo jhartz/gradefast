@@ -57,6 +57,10 @@ var gradeStructure = {{ gradeStructure|safe }};
 var isDone = {{ isDone|safe }};
 var currentSubmissionID = {{ currentSubmissionID|safe }};
 
+// Whether to make sure when enabling or disabling point hints that
+// applying the point hint doesn't make us go out of the grade item's range
+var checkPointHintRange = {{ checkPointHintRange|safe }};
+
 // usually /gradefast/
 var base = location.pathname.substring(0, location.pathname.indexOf("gradebook"));
 var docTitle = document.title;

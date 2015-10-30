@@ -50,12 +50,20 @@ function createGradeStructure(table, grades, depth, path) {
         if (grade.grades) {
             // We have sub-grades
             // First, put in the title and grader notes
-            var $titleRow = $("<tr />").addClass("topborder");
-            // (This title row uses its parent's path due to reasons)
-            if (path) $titleRow.addClass("has-path").attr("data-path", path);
+            var $titleRow = $("<tr />").addClass("topborder highlight");
+            if (path) {
+                // This title row uses its parent's path so that the title
+                // itself isn't hidden if this section is disabled
+                $titleRow.addClass("has-path").attr("data-path", path);
+                /*
+                // But for other ID'ing, we'll specify the "real" path too
+                // (allows us to blacken it out)
+                $titleRow.attr("data-path-absolut", currentPath);
+                */
+            }
             if (grade.note || grade.notes) {
                 $titleRow.append($("<td />").append($title));
-                $titleRow.append($("<td />").append($("<em />").text(grade.note || grade.notes)));
+                $titleRow.append($("<td />").append(renderNotes(grade.note || grade.notes)));
             } else {
                 $titleRow.append($("<td />").attr("colspan", "2").append($title));
             }
@@ -63,7 +71,7 @@ function createGradeStructure(table, grades, depth, path) {
 
             // Next, put in the section deductions table
             $(table).append(
-                $("<tr />").addClass("has-path").attr("data-path", currentPath).append(
+                $("<tr />").addClass("has-path highlight").attr("data-path", currentPath).append(
                     $("<td />").attr("colspan", "2")
                                .css("padding-left", (depth * 20) + "px")
                                .append(
@@ -89,23 +97,35 @@ function createGradeStructure(table, grades, depth, path) {
                 "data-default": defaultCommentValue,
                 "data-path": currentPath
             });
-            $textarea.addClass("comments-input").addClass("has-path");
+            $textarea.addClass("comments-input").addClass("has-path").addClass("autoresize-textarea");
             $textarea.change(function () {
                 post("comments", {
                     path: this.id,
                     value: this.value
                 });
+            }).on("input", function () {
+                // Auto-resize this textarea if necessary
+                var $this = $(this);
+                checkTextareaResize($this, $this.closest(".autoresize-textarea-parent"));
             });
             if (grade["default comments"]) {
                 $textarea.val("" + grade["default comments"]);
             }
 
-            // Alrighty, let's add the title+notes+comments row
-            $col = $("<td />").attr("rowspan", "2");
+            // Alrighty, let's add the title+notes+comments row (inner smalltable)
+            var $innerTbody = $("<tbody />");
             if (grade.note || grade.notes) {
-                $col.append($("<em />").text(grade.note || grade.notes));
+                $innerTbody.append($("<tr />").append($("<td />").append(
+                    renderNotes(grade.note || grade.notes))));
+            } else {
+                $innerTbody.append($("<tr />").append($("<td />")));
             }
-            $col.append($textarea);
+            $innerTbody.append($("<tr />").append(
+                $("<td />").addClass("bigboyheftymama").append($textarea)));
+
+            $col = $("<td />").attr("rowspan", "2").addClass("autoresize-textarea-parent");
+            $col.append($("<table />").addClass("smalltable").append($innerTbody));
+            // $col is appended in below after the title
 
             $row = $("<tr />");
             // (This title row uses its parent's path due to reasons)
@@ -154,7 +174,7 @@ function createGradeStructure(table, grades, depth, path) {
             $pointsContainer.append(makeCheckboxTable(grade["point hints"], "point_hint", currentPath, $input));
 
             // Make a column to hold the container
-            $col = $("<td />");
+            $col = $("<td />").addClass("bigboyheftymama");
             $col.css("padding-left", (depth * 20) + "px");
             $col.append($pointsContainer);
 
@@ -167,6 +187,52 @@ function createGradeStructure(table, grades, depth, path) {
             $(table).append($row);
         }
     });
+}
+
+/**
+ * Render some grader notes.
+ * @param {string} notes - The newline-separated grader notes.
+ * @return {Element} The element containing the notes.
+ */
+function renderNotes(notes) {
+    var $notes = $("<div />");
+    $.each(notes.split("\n"), function (index, note) {
+        if (index) $notes.append($("<br />"));
+        $notes.append($("<em />").text(note));
+    });
+    return $notes;
+}
+
+/**
+ * Make a textarea be big enough to see all its contents at once, or big enough
+ * to fill its parent, or be its minimum height, whichever is greatest.
+ * @param $textarea - The jQuery object representing the testarea.
+ * @param $parent - The jQuery object representing the resizable parent.
+ */
+function checkTextareaResize($textarea, $parent) {
+    // First, make sure it's not hidden
+    if ($textarea.is(":hidden")) return;
+
+    // Reset the height to its default and collect some base info
+    $textarea.css("height", "auto");
+    var origHeight = $textarea[0].scrollHeight + 3;
+    var origParentHeight = $parent[0].scrollHeight;
+
+    var currentHeight = origHeight;
+    if (origHeight < origParentHeight) {
+        // Increase this guy's height until its parent feels the bulge, or
+        // until we hit a sane max (5x the original)
+        while ($parent[0].scrollHeight <= origParentHeight &&
+                currentHeight < origHeight * 5) {
+            currentHeight += 2;
+            $textarea.css("height", currentHeight + "px");
+        }
+        if (currentHeight == origHeight * 3) {
+            console.log("HEIGHT WAS ALMOST TOO BIG: ", $textarea[0]);
+        }
+        currentHeight -= 2;
+    }
+    $textarea.css("height", currentHeight + "px");
 }
 
 /**
@@ -217,12 +283,19 @@ function makeCheckboxTable(items, type, currentPath, $input) {
                         delta -= dValue.value;
                     }
 
-                    if (delta < 0) {
-                        // Subtract points
-                        $input.val("" + Math.max(oldVal + delta, 0));
+                    if (!checkPointHintRange) {
+                        // Just apply the point hint, no matter what
+                        $input.val("" + (oldVal + delta));
                     } else {
-                        // Add points
-                        $input.val("" + Math.min(oldVal + delta, defaultVal));
+                        // Make sure that applying the point hint doesn't go
+                        // out of range
+                        if (delta < 0) {
+                            // Subtract points
+                            $input.val("" + Math.max(oldVal + delta, 0));
+                        } else {
+                            // Add points
+                            $input.val("" + Math.min(oldVal + delta, defaultVal));
+                        }
                     }
                     $input.change();
                 }

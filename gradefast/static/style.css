@@ -143,9 +143,27 @@ td {
     vertical-align: top;
 }
 
+tr.highlight > td {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+/* Used to hold title/notes (first row) + comments textarea (2nd row) */
+table.smalltable {
+    width: 100%;
+    height: 100%;
+}
+
+td.bigboyheftymama {
+    height: 100%;
+}
+
 textarea {
     width: 100%;
-    height: 120px;
+    /* height: 120px; */
+}
+
+td > textarea {
+    /* height: 100%; */
 }
 
 .points-input {

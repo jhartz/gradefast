@@ -79,6 +79,7 @@ function startSubmission(id, name, currentScore, maxScore, is_late, overallComme
             shownPaths.push($(this).attr("data-path-start"));
         }
     });
+
     $(".has-path").each(function () {
         if (shownPaths.indexOf($(this).attr("data-path")) != -1) {
             // It should be shown
@@ -92,10 +93,15 @@ function startSubmission(id, name, currentScore, maxScore, is_late, overallComme
     // Show the grading interface (if necessary)
     section();
 
-    if (isDifferent) {
-        // Scroll to the top of the grading interface
-        setTimeout(function () {
-            $("#main")[0].scrollTop = 0;
-        }, 1);
-    }
+    // Resize textareas if necessary
+    setTimeout(function () {
+        $(".autoresize-textarea").trigger("input");
+
+        if (isDifferent) {
+            // Scroll to the top of the grading interface
+            setTimeout(function () {
+                $("#main")[0].scrollTop = 0;
+            }, 1);
+        }
+    }, 1);
 }
