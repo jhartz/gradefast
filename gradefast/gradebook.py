@@ -39,7 +39,7 @@ FEEDBACK_HTML_TEMPLATES = {
 
     # (points added/deducted, reason); used by "item" and "section"
     "credit": """<div style="text-indent: -20px; margin-left: 20px;">"""
-              """<b>%s:</b> <i>%s</i></div>""",
+              """<b>%+d:</b> <i>%s</i></div>""",
 
     # (title, points earned, total points)
     "section_header_top": "<p><b><u>%s</u></b><br>Section Score: %s / %s</p>",
@@ -50,9 +50,13 @@ FEEDBACK_HTML_TEMPLATES = {
     # (content)
     "section_body": """<div style="margin-left: 15px;">%s</div>""",
 
-    # (title, points earned, total points)
-    "item_header_top": """<p><b><u>%s</u></b><br>Score: %s / %s</p>""",
-    "item_header": """<p><u>%s</u><br>Score: %s / %s</p>""",
+    # (title, score)
+    "item_header_top": """<p><b><u>%s</u></b><br>%s</p>""",
+    "item_header": """<p><u>%s</u><br>%s</p>""",
+    # (points earned, total points)
+    "item_score": """Score: %s / %s""",
+    # (points)
+    "item_score_bonus": """%+d Points""",
     # (content)
     "item_body": """<p>%s</p>"""
 }
@@ -550,7 +554,7 @@ class SubmissionGrade:
                         points_earned -= section_deduction["minus"]
                         # Add some feedback about it
                         deduction_feedback += FEEDBACK_HTML_TEMPLATES[
-                            "credit"] % ("-" + str(section_deduction["minus"]),
+                            "credit"] % (-1 * section_deduction["minus"],
                                          self._md(section_deduction["name"]))
 
                 # Check if it was late and, if so, add that deduction
@@ -585,11 +589,22 @@ class SubmissionGrade:
                 points_earned = SubmissionGrade.get_points_earned(structure,
                                                                   data)
 
+                # Bolded header only if depth 2 or less
                 header_name = "item_header"
                 if depth < 2: header_name += "_top"
+                # We skip the score if it's 0 out of 0
+                score = ""
+                if points_earned and not structure["points"]:
+                    # No total points, but still points earned
+                    score = FEEDBACK_HTML_TEMPLATES["item_score_bonus"] % \
+                        points_earned
+                elif structure["points"]:
+                    # We have total points, and possibly points earned
+                    score = FEEDBACK_HTML_TEMPLATES["item_score"] % \
+                            (points_earned, structure["points"])
+                # Generate dat feedback
                 feedback += FEEDBACK_HTML_TEMPLATES[header_name] % \
-                    (self._md(structure["name"]), points_earned,
-                     structure["points"])
+                    (self._md(structure["name"]), score)
 
                 # Add point hints, if applicable
                 for i, item, is_set in SubmissionGrade.enumerate_boolean_list(
