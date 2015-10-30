@@ -349,7 +349,8 @@ class FancyIO:
         if readline is not None: readline.set_completer(None)
         return result
 
-    def prompt(self, prompt, choices, default_choice=None, show_choices=True):
+    def prompt(self, prompt, choices, default_choice=None, show_choices=True,
+               hidden_choices=None):
         """
         Ask the user a question, returning their choice.
 
@@ -358,28 +359,32 @@ class FancyIO:
         :param default_choice: The default choice from choices (only used if
             "" is not in choices)
         :param show_choices: Whether to add the list of choices
+        :param hidden_choices: If show_choices==True, this can be a list of
+            choices to hide from the user at the prompt
         :return: An element of choices chosen by the user (lowercase)
         """
         our_choices = []
-        user_choices = "("
+        user_choices = ""
         has_enter_key = False
 
         for choice in choices:
             if choice == "":
                 has_enter_key = True
             else:
-                user_choices += choice + "/"
                 our_choices.append(choice.lower())
+                if hidden_choices is None or choice not in hidden_choices:
+                    user_choices += choice + "/"
 
         if has_enter_key:
+            # We add in this choice last
             user_choices += "Enter"
         else:
+            # Strip trailing slash
             user_choices = user_choices[:-1]
-        user_choices += ")"
 
         msg = prompt
         if show_choices:
-            msg += " " + user_choices
+            msg += " (%s)" % user_choices
         msg += ": "
 
         while True:
@@ -576,7 +581,7 @@ class Grader:
             
             whattodo = self._io.prompt(
                 "Press Enter to begin, 's' to skip, 'quit' to quit",
-                ["s", "quit", ""], show_choices=False)
+                ["", "s", "quit"], show_choices=False)
             if whattodo == "quit":
                 # Give up on the rest
                 break
