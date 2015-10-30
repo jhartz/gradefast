@@ -700,7 +700,9 @@ class GradeBook:
                 "gradebook.html",
                 gradeStructure=json.dumps(self._grade_structure),
                 isDone=json.dumps(self._is_done),
-                currentSubmissionID=current_submission_id_json)
+                currentSubmissionID=current_submission_id_json,
+                # TODO: implement (from YAML file)
+                checkPointHintRange=json.dumps(False))
 
         # Log page
         @app.route("/gradefast/log/<grade_id>")
@@ -854,7 +856,8 @@ class GradeBook:
         max_score = 0
 
         for grade in st:
-            if not isinstance(grade["name"], str) or not grade["name"]:
+            if "name" not in grade or not isinstance(grade["name"], str) or \
+                    not grade["name"]:
                 raise BadStructureException("Grade item missing a name")
             if "grades" in grade:
                 if "section deductions" in grade:
