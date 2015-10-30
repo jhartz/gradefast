@@ -1092,6 +1092,8 @@ class CommandRunner:
             # The output will only be collected here if we have stdout set above
             # (i.e. if we're planning on capturing the output)
             output, _ = process.communicate(input=input)
+        except (NotADirectoryError, FileNotFoundError) as ex:
+            self._io.error("Directory or file not found: " + ex)
         except (InterruptedError, KeyboardInterrupt):
             self._io.error("Process interrupted")
 
