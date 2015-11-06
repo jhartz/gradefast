@@ -823,6 +823,9 @@ class CommandRunner:
             if new_path_pretty is not None:
                 self._io.status("End commands for folder: " + new_path_pretty)
             self._io.print("")
+
+        # All done!
+        return True
     
     def _do_command(self, cmd, submission, path, environment):
         """
