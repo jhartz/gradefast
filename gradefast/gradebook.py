@@ -1003,7 +1003,8 @@ class GradeBook:
             grade_details["name"] = grade.name
             grade_details["score"] = points_earned
             grade_details["possible_score"] = points_possible
-            grade_details["percentage"] = 100 * points_earned / points_possible
+            grade_details["percentage"] = 0 if points_possible == 0 else \
+                100 * points_earned / points_possible
             grade_details["feedback"] = grade.get_feedback()
             for item_name, item_points in individual_points:
                 grade_details[item_name] = item_points
