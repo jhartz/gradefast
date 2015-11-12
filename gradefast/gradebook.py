@@ -1060,7 +1060,8 @@ class GradeBook:
         server_log.setLevel(log_level)
         # Start the server
         kwargs = {
-            "threaded": True
+            "threaded": True,
+            "use_reloader": False
         }
         if debug:
             kwargs["debug"] = True

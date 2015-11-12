@@ -11,7 +11,6 @@ import sys
 import threading
 import webbrowser
 import time
-import _thread
 import traceback
 import subprocess
 
@@ -34,7 +33,7 @@ def print_bordered_message(*msgs):
     :param msgs: The messages to print.
     """
     longest = max((len(msg) for msg in msgs), default=0)
-    msgs = [("**  %-*s  **") % (longest, msg) for msg in msgs]
+    msgs = ["**  %-*s  **" % (longest, msg) for msg in msgs]
     width = longest + 8
     print("\n" + "*" * width)
     for msg in msgs:
@@ -42,77 +41,33 @@ def print_bordered_message(*msgs):
     print("*" * width + "\n")
 
 
-class SaveFile:
-    def __init__(self, path, overwrite=False):
-        """
-        Initialize a new Save File.
-
-        :param path: The path to the save file.
-        :param overwrite: Whether to overwrite anything that already exists at
-            `path`. If this is false, then we will attempt to use the contents
-            of the existing file (if it exists) to "pick up" where we last left
-            off.
-        """
-        self.path = path
-        self.overwrite = overwrite
-
-    def save_submission_grade(self, grade_id, grade):
-        """
-        Save a SubmissionGrade.
-
-        :param grade_id: The ID (or index) of the SubmissionGrade.
-        :param grade: The SubmissionGrade object.
-        """
-        pass
-
-    def save_submission_list(self, submissions):
-        """
-        Save a list of Submissions.
-
-        :param submissions: The list of submissions to save.
-        """
-        pass
-
-
-def _start_thread(grader_thread, url):
-    """
-    Prompt the user for whether they want to open the gradebook in their web
-    browser, then start the grader thread.
-
-    This is a helper function for `run'; it's separate because it is run in a
-    separate thread.
-
-    :param grader_thread: The grader thread to start
-    :param url: The URL to the grade book
-    """
-    # First, sleep for a bit to give some time for the web server to print shit
-    time.sleep(0.5)
-
-    # Give the user the grade book URL
-    print_bordered_message("Grade Book URL: %s" % url)
-
-    if input("Open in browser (y/N)? ").strip().lower() == "y":
-        webbrowser.open_new(url)
-    print("")
-
-    # Start the Grader thread
-    grader_thread.start()
-
-
-def _run_grader(yaml_data, yaml_directory, *args, **kwargs):
+def _run_grader(yaml_data, yaml_directory, gradebook, gradebook_url,
+                *args, **kwargs):
     """
     Load the Grader and start it. "args" and "kwargs" are passed directly on to
     Grader.
 
-    This is a helper function for `run'; it's separate because it is run in a
-    separate thread.
+    This is a helper function for `run'.
 
     :param yaml_data: The parsed data from the YAML file (assumed to be valid)
     :param yaml_directory: The directory where the YAML file lives (to get any
         paths that are relative to it)
+    :param gradebook: The Gradebook instance (that holds the web server)
+    :param gradebook_url: The URL to the Gradebook server
     """
+    # First, sleep for a bit to give some time for the web server to start up
+    time.sleep(0.5)
+
+    # Give the user the grade book URL
+    print_bordered_message("Grade Book URL: %s" % gradebook_url)
+
+    if input("Open in browser (y/N)? ").strip().lower() == "y":
+        webbrowser.open_new(gradebook_url)
+    print("")
+
+    # Wrap the rest in a `try` so that exceptions in the Grader don't kill
+    # everything (i.e. the server will still be running)
     try:
-        print("")
         grader = Grader(*args, **kwargs)
         for submission in yaml_data["submissions"]:
             grader.add_submissions(
@@ -144,6 +99,7 @@ def _run_grader(yaml_data, yaml_directory, *args, **kwargs):
         grader.run_commands(yaml_data["commands"], yaml_directory,
                             command_shell, terminal_shell)
     except:
+        print("")
         print_bordered_message("ERROR RUNNING GRADER")
         traceback.print_exc()
     finally:
@@ -154,9 +110,11 @@ def _run_grader(yaml_data, yaml_directory, *args, **kwargs):
             "Once you exit the server, the gradebook is lost.")
         print("")
         input("Press Enter to exit server... ")
+
+        # Things we tried before we realized Thread(daemon=True)
         #sys.exit()
-        _thread.interrupt_main()
-        os._exit(0)
+        #_thread.interrupt_main()
+        #os._exit(0)
 
 
 def run(yaml_file, hostname, port):
@@ -187,6 +145,7 @@ def run(yaml_file, hostname, port):
     # Create grade book WSGI app
     gradebook = GradeBook(yaml_data["grades"],
                           os.path.splitext(os.path.basename(yaml_file))[0])
+    gradebook_url = "http://%s:%s/gradefast/gradebook" % (hostname, port)
 
     # These keyword arguments will be used for the Grader constructor
     grader_kwargs = {
@@ -195,27 +154,16 @@ def run(yaml_file, hostname, port):
         "on_end_of_submissions": lambda: gradebook.end_of_submissions()
     }
 
-    # Load up the Grader in its own thread
-    grader_thread = threading.Thread(
-        target=_run_grader,
-        # The args are (yaml data, yaml file location)
-        args=(yaml_data, os.path.dirname(yaml_file)),
-        # The kwargs are passed right on to Grader
-        kwargs=grader_kwargs
+    # Start the main Gradebook server
+    gradebook_thread = threading.Thread(
+        target=lambda: gradebook.run(hostname, port, debug=True),
+        daemon=True
     )
+    gradebook_thread.start()
 
-    # Start a different thread that will start the Grader thread
-    threading.Thread(
-        target=_start_thread,
-        kwargs={
-            "grader_thread": grader_thread,
-            "url": "http://%s:%s/gradefast/gradebook" % (hostname, port)
-        }
-    ).start()
-
-    # Start the main gradebook server
-    gradebook.run(hostname, port, debug=True)
+    # Run the Grader CLI interface
+    _run_grader(yaml_data, os.path.dirname(yaml_file), gradebook, gradebook_url,
+                **grader_kwargs)
 
     # All good!
     return True
-

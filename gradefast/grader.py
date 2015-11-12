@@ -579,13 +579,13 @@ class Grader:
             self._io.status(msg)
             self._io.status("-" * len(msg))
             
-            whattodo = self._io.prompt(
+            what_to_do = self._io.prompt(
                 "Press Enter to begin, 's' to skip, 'quit' to quit",
                 ["", "s", "quit"], show_choices=False)
-            if whattodo == "quit":
+            if what_to_do == "quit":
                 # Give up on the rest
                 break
-            if whattodo != "s":
+            if what_to_do != "s":
                 self._on_submission_start(submission.name)
                 runner.run_on_submission(submission, submission.path, {
                     "SUPPORT_DIRECTORY": support_directory,
@@ -758,8 +758,13 @@ class CommandRunner:
             commands
         :return: False if part of this submission was skipped
         """
-        return self._do_command_set(self.commands, submission, path,
-                                    environment)
+        try:
+            return self._do_command_set(self.commands, submission, path,
+                                        environment)
+        except (InterruptedError, KeyboardInterrupt):
+            self._io.print("")
+            self._io.error("Submission interrupted")
+            self._io.print("")
 
     def _do_command_set(self, commands, submission, path, environment):
         """
@@ -862,12 +867,8 @@ class CommandRunner:
 
         # Before starting, ask the user what they want to do
         while True:
-            try:
-                choice = self._io.prompt("What now?",
-                                         ["o", "f", "m", "s", "ss", "?", ""])
-            except KeyboardInterrupt:
-                # Act as though they want to skip the rest of this submission
-                return False
+            choice = self._io.prompt("What now?",
+                                     ["o", "f", "m", "s", "ss", "?", ""])
             if choice == "o":
                 # Open a shell in the current folder
                 self.open_shell(path, env)
