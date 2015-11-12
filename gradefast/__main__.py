@@ -6,7 +6,7 @@ Licensed under the MIT License. For more, see the LICENSE file.
 
 Author: Jake Hartz <jhartz@mail.rit.edu>
 """
-import sys
+import sys, os
 
 from .runyaml import run
 
@@ -35,6 +35,7 @@ if __name__ == "__main__":
     PORT = DEFAULT_PORT if len(sys.argv) < 4 else int(sys.argv[3])
 
     # Zhu Li, do the thing!
-    if not run(sys.argv[1], HOST, PORT):
-        # Something bad happened
-        sys.exit(1)
+    run(sys.argv[1], HOST, PORT)
+
+    # Make sure that everything is closed up
+    os._exit(0)
