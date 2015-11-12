@@ -30,6 +30,8 @@ except ImportError:
     print("")
     sys.exit(1)
 
+from . import events
+
 
 FEEDBACK_HTML_TEMPLATES = {
     # (content)
@@ -935,61 +937,6 @@ class GradeBook:
             return None
         return self._grades[int_id]
 
-    def _send_event(self, event, data):
-        """
-        Send an event to any open gradebook clients.
-        
-        The following are valid events:
-          * "start_submission": A new submission has just started. The data
-            has 2 properties: "name" (the name of the owner of the submission),
-            and "id" (the ID of the submission in this gradebook).
-          * "done": There are no more submissions. The data has no properties.
-        
-        :param event: The name of the event (a string)
-        :param data: The data associated with the event (a dict)
-        """
-        # Send this event to any open gradebook clients
-        for q in self._subscriptions:
-            q.put({
-                "event": event,
-                "data": json.dumps(data)
-            })
-
-    def start_submission(self, name):
-        """
-        Initialize a new submission and tell any open gradebook clients about
-        it.
-        
-        :param name: The name of the owner of the submission.
-        """
-        # Make a new Grade object for this submission
-        grade = SubmissionGrade(name, self._grade_structure, self._md)
-        grade_id = len(self._grades)
-        self._grades.append(grade)
-        self._send_event("start_submission", {
-            "id": grade_id
-        })
-
-    def log_submission(self, log):
-        """
-        Add log info for the last-started submission.
-
-        :param log: The HTML log info
-        """
-        if len(self._grades):
-            grade_id = len(self._grades) - 1
-            self._grades[grade_id].log += log
-
-    def end_of_submissions(self):
-        """
-        Tell any open gradebook clients that there are no more submissions and
-        total up all the grades.
-        """
-        self._is_done = True
-        self._send_event("done", {
-            "grades": self._get_grades()
-        })
-
     def _get_grades(self):
         """
         Return a list of ordered dicts representing the scores and feedback for
@@ -1044,6 +991,73 @@ class GradeBook:
         Return a string representing the grades as JSON.
         """
         return json.dumps(self._get_grades())
+
+    def _send_client_event(self, event, data):
+        """
+        Send an event to any open gradebook clients.
+        
+        The following are valid events:
+          * "start_submission": A new submission has just started. The data
+            has 2 properties: "name" (the name of the owner of the submission),
+            and "id" (the ID of the submission in this gradebook).
+          * "done": There are no more submissions. The data has no properties.
+        
+        :param event: The name of the event (a string)
+        :param data: The data associated with the event (a dict)
+        """
+        # Send this event to any open gradebook clients
+        for q in self._subscriptions:
+            q.put({
+                "event": event,
+                "data": json.dumps(data)
+            })
+
+    def start_submission(self, name):
+        """
+        Initialize a new submission and tell any open gradebook clients about
+        it.
+        
+        :param name: The name of the owner of the submission.
+        """
+        # Make a new Grade object for this submission
+        grade = SubmissionGrade(name, self._grade_structure, self._md)
+        grade_id = len(self._grades)
+        self._grades.append(grade)
+        self._send_client_event("start_submission", {
+            "id": grade_id
+        })
+
+    def log_submission(self, log):
+        """
+        Add log info for the last-started submission.
+
+        :param log: The HTML log info
+        """
+        if len(self._grades):
+            grade_id = len(self._grades) - 1
+            self._grades[grade_id].log += log
+
+    def end_of_submissions(self):
+        """
+        Tell any open gradebook clients that there are no more submissions and
+        total up all the grades.
+        """
+        self._is_done = True
+        self._send_client_event("done", {
+            "grades": self._get_grades()
+        })
+
+    def event(self, event):
+        """
+        Handle a Gradebook Event with this gradebook.
+
+        :param event: An instance of a subclass of events.GradebookEvent
+        """
+        if not isinstance(event, events.GradebookEvent):
+            raise TypeError("Event must be a subclass of GradebookEvent")
+
+        # Run the event on this Gradebook
+        event.handle(self)
 
     def run(self, hostname, port, log_level=logging.WARNING, debug=False):
         """

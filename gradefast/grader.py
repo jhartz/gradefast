@@ -32,6 +32,8 @@ except ImportError:
     print("")
     sys.exit(1)
 
+from . import events
+
 
 def _cmd_exists(cmd):
     """Determine whether a command exists on this system"""
@@ -406,41 +408,24 @@ class Grader:
     Class to grade (run commands on) submissions.
     """
 
-    def __init__(self, on_submission_start=None, on_submission_end=None,
-                 on_end_of_submissions=None, **FancyIO_args):
+    def __init__(self, on_event=None, **FancyIO_args):
         """
         Initialize a Grader.
         Any extra arguments will be passed to the FancyIO constructor.
 
-        :param on_submission_start: A function to call with the name of a
-            submission when we start it.
-        :param on_submission_end: A function to call with an HTML log of a
-            submission when it's done.
-        :param on_end_of_submissions: A function to call when we are done with
-            all the submissions.
+        :param on_event: A function to call with a GradebookEvent when an event
+            occurs that
         """
         self._submissions = []
 
         # Set up our I/O
         self._io = FancyIO(**FancyIO_args)
         
-        # Set up on_submission_start
-        if callable(on_submission_start):
-            self._on_submission_start = on_submission_start
+        # Set up on_event
+        if callable(on_event):
+            self._event = on_event
         else:
-            self._on_submission_start = lambda n: None
-
-        # Set up on_submission_end
-        if callable(on_submission_end):
-            self._on_submission_end = on_submission_end
-        else:
-            self._on_submission_end = lambda n: None
-        
-        # Set up on_end_of_submissions
-        if callable(on_end_of_submissions):
-            self._on_end_of_submissions = on_end_of_submissions
-        else:
-            self._on_end_of_submissions = lambda: None
+            self._event = lambda event: None
 
     def add_submissions(self, submissions_directory, folder_regex,
                         check_zipfiles=False, check_files=None):
@@ -586,18 +571,18 @@ class Grader:
                 # Give up on the rest
                 break
             if what_to_do != "s":
-                self._on_submission_start(submission.name)
+                self._event(events.SubmissionStart(submission.name))
                 runner.run_on_submission(submission, submission.path, {
                     "SUPPORT_DIRECTORY": support_directory,
                     "HELPER_DIRECTORY": support_directory
                 })
                 # All done! Send the HTML log back up the chain
-                self._on_submission_end(self._io.get_log_as_html())
+                self._event(events.SubmissionEnd(self._io.get_log_as_html()))
                 # And reset the log, just for good measure (i.e. memory)
                 self._io.reset_log()
 
         # All done with everything!
-        self._on_end_of_submissions()
+        self._event(events.EndOfSubmissions())
 
 
 class CommandRunner:

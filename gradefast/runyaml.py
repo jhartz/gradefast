@@ -77,11 +77,11 @@ def _start_gradebook(grade_structure, grade_name, hostname, port):
     return gradebook
 
 
-def _run_grader(yaml_data, yaml_directory, **grader_kwargs):
+def _run_grader(yaml_data, yaml_directory, on_event):
     """
     Create and run the Grader CLI.
     """
-    grader = Grader(**grader_kwargs)
+    grader = Grader(on_event)
 
     for submission in yaml_data["submissions"]:
         grader.add_submissions(
@@ -146,11 +146,8 @@ def run(yaml_file, hostname, port):
         print("")
 
         # Finally... let's start grading!
-        _run_grader(yaml_data, os.path.dirname(yaml_file), **{
-            "on_submission_start": lambda nam: gradebook.start_submission(nam),
-            "on_submission_end": lambda log: gradebook.log_submission(log),
-            "on_end_of_submissions": lambda: gradebook.end_of_submissions()
-        })
+        _run_grader(yaml_data, os.path.dirname(yaml_file),
+                    lambda evt: gradebook.event(evt))
     except:
         print("")
         print_bordered_message("ERROR RUNNING GRADER")
