@@ -63,11 +63,11 @@ def load_yaml_data(yaml_file):
 
 def _start_gradebook(grade_structure, grade_name, hostname, port):
     """
-    Create and start the Gradebook web server.
+    Create and start the GradeBook web server.
     """
     gradebook = GradeBook(grade_structure, grade_name)
 
-    # Start the main Gradebook server
+    # Start the main GradeBook server
     gradebook_thread = threading.Thread(
         target=lambda: gradebook.run(hostname, port, debug=True),
         daemon=True
@@ -159,4 +159,8 @@ def run(yaml_file, hostname, port):
             "Download the gradebook and any other data you need.",
             "Once you exit the server, the gradebook is lost.")
         print("")
-        input("Press Enter to exit server... ")
+        try:
+            input("Press Enter to exit server... ")
+        except (InterruptedError, KeyboardInterrupt):
+            # Just ignore Ctrl+C here
+            pass
