@@ -605,7 +605,7 @@ class Grader:
                         index -= int(new_index[1:])
                     else:
                         index = int(new_index)
-                except ValueError:
+                except (ValueError, IndexError):
                     self._io.error("Invalid index!")
 
                 index = min(max(index, 1), total)
