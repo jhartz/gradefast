@@ -167,7 +167,6 @@ class Submission:
         self.name = name
         self.path = path
         self.base = base
-        self.grades = {}
 
 
 class FancyIO:
@@ -276,7 +275,11 @@ class FancyIO:
     def _in(self, *args, **kwargs):
         """Handle input using this class's input function"""
         # First, get the input
-        user_input = self._input_func(*args, **kwargs)
+        try:
+            user_input = self._input_func(*args, **kwargs)
+        except EOFError:
+            # No input :(
+            user_input = ""
 
         # Next, record it in our log
         self.log.write(user_input + "\n")
@@ -413,7 +416,7 @@ class Grader:
         Initialize a Grader.
         Any extra arguments will be passed to the FancyIO constructor.
 
-        :param on_event: A function to call with a GradebookEvent when an event
+        :param on_event: A function to call with a GradeBookEvent when an event
             occurs that
         """
         self._submissions = []
@@ -555,31 +558,74 @@ class Grader:
 
         # Run the commands on each submission
         total = len(self._submissions)
-        for index, submission in enumerate(self._submissions, start=1):
+        index = 1  ### NOTE: 1-based indexing!!
+        while index <= total:
             # Reset the I/O log so it's good and fresh
             self._io.reset_log()
 
-            msg = "Starting %s (%s/%s)" % (submission.name, index, total)
+            next_submission = self._submissions[index - 1]
+            msg = "Next Submission: %s (%s/%s)" % (next_submission.name,
+                                                   index, total)
             self._io.status("-" * len(msg))
             self._io.status(msg)
             self._io.status("-" * len(msg))
             
             what_to_do = self._io.prompt(
-                "Press Enter to begin, 's' to skip, 'quit' to quit",
-                ["", "s", "quit"], show_choices=False)
-            if what_to_do == "quit":
+                "Press Enter to begin, 'g'oto, 'b'ack, 's'kip, 'quit', "
+                "'?' for help",
+                ["", "g", "b", "s", "quit", "?"], show_choices=False)
+            if what_to_do == "?":
+                # Print more help
+                self._io.print("(Enter):  Start the next submission")
+                self._io.print("g:  Go to a specific submission")
+                self._io.print("b:  Go to the previous submission (goto -1)")
+                self._io.print("s:  Skip the next submission (goto +1)")
+                self._io.print("quit:  Give up on grading")
+            elif what_to_do == "quit":
                 # Give up on the rest
                 break
-            if what_to_do != "s":
-                self._event(events.SubmissionStart(submission.name))
-                runner.run_on_submission(submission, submission.path, {
-                    "SUPPORT_DIRECTORY": support_directory,
-                    "HELPER_DIRECTORY": support_directory
-                })
+            elif what_to_do == "b":
+                # Go back to the last-completed submission
+                index = max(index - 1, 1)
+            elif what_to_do == "s":
+                # Skip to the next submission
+                index = min(index + 1, total)
+            elif what_to_do == "g":
+                # Go to a user-entered submission
+                self._io.print("Enter index of submission to jump to.")
+                self._io.print("n   Jump to submission n")
+                self._io.print("+n  Jump forward n submissions")
+                self._io.print("-n  Jump back n submissions")
+                new_index = self._io.input("Go:").strip()
+
+                try:
+                    if new_index[0] == "+":
+                        index += int(new_index[1:])
+                    elif new_index[0] == "-":
+                        index -= int(new_index[1:])
+                    else:
+                        index = int(new_index)
+                except ValueError:
+                    self._io.error("Invalid index!")
+
+                index = min(max(index, 1), total)
+            else:
+                # Run next_submission
+                self._event(events.SubmissionStart(next_submission.name))
+                runner.run_on_submission(
+                    next_submission,
+                    next_submission.path,
+                    {
+                        "SUPPORT_DIRECTORY": support_directory,
+                        "HELPER_DIRECTORY": support_directory
+                    }
+                )
                 # All done! Send the HTML log back up the chain
                 self._event(events.SubmissionEnd(self._io.get_log_as_html()))
                 # And reset the log, just for good measure (i.e. memory)
                 self._io.reset_log()
+                # Move on to the next submission
+                index += 1
 
         # All done with everything!
         self._event(events.EndOfSubmissions())
@@ -1085,6 +1131,7 @@ class CommandRunner:
             self._io.error("Directory or file not found: " + str(ex))
         except (InterruptedError, KeyboardInterrupt):
             self._io.error("Process interrupted")
+            # TODO: Try to get what output there was from the process
 
         # Check the return code
         if not process:
