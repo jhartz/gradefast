@@ -627,6 +627,14 @@ class Grader:
                 # Move on to the next submission
                 index += 1
 
+        # No more submissions!
+        self._io.print("")
+        self._io.status("End of submissions")
+        self._io.print("")
+
+        # Wait for any background processes, if necessary
+        runner.wait_for_background_processes()
+
         # All done with everything!
         self._event(events.EndOfSubmissions())
 
@@ -655,6 +663,7 @@ class CommandRunner:
         self.diff_directory = diff_directory
         self.shell_command = shell_command
         self.open_shell = open_shell
+        self.background_processes = []
 
     def get_modified_command(self, cmd):
         """
@@ -778,6 +787,29 @@ class CommandRunner:
             return None
         else:
             return new_path, without_base(new_path)
+
+    def wait_for_background_processes(self):
+        """
+        If there are any background processes still running, wait for them to
+        exit, then return.
+        """
+        for p, info in self.background_processes:
+            if p.poll() is None:
+                # He's alive! Print his info
+                self._io.status("Waiting for background process: ", end="")
+                if info is not None:
+                    for index, nfo in enumerate(info):
+                        if index: self._io.status(" / ", end="")
+                        self._io.print(nfo, end="")
+                    self._io.print("")
+                else:
+                    self._io.print(p.args)
+
+                # Now, wait for him...
+                try:
+                    p.wait()
+                except (InterruptedError, KeyboardInterrupt):
+                    self._io.error("Process interrupted")
 
     def run_on_submission(self, submission, path, environment):
         """
@@ -931,7 +963,7 @@ class CommandRunner:
                 break
 
         # Alrighty, it's command-running time!
-        self._run_command(cmd, path, env)
+        self._run_command(cmd, path, env, (submission.name, cmd["name"]))
 
         # All done with the command!
         # Ask user what they want to do
@@ -975,7 +1007,7 @@ class CommandRunner:
             clean_to_orig[clean_line].append(line)
         return clean_lines, clean_to_orig
 
-    def _run_command(self, cmd, path, environment):
+    def _run_command(self, cmd, path, environment, info=None):
         """
         Run an individual command, handling the output if necessary.
 
@@ -983,6 +1015,8 @@ class CommandRunner:
         :param path: The working directory for the command
         :param environment: A dictionary of environmental variables for the
             command
+        :param info: Any extra metadata info about the command (stored with
+            the process if it runs in the background)
         """
         # Filled with the text content to compare to, if any
         diff_reference = None
@@ -1037,7 +1071,9 @@ class CommandRunner:
         output = self._exec_command(
             cmd["command"], path, environment,
             input=None if "input" not in cmd else cmd["input"],
-            capture_output=diff_reference is not None)
+            capture_output=diff_reference is not None,
+            wait=not ("background" in cmd and cmd["background"]),
+            info=info)
 
         # Only continue if we need to diff the output
         if diff_reference is not None and output is not None:
@@ -1082,7 +1118,7 @@ class CommandRunner:
                     self._io.print_highlighted(output_orig[content].pop(0))
 
     def _exec_command(self, command, path, environment, input=None,
-                      capture_output=False):
+                      capture_output=False, wait=True, info=None):
         """
         Actually execute an individual command.
 
@@ -1092,6 +1128,10 @@ class CommandRunner:
             command
         :param input: Any input to use as stdin
         :param capture_output: Whether to capture and return the output
+        :param wait: Whether to wait for the process to complete
+            (will always wait if input is not None or capture_output is True)
+        :param info: Any info about the command (stored with the process if
+            wait is False, i.e. if we're going to run it in the background)
         :return: The output of the process if capture_output, otherwise None
         """
         # kwargs for subprocess.Popen
@@ -1114,16 +1154,25 @@ class CommandRunner:
         # Check if we have input to throw at stdin
         if input is not None:
             kwargs["stdin"] = subprocess.PIPE
+            # We must wait, regardless of what the user wants
+            wait = True
 
         # Check if we should capture stdout and stderr
         if capture_output:
             kwargs["stdout"] = subprocess.PIPE
             kwargs["stderr"] = subprocess.STDOUT
+            # We must wait, regardless of what the user wants
+            wait = True
 
         process = None
         output = None
         try:
             process = subprocess.Popen(args, **kwargs)
+            # If we're not waiting, return now
+            if not wait:
+                self.background_processes.append((process, info))
+                self._io.status("Running in background...")
+                return
             # The output will only be collected here if we have stdout set above
             # (i.e. if we're planning on capturing the output)
             output, _ = process.communicate(input=input)
