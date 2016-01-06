@@ -42,8 +42,8 @@ For more info, see the
 on the GradeFast wiki.
 
 Want to delve deeper or use individual parts of GradeFast as part of your
-larger, superior project? Check out the individual `grader.py`, `gradebook.py`,
-and `runyaml.py` modules. Also, look at the
+larger, superior project? Check out the `runyaml.py` module to see how the
+other GradeFast modules and packages are used. Also, look at the
 [other pages on the GradeFast wiki](https://github.com/jhartz/gradefast/wiki)
 for lots more information.
 
