@@ -110,22 +110,22 @@ section h2 {
     text-align: center;
 }
 
-h3 {
+h3, h3.header-1 {
     margin: 0;
     font-size: 22px;
 }
 
-h4 {
+h4, h3.header-2 {
     margin: 0 0 0 20px;
     font-size: 18px;
 }
 
-h5 {
+h5, h3.header-3 {
     margin: 0 0 0 40px;
     font-size: 16px;
 }
 
-h6 {
+h6, h3.header-4 {
     margin: 0 0 0 60px;
     font-size: 14px;
 }

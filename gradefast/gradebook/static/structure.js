@@ -106,7 +106,7 @@ function createGradeStructure(table, grades, depth, path) {
             }).on("input", function () {
                 // Auto-resize this textarea if necessary
                 var $this = $(this);
-                checkTextareaResize($this, $this.closest(".autoresize-textarea-parent"));
+                 checkTextareaResize($this, $this.closest(".autoresize-textarea-parent"));
             });
             if (grade["default comments"]) {
                 $textarea.val("" + grade["default comments"]);

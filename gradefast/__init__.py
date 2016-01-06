@@ -13,12 +13,10 @@ Author: Jake Hartz <jhartz@mail.rit.edu>
 """
 
 from .grader import Grader
-from .gradebook import GradeBook
+from .gradebook import *
 from .runyaml import run
 
 __author__ = "Jake Hartz"
 __copyright__ = "Copyright (C) 2015 Jake Hartz"
 __license__ = "MIT"
 __version__ = "0.9"
-
-__all__ = ["Grader", "GradeBook", "run"]
