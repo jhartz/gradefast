@@ -1,6 +1,42 @@
 TODO
 ====
 
+- When we send which submission we're on to the gradebook, pass in the index too
+  (so that when we go back or jump around it don't throw it off)
+- For sections, add a "scale" option that takes a ratio to scale the section by
+  (or a string representing a fraction)
+- subprocess.CREATE_NEW_PROCESS_GROUP (if it's a background process)
+  Then catch Ctrl-C manually (in the "Waiting" stage) and do process.terminate()
+  Also test the current functionality on linux... and this might be useful:
+  http://stackoverflow.com/questions/18255730/popen-new-process-group-on-linux
+- Like entering grades on mycourses, mark background in gradebook when a grade
+  item is modified
+- For grade structures, add "collapsible" option to collapse the structure if
+  it's either 0 or 100 (and with no comments/point hints/section deductions,
+  and all grade items are exactly full points)
+- Unicode issues (in comments, shows up weird in CSV file)
+- 3 states for grade structures: enabled, disabled, or collapsed, in which case
+  any sub grades are not shown, and we just enter one big point value, one big
+  comment.
+- Add "check point hint range" into YAML file
+- Better signaling between gradebook and grader (can still be 1-way, since the
+  gradebook shouldn't really have to communicate with the grader).
+  Things we could do with this:
+  - Make a section in the YAML commands to take the output of a command (or
+    the last line of output) and use that as the grade for a certain grading
+    item (identified by name... if there's more than 1, then they both get it)
+- Make "pre-run" and "post-cleanup" sections in the YAML file with commands to
+  run before starting any grading, and after all the grading is complete.
+  (Store that the pre-run was run so that it'll store in the savefile)
+- When asking whether a directory satisfies our innate human needs, and the
+  user enters a new one, make it relative to the *current working directory*,
+  NOT the root of the submission.
+- FIXME: TODO: Not in Kansas anymore
+- New YAML file command environmental variable: GRADEFAST_ROOT (the path to the
+  GradeFast package / main script)
+
+- TODO: TODOs IN THE FILES THEMSELVES!!!
+
 - Save files (spec'd in YAML config)
 - In grade book, make a "note book" where we store commonly used notes, and we
   can access it by right-clicking in any of the comment boxes and it brings it
@@ -24,7 +60,3 @@ TODO
       delete the earlier one
     - Actually, in general, delete the earlier one for any submissions that
       have multiple submissions (unless one is on time and other is late)
-- Make greasemonkey script for Desire2Learn platforms for automatically adding
-  grades...
-
-    $(".dsh_c")[0].parentNode.parentNode.parentNode.getElementsByTagName("td")[1].textContent.trim()
