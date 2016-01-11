@@ -32,7 +32,7 @@ except ImportError:
     print("")
     sys.exit(1)
 
-from . import events
+from .gradebook import events
 
 
 def _cmd_exists(cmd):
@@ -43,7 +43,16 @@ def _cmd_exists(cmd):
 
 def _default_shell_unix(path, env):
     """Default function to open a terminal in a Unix-like environment"""
-    if _cmd_exists("gnome-terminal"):
+    if _cmd_exists("exo-open"):
+        # Use the system's default terminal emulator
+        subprocess.Popen([
+            "exo-open",
+            "--launch",
+            "TerminalEmulator",
+            "--working-directory",
+            path
+        ], env=env)
+    elif _cmd_exists("gnome-terminal"):
         # We have gnome-terminal
         subprocess.Popen([
             "gnome-terminal",
@@ -54,13 +63,6 @@ def _default_shell_unix(path, env):
         subprocess.Popen([
             "xfce4-terminal",
             "--default-working-directory=" + path
-        ], env=env)
-    elif _cmd_exists("xterm"):
-        # We have xterm (WARNING: DANGEROUS if the path is malformed)
-        subprocess.Popen([
-            "xterm",
-            "-e",
-            "cd \"" + path + "\" && /bin/bash"
         ], env=env)
     else:
         print("No terminal emulator found")
