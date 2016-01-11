@@ -18,7 +18,8 @@ DEFAULT_PORT = 8051
 if __name__ == "__main__":
     # Make sure that we have a YAML file
     if len(sys.argv) <= 1:
-        print("Usage: python -m gradefast YAML_FILE [HOSTNAME [PORT]]")
+        print("Usage: %s -m gradefast YAML_FILE [HOSTNAME [PORT]]" %
+              os.path.basename(sys.executable))
         print("")
         print("    \"YAML_FILE\" contains the structure of the grading and " +
               "the commands to run.")
