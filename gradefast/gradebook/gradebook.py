@@ -5,12 +5,14 @@ Licensed under the MIT License. For more, see the LICENSE file.
 
 Author: Jake Hartz <jhartz@mail.rit.edu>
 """
+import os
 import sys
 import json
 import queue
 import logging
 import csv
 import io
+import subprocess
 from collections import OrderedDict
 import traceback
 
@@ -30,6 +32,11 @@ except ImportError:
     sys.exit(1)
 
 from . import events, grades
+
+
+GRADEBOOK_DIR = os.path.dirname(os.path.abspath(__file__))
+JSX_DIR = os.path.join(GRADEBOOK_DIR, "static", "jsx")
+JSX_COMPILED = os.path.join(GRADEBOOK_DIR, "static", "bin", "jsx-compiled.js")
 
 
 class ServerSentEvent:
@@ -117,6 +124,9 @@ class GradeBook:
 
         self._md = parse_md
 
+        # Compile JSX, if necessary
+        GradeBook.check_compiled_jsx()
+
         app = Flask(__name__)
         self._app = app
 
@@ -129,9 +139,9 @@ class GradeBook:
         # Index pages (redirect to current gradebook)
         @app.route("/gradefast/gradebook/")
         def _gradefast_gradebook_():
-            current_submission_id = self._current_submission_index or 0
-            return redirect(url_for("_gradefast_gradebook__",
-                                    grade_id=str(current_submission_id)))
+            return redirect(url_for(
+                    "_gradefast_gradebook__",
+                    grade_id=str(self._current_submission_index or 0)))
 
         # GradeBook page
         @app.route("/gradefast/gradebook/<grade_id>")
@@ -148,8 +158,8 @@ class GradeBook:
             return render_template(
                 "gradebook.html",
                 gradeStructure=json.dumps(self._grade_structure),
-                isDone=json.dumps(self._is_done),
-                currentSubmissionID=current_submission_id_json,
+                #isDone=json.dumps(self._is_done),
+                #currentSubmissionID=current_submission_id_json,
                 # TODO: implement (from YAML file)
                 checkPointHintRange=json.dumps(False))
 
@@ -566,3 +576,17 @@ class GradeBook:
         Get a function representing the server as a WSGI app.
         """
         return self._app.wsgi_app
+
+    @staticmethod
+    def check_compiled_jsx():
+        """
+        Check JSX_DIR and JSX_COMPILED and compile jsx files if necessary.
+
+        Requirements:
+        - Node
+        - NPM packages: babel-cli, babel-preset-react, babel-preset-es2015
+        """
+        subprocess.check_call(["babel", "--presets", "react,es2015",
+                               JSX_DIR,
+                               "--out-file", JSX_COMPILED,
+                               "--source-maps", "--minified"])

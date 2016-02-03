@@ -15,6 +15,13 @@ Additionally, these packages are required:
  - [Flask](https://pypi.python.org/pypi/Flask) because... what isn't shipped
    with a web server these days?
 
+To compile the React JSX files, you will need a working install of
+[Node.js](https://nodejs.org/) and [NPM](https://www.npmjs.com/). To install
+the Node dependencies:
+
+    npm install --global babel-cli
+    npm install  # to install babel-presets-... locally
+
 ### Optional Dependencies
 
  - [pyreadline](https://pypi.python.org/pypi/pyreadline) - if you want

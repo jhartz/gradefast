@@ -573,15 +573,17 @@ class Grader:
             self._io.status("-" * len(msg))
             
             what_to_do = self._io.prompt(
-                "Press Enter to begin, 'g'oto, 'b'ack, 's'kip, 'quit', "
+                "Press Enter to begin, 'g'oto, 'b'ack, 's'kip, 'l'ist, 'quit', "
                 "'?' for help",
-                ["", "g", "b", "s", "quit", "?"], show_choices=False)
+                ["", "g", "b", "s", "l", "quit", "?"], show_choices=False)
             if what_to_do == "?":
                 # Print more help
                 self._io.print("(Enter):  Start the next submission")
                 self._io.print("g:  Go to a specific submission")
                 self._io.print("b:  Go to the previous submission (goto -1)")
                 self._io.print("s:  Skip the next submission (goto +1)")
+                self._io.print("l:  List all the submissions and corresponding "
+                               "indices")
                 self._io.print("quit:  Give up on grading")
             elif what_to_do == "quit":
                 # Give up on the rest
@@ -611,9 +613,13 @@ class Grader:
                     self._io.error("Invalid index!")
 
                 index = min(max(index, 1), total)
+            elif what_to_do == "l":
+                # List all the submissions (and indices)
+                for index, submission in enumerate(self._submissions, start=1):
+                    self._io.print("%d: %s" % (index, submission))
             else:
                 # Run next_submission
-                self._event(events.SubmissionStart(next_submission.name))
+                self._event(events.SubmissionStart(index, next_submission.name))
                 runner.run_on_submission(
                     next_submission,
                     next_submission.path,

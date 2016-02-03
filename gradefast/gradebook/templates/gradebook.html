@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>GradeFast grade book</title>
+    <link rel="stylesheet" type="text/css" href="/static/style/style.css">
+    <script type="text/javascript" src="/static/lib/react.min.js"></script>
+    <script type="text/javascript" src="/static/lib/react-dom.min.js"></script>
+</head>
+<body>
+
+<div id="container"></div>
+
+<script type="text/javascript">
+var gradeStructure = {{ gradeStructure|safe }};
+
+// Whether to make sure when enabling or disabling point hints that
+// applying the point hint doesn't make us go out of the grade item's range
+var checkPointHintRange = {{ checkPointHintRange|safe }};
+
+// usually /gradefast/
+var base = location.pathname.substring(0, location.pathname.indexOf("gradebook"));
+var styleBase = "/static/style/";
+</script>
+<script type="text/javascript" src="/static/bin/jsx-compiled.js"></script>
+
+</body>
+</html>

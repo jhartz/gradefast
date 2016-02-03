@@ -71,16 +71,14 @@ def _get_late_deduction(score, percent_to_deduct, precision=0):
 
 class BadPathException(Exception):
     """
-    Exception resulting from a bad path provided to one of the
-    SubmissionGrade.set_... methods
+    Exception resulting from a bad path
     """
     pass
 
 
 class BadValueException(Exception):
     """
-    Exception resulting from a bad value provided to one of the
-    SubmissionGrade.set_... methods
+    Exception resulting from a bad number or value
     """
     pass
 
@@ -108,10 +106,10 @@ class GradeItem:
 
             try:
                 self.note = structure["note"]
-            except ValueError:
+            except KeyError:
                 try:
                     self.note = structure["notes"]
-                except ValueError:
+                except KeyError:
                     pass
 
     def enumerate_all(self, include_disabled=False):
@@ -281,7 +279,8 @@ class GradeSection(GradeItem):
         self.section_deduction_values = structure["section deductions"]
         self.section_deduction_set = {}
 
-        self.children = _create_tree_from_structure(structure, **kwargs)
+        self.children = _create_tree_from_structure(structure["grades"],
+                                                    **kwargs)
 
     def enumerate_all(self, include_disabled=False):
         # If we're not enabled, stop
@@ -417,15 +416,13 @@ def _create_tree_from_structure(structure, **kwargs):
     Any additional keyword arguments are passed on to the Grade___ constructors.
     This is called by any Grade___ constructors that have children.
 
-    :param structure: A grade structure dictionary with a "grades" property
-        that contains children.
+    :param structure: A list of grade structure items
     :return: A list of instances of subclasses of GradeItem
     """
-    assert("grades" in structure)
     return [
         GradeSection(item, **kwargs) if "grades" in item else
         GradeScore(item, **kwargs)
-        for item in structure["grades"]
+        for item in structure
     ]
 
 
