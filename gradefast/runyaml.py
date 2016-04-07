@@ -8,6 +8,7 @@ Author: Jake Hartz <jhartz@mail.rit.edu>
 """
 import os
 import sys
+import shutil
 import threading
 import webbrowser
 import time
@@ -99,16 +100,24 @@ def _run_grader(yaml_data, yaml_directory, on_event):
     if "config" in yaml_data:
         # Check if they've provided a command to open a shell window
         if "terminal shell" in yaml_data["config"]:
+            # Make sure the terminal shell exists
+            terminal_shell_args = yaml_data["config"]["terminal shell"]
+            if shutil.which(terminal_shell_args[0]) is None:
+                raise FileNotFoundError("Could not find \"terminal shell\" " +
+                                        "from config file")
+
             # Re-define the terminal shell function to use their command
             def terminal_shell(path, env):
                 subprocess.Popen([
-                    path if arg is None else arg
-                    for arg in yaml_data["config"]["terminal shell"]
+                    path if arg is None else arg for arg in terminal_shell_args
                 ], cwd=path, env=env)
 
         # Check if they've provided a command to execute a command
         if "command shell" in yaml_data["config"]:
             command_shell = yaml_data["config"]["command shell"]
+            if shutil.which(command_shell[0]) is None:
+                raise FileNotFoundError("Could not find \"command shell\" " +
+                                        "from config file")
 
     grader.run_commands(yaml_data["commands"], yaml_directory,
                         command_shell, terminal_shell)
