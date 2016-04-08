@@ -34,6 +34,26 @@ TODO
 - FIXME: TODO: Not in Kansas anymore
 - New YAML file command environmental variable: GRADEFAST_ROOT (the path to the
   GradeFast package / main script)
+- Option to "steal back" terminal/cmd window focus after running a command
+- Better styling for <code> items in the finished source (so they look more
+  like GitHub)
+- For comments, instead of textareas, show the rendered Markdown, then, on
+  click, switch it to a textarea (until it loses focus)
+- For "folder"s in the command section of the YAML file, add "confirm" option
+  that defaults to true, but if set to false, skips the "Does this folder
+  satisfy your innate human needs?" prompt
+- When running a command, ability to NOT do diff, or to enter a different diff
+  filename. (same w/ input)
+- Add ability to specify a max running time for a process (useful for
+  background commands)
+- Better ability to select a folder (some sort of fancy CLI folder select
+  dialog)
+- When specifying a folder, add ability to specify "required files" that must
+  be in the folder (and option with it to look thru sub-folders to see if any
+  match the requirement)
+- For point hints, if no value is specified, then it doesn't change the point
+  total -- just shows a message to the user.
+- https://facebook.github.io/react/docs/pure-render-mixin.html
 
 - TODO: TODOs IN THE FILES THEMSELVES!!!
 
