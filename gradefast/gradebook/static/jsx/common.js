@@ -6,7 +6,7 @@
  * @param {string} [details] - Any details, such as the response body.
  * @param {Event} [event] - An error or event object to log.
  */
-function reportError(completed, path, status, details, event) {
+export function reportError(completed, path, status, details, event) {
     var pre;
     if (completed) {
         pre = `Invalid response from ${path} (status: ${status})`;
@@ -17,52 +17,40 @@ function reportError(completed, path, status, details, event) {
     alert(pre + (details ? `:\n\n${details}` : `.`));
 }
 
-var HeaderContent = React.createClass({
-    render() {
-        var score;
-        if (this.props.showScore) {
-            score = <span>
-                <label>Current Score: </label>{this.props.currentScore}&nbsp;/&nbsp;{this.props.maxScore}
-                &emsp;
-                <input id="late" type="checkbox" ref="late" onChange={(event) => {
-                    this.props.setLate(this.refs.late.checked)
-                }} /><label htmlFor="late"> Late?</label>
-                &emsp;
-            </span>;
+function post(path, data, onsuccess) {
+    var fd = new FormData();
+    if (data) {
+        Object.keys(data).forEach((key) => {
+            fd.append(key, data[key]);
+        });
+    }
+
+    var xhr = new XMLHttpRequest();
+
+    xhr.addEventListener("load", (event) => {
+        // Parse the JSON data
+        var jsonData;
+        try {
+            jsonData = JSON.parse(xhr.responseText);
+        } catch (err) {
+            reportError(true, path, xhr.statusText, xhr.responseText, event);
+            return;
         }
 
-        return (
-            <h2><span>
-                {score}
-                <a href={`${base}grades.csv`} title="Download Grades as CSV"
-                   target="_blank"><img src={`${styleBase}csv.png`} /></a>
-                <a href={`${base}grades.json`} title="Download Grades as JSON"
-                   target="_blank"><img src={`${styleBase}json.png`} /></a>
-            </span></h2>
-        );
-    }
-});
+        // Check the data's status
+        if (jsonData && jsonData.status === "Aight") {
+            // Woohoo, all good! Update the things
+            alert("TODO");
+        } else {
+            // Bleh, not good :(
+            reportError(true, path, xhr.statusText, JSON.stringify(jsonData, null, 2), event);
+        }
+    }, false);
 
-var SubmissionList = React.createClass({
-    render() {
-        return (
-            <section>
-                <h2>Submissions</h2>
-                <ul>
-                    {
-                        this.props.submissions.filter((item) => {
-                            return !!item;
-                        }).map((item, index) => {
-                            return <li>
-                                <a href="#" onClick={(event) => {
-                                    event.preventDefault();
-                                    this.props.goToSubmission(index);
-                                }}>{index}: <strong>{item.name}</strong></a>
-                            </li>;
-                        })
-                    }
-                </ul>
-            </section>
-        );
-    }
-});
+    xhr.addEventListener("error", (event) => {
+        reportError(false, path, xhr.statusText, xhr.responseText, event);
+    }, false);
+
+    xhr.open("GET", base + "_/" + path, true);
+    xhr.send(fd);
+}

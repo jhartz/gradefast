@@ -4,25 +4,32 @@
     <meta charset="UTF-8">
     <title>GradeFast grade book</title>
     <link rel="stylesheet" type="text/css" href="/static/style/style.css">
-    <script type="text/javascript" src="/static/lib/react.min.js"></script>
-    <script type="text/javascript" src="/static/lib/react-dom.min.js"></script>
+    <script type="text/javascript" src="/static/lib/immutable.min.js"></script>
+    <script type="text/javascript" src="/static/lib/react{% if PRODUCTION %}.min{% endif %}.js"></script>
+    <script type="text/javascript" src="/static/lib/react-dom{% if PRODUCTION %}.min{% endif %}.js"></script>
+    <script type="text/javascript" src="/static/lib/redux.min.js"></script>
+    <script type="text/javascript" src="/static/lib/react-redux{% if PRODUCTION %}.min{% endif %}.js"></script>
 </head>
 <body>
 
 <div id="container"></div>
 
 <script type="text/javascript">
-var gradeStructure = {{ gradeStructure|safe }};
+var initialList = {{ initial_list|safe }};
+var initialGradeStructure = {{ initial_grade_structure|safe }};
+var initialSubmissionIndex = {{ initial_submission_index|safe }};
 
-// Whether to make sure when enabling or disabling point hints that
-// applying the point hint doesn't make us go out of the grade item's range
-var checkPointHintRange = {{ checkPointHintRange|safe }};
+// Whether to make sure when enabling or disabling hints (on grade scores) that
+// applying the hint doesn't make us go out of the grade item's range
+var check_hint_range = {{ check_hint_range|safe }};
 
 // usually /gradefast/
 var base = location.pathname.substring(0, location.pathname.indexOf("gradebook"));
 var styleBase = "/static/style/";
+
+var store;
 </script>
-<script type="text/javascript" src="/static/bin/jsx-compiled.js"></script>
+<script type="text/javascript" src="/static/build/bundle.js"></script>
 
 </body>
 </html>

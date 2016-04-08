@@ -13,6 +13,7 @@ import logging
 import csv
 import io
 import subprocess
+import mimetypes
 from collections import OrderedDict
 import traceback
 
@@ -22,8 +23,7 @@ except ImportError:
     mistune = None
 
 try:
-    from flask import Flask, request, Response, render_template, abort,\
-        redirect, url_for
+    import flask
 except ImportError:
     print("")
     print("*** Couldn't find Flask package!")
@@ -34,69 +34,29 @@ except ImportError:
 from . import events, grades
 
 
-GRADEBOOK_DIR = os.path.dirname(os.path.abspath(__file__))
-JSX_DIR = os.path.join(GRADEBOOK_DIR, "static", "jsx")
-JSX_COMPILED = os.path.join(GRADEBOOK_DIR, "static", "bin", "jsx-compiled.js")
-
-
-class ServerSentEvent:
-    """
-    Represents an event that the server is sending to a client event stream.
-    """
-
-    last_id = 0
-
-    def __init__(self, event, data):
-        self.event = event
-        self.data = data
-        ServerSentEvent.last_id += 1
-        self._id = ServerSentEvent.last_id
-
-    def encode(self):
-        """
-        Return the event in the HTML5 Server-Sent Events format.
-        """
-        if not self.data:
-            return ""
-
-        result = ""
-        result += "id: " + str(self._id) + "\n"
-        if self.event:
-            result += "event: " + str(self.event) + "\n"
-        result += "data: " + "\ndata:".join(str(self.data).split("\n"))
-        result += "\n\n"
-        return result
-
-
-class BadStructureException(Exception):
-    """Exception resulting from a bad grade structure passed into Grader"""
-    pass
-
-
 class GradeBook:
     """Represents a grade book with submissions and grade structures."""
     def __init__(self, grade_structure, grade_name=None):
         """
         Create a WSGI app representing a grade book.
         
-        A grade structure is a list of grade items and/or other grade
-        structures. For more, see the GradeFast wiki:
+        A grade structure is a list of grade items (grade scores and grade
+        sections). For more, see the GradeFast wiki:
         https://github.com/jhartz/gradefast/wiki/Grade-Structure
         
-        :param grade_structure: A list of grade items and/or other grade
-            structures
+        :param grade_structure: A list of grade items
         :param grade_name: A name for whatever we're grading
         """
         self._grade_name = grade_name or "grades"
 
         # Check validity of _grade_structure
         self._grade_structure = grade_structure
-        self._check_grade_structure()
+        grades.check_grade_structure(self._grade_structure)
 
-        self._grades = {}
-        self._current_submission_index = None
+        self._grades_by_submission = {}
+        self._current_submission_id = None
         self._subscriptions = []
-        self._is_done = False
+        self.is_done = False
 
         # Set up Mistune (Markdown)
         if mistune is None:
@@ -124,80 +84,68 @@ class GradeBook:
 
         self._md = parse_md
 
-        # Compile JSX, if necessary
-        GradeBook.check_compiled_jsx()
+        # Set up MIME type for JS source map
+        mimetypes.add_type("application/json", ".map")
 
-        app = Flask(__name__)
+        # Start Flask app
+        app = flask.Flask(__name__)
         self._app = app
 
         # Now, initialize the routes for the app
 
         @app.route("/gradefast/")
         def _gradefast_():
-            return redirect(url_for("_gradefast_gradebook_"))
+            return flask.redirect(flask.url_for("_gradefast_gradebook_HTM"))
 
-        # Index pages (redirect to current gradebook)
         @app.route("/gradefast/gradebook/")
         def _gradefast_gradebook_():
-            return redirect(url_for(
-                    "_gradefast_gradebook__",
-                    grade_id=str(self._current_submission_index or 0)))
+            return flask.redirect(flask.url_for("_gradefast_gradebook_HTM"))
 
-        # GradeBook page
-        @app.route("/gradefast/gradebook/<grade_id>")
-        def _gradefast_gradebook__(grade_id):
-            current_submission_id_json = "null"
-            # If nothing has been started, keep the default of null
-            if len(self._grades) > 0:
-                grade = self._get_grade(grade_id)
-                if grade is None:
-                    abort(404)
-                    return
-                current_submission_id_json = json.dumps(grade_id)
-
-            return render_template(
+        # GradeBook page (yes, the HTM is solely for trolling, teehee)
+        @app.route("/gradefast/gradebook.HTM")
+        def _gradefast_gradebook_HTM():
+            return flask.render_template(
                 "gradebook.html",
-                gradeStructure=json.dumps(self._grade_structure),
-                #isDone=json.dumps(self._is_done),
-                #currentSubmissionID=current_submission_id_json,
+                PRODUCTION=False,
+                initial_list=json.dumps([]),
+                initial_grade_structure=json.dumps(self._grade_structure),
+                initial_submission_index=json.dumps(self._current_submission_id),
+                is_done=json.dumps(self.is_done),
                 # TODO: implement (from YAML file)
-                checkPointHintRange=json.dumps(False))
+                check_hint_range=json.dumps(False))
 
         # Log page
-        @app.route("/gradefast/log/<grade_id>")
-        def _gradefast_log__(grade_id):
-            grade = self._get_grade(grade_id)
+        @app.route("/gradefast/log/<submission_id>")
+        def _gradefast_log__(submission_id):
+            grade = self._get_grade(submission_id)
             if grade is None:
-                abort(404)
+                flask.abort(404)
             else:
-                return render_template(
+                return flask.render_template(
                     "log.html",
                     title="Log for %s" % grade.name,
                     content=grade.log
                 )
 
-        @app.route("/gradefast/_ng", methods=["POST"])
-        def _gradefast_ng__():
-            retval = {
-                "submission": {
-                    "name": "Test Bob"
-                }
-            }
-            return Response(json.dumps(retval), mimetype="application/json")
-
-        # AJAX calls regarding grades
-        @app.route("/gradefast/_/<command>", methods=["POST"])
-        def _gradefast_ajax__(command):
+        # AJAX endpoint to update grades based on an action
+        @app.route("/gradefast/_update", methods=["POST"])
+        def _gradefast_update(command):
             try:
-                grade = self._get_grade(request.form["id"])
+                grade = self._get_grade(flask.request.form["submission_id"])
                 if grade is None:
                     return json.dumps({
-                        "status": "Invalid grade ID"
+                        "status": "Invalid submission ID"
                     })
 
-                # Commands make it change something before getting the info,
-                # but providing a valid command in the URL is not required
-                self._parse_command(command, grade)
+                action = flask.request.form["action"]
+                try:
+                    action = json.loads(action)
+                except json.JSONDecodeError:
+                    return json.dumps({
+                        "status": "Invalid action"
+                    })
+
+                self._parse_action(action, grade)
 
                 # Return the current state of this grade
                 points_earned, points_total, _ = grade.get_score()
@@ -205,9 +153,9 @@ class GradeBook:
                     "status": "Aight",
                     "name": grade.name,
                     "is_late": grade.is_late,
-                    "overallComments": grade.overall_comments,
-                    "currentScore": points_earned,
-                    "maxScore": points_total,
+                    "overall_comments": grade.overall_comments,
+                    "current_score": points_earned,
+                    "max_score": points_total,
                     "values": grade.get_values()
                 })
             except grades.BadPathException:
@@ -224,7 +172,7 @@ class GradeBook:
                 print("")
                 return json.dumps({
                     "status": "Look what you did... (seriously, look in the "
-                              "server error log)"
+                              "server error console)"
                 })
 
         # Grades CSV file
@@ -242,9 +190,9 @@ class GradeBook:
                 except GeneratorExit:
                     pass
 
-            resp = Response(gen(), mimetype="text/csv")
-            filename_param = 'filename="%s.csv"' % self._grade_name\
-                .replace("\\", "").replace('"', '\\"')
+            resp = flask.Response(gen(), mimetype="text/csv")
+            filename_param = 'filename="%s.csv"' % \
+                self._grade_name.replace("\\", "").replace('"', '\\"')
             resp.headers["Content-disposition"] = "attachment; " + \
                                                   filename_param
             return resp
@@ -252,7 +200,7 @@ class GradeBook:
         # Grades JSON file
         @app.route("/gradefast/grades.json")
         def _gradefast_grades_json():
-            return Response(self._get_json(), mimetype="application/json")
+            return flask.Response(self._get_json(), mimetype="application/json")
 
         # Event stream
         @app.route("/gradefast/events.stream")
@@ -262,176 +210,91 @@ class GradeBook:
                 self._subscriptions.append(q)
                 try:
                     while True:
-                        result = q.get()
-                        ev = ServerSentEvent(result["event"], result["data"])
+                        ev = q.get()
+                        assert isinstance(ev, events.ServerSentEvent)
                         yield ev.encode()
-                        if ev.event == "done":
+                        if ev.is_done:
                             break
                 except GeneratorExit:
                     pass
                 finally:
                     self._subscriptions.remove(q)
-            return Response(gen(), mimetype="text/event-stream")
+            return flask.Response(gen(), mimetype="text/event-stream")
 
-    def _check_grade_structure(self, st=None):
+    def _get_grade(self, submission_id):
         """
-        Check a grade structure and raise a BadStructureException if the
-        structure is invalid. If not, return the maximum score.
+        Test whether a submission ID is valid and, if so, get the Grade
+        corresponding to it.
         
-        :param st: The structure to check. If not provided, defaults to
-                   self._grade_structure
-        :return: The maximum score for this grade structure.
-        """
-        if st is None:
-            st = self._grade_structure
-        if not isinstance(st, list):
-            raise BadStructureException("Grade structure is not a list")
-
-        max_score = 0
-
-        for grade in st:
-            if "name" not in grade or not isinstance(grade["name"], str) or \
-                    not grade["name"]:
-                raise BadStructureException("Grade item missing a name")
-            if "grades" in grade:
-                if "section deductions" in grade:
-                    for section_deduction in grade["section deductions"]:
-                        if "name" not in section_deduction:
-                            raise BadStructureException(
-                                "Section deduction missing name")
-                        if "minus" not in section_deduction:
-                            raise BadStructureException(
-                                "Section deduction missing points")
-                if "deduct percent if late" in grade:
-                    if grade["deduct percent if late"] < 0 or \
-                       grade["deduct percent if late"] > 100:
-                        raise BadStructureException(
-                            "Grade item has an invalid \"deduct percent if "
-                            "late\"")
-                max_score += self._check_grade_structure(grade["grades"])
-            elif "points" in grade:
-                if grade["points"] < 0:
-                    raise BadStructureException("Points must be greater than "
-                                                "zero")
-                max_score += grade["points"]
-                if "default points" in grade:
-                    if grade["default points"] < 0:
-                        raise BadStructureException("Default points must be "
-                                                    "greater than zero")
-                    if grade["default points"] > grade["points"]:
-                        raise BadStructureException("Default points must be "
-                                                    "less than total points")
-                if "point hints" in grade:
-                    for point_hint in grade["point hints"]:
-                        if "name" not in point_hint:
-                            raise BadStructureException(
-                                "Point hint missing name")
-                        if "value" not in point_hint:
-                            raise BadStructureException(
-                                "Point hint missing value")
-            else:
-                raise BadStructureException(
-                    "Grade item needs one of either points or grades")
-
-        return max_score
-
-    def _get_grade(self, grade_id):
-        """
-        Test whether an ID is valid and, if so, get the Grade corresponding to
-        it.
-        
-        :param grade_id: The ID to test (can be any type)
+        :param submission_id: The ID to test (can be any type)
         :return: a Grade if valid, or None otherwise
         """
-        int_id = None
+        int_index = None
         try:
-            int_id = int(grade_id)
+            int_index = int(submission_id)
         except ValueError:
             pass
-        if int_id is None:
+        if int_index is None:
             return None
-        if int_id not in self._grades:
+        if int_index not in self._grades_by_submission:
             return None
-        return self._grades[int_id]
+        return self._grades_by_submission[int_index]
 
-    def _parse_command(self, command, grade):
+    def _parse_action(self, action, grade):
         """
-        Parse and execute an AJAX command.
-        :param command: The command to run (does not need to be valid)
-        :param grade: The GradeStructure instance to execute the command on
+        Parse and execute an action from the JavaScript gradebook.
+
+        :param action: The action to run (as a dict)
+        :param grade: The GradeStructure instance to execute the action on
         """
-        if command == "late":
+        type = action["type"]
+        if type == "SET_LATE" and "is_late" in action:
             # Set whether the submission is marked as late
-            grade.is_late = request.form["is_late"] == "true"
-        elif command == "overall_comments":
+            grade.is_late = bool(action["is_late"])
+        elif type == "SET_OVERALL_COMMENTS" and "overall_comments" in action:
             # Set the overall comments of the submission
-            grade.overall_comments = request.form["value"]
-        elif command == "add_point_hint":
+            grade.overall_comments = action["overall_comments"]
+        elif type == "ADD_HINT" and "path" in action and "name" in action and \
+                "value" in action:
             # Change the grade structure (MUA HA HA HA)
             grade.add_value_to_all_grades(
-                request.form["path"],
-                "point hints",
+                action["path"],
+                "hints",
                 {
-                    "name": request.form["name"],
-                    "value": grades.make_number(request.form["value"])
+                    "name": action["name"],
+                    "value": grades.make_number(action["value"])
                 })
-        elif command == "add_section_deduction":
-            # Change the grade structure (MUA HA HA HA)
-            grade.add_value_to_all_grades(
-                request.form["path"],
-                "section deductions",
-                {
-                    "name": request.form["name"],
-                    "minus": -1 * grades.make_number(request.form["value"])
-                })
-        else:
+        elif "path" in action and "value" in action:
             # We have a command with a path
-            path = request.form["path"].split(".")
+            path = action["path"].split(".")
             if len(path) <= 1:
                 raise grades.BadPathException()
 
             path = path[1:]
             index = None
-            if command == "point_hint" or command == "section_deduction":
+            if type == "SET_HINT":
                 index = path[-1]
                 path = path[:-1]
 
             grade_item = grade.get_by_path(path[1:])
+            value = action["value"]
 
-            if command == "enabled":
-                grade_item.set_enabled(request.form["value"] == "true")
-            elif command == "points":
-                grade_item.set_points(request.form["value"])
-            elif command == "comments":
-                grade_item.set_comments(request.form["value"])
-            elif command == "point_hint":
-                grade_item.set_point_hint(
-                    index,
-                    request.form["value"] == "true")
-            elif command == "section_deduction":
-                grade_item.set_section_deduction(
-                    index,
-                    request.form["value"] == "true")
+            if type == "SET_ENABLED":
+                grade_item.set_enabled(bool(value))
+            elif type == "SET_POINTS":
+                grade_item.set_points(value)
+            elif type == "SET_COMMENTS":
+                grade_item.set_comments(value)
+            elif type == "SET_HINT":
+                grade_item.set_hint(index, bool(value))
 
-    # def set_grade_property_by_name(self, name, prop):
-    #     """
-    #     Set a property for a specific grade item for the current submission.
-    #
-    #     :param name: The name of the grade item to set
-    #     :param prop: The details about the property to set (as an instance
-    #         of a subclass of grades.Property)
-    #     """
-    #     assert isinstance(prop, grades.Property)
-    #     grade = self._grades[self._current_submission_index]
-    #     grade.set_property_by_name(name, prop)
-
-    def _get_grades(self):
+    def get_grades(self):
         """
         Return a list of ordered dicts representing the scores and feedback for
         each submission.
         """
         grade_list = []
-        for grade in self._grades.values():
+        for grade in self._grades_by_submission.values():
             points_earned, points_possible, individual_points = \
                 grade.get_score()
             grade_details = OrderedDict()
@@ -460,7 +323,7 @@ class GradeBook:
         csv_writer.writerow(row_titles)
 
         # Make the value rows
-        for grade in self._get_grades():
+        for grade in self.get_grades():
             csv_writer.writerow([
                 grade["name"],
                 grade["score"],
@@ -478,63 +341,40 @@ class GradeBook:
         """
         Return a string representing the grades as JSON.
         """
-        return json.dumps(self._get_grades())
+        return json.dumps(self.get_grades())
 
-    def _send_client_event(self, event, data):
+    def _send_client_event(self, event):
         """
         Send an event to any open gradebook clients.
         
-        The following are valid events:
-          * "start_submission": A new submission has just started. The data
-            has 2 properties: "name" (the name of the owner of the submission),
-            and "id" (the ID of the submission in this gradebook).
-          * "done": There are no more submissions. The data has no properties.
-        
-        :param event: The name of the event (a string)
-        :param data: The data associated with the event (a dict)
+        :param event: The ServerSentEvent
         """
+        assert isinstance(event, events.ServerSentEvent)
         # Send this event to any open gradebook clients
         for q in self._subscriptions:
-            q.put({
-                "event": event,
-                "data": json.dumps(data)
-            })
+            q.put(event)
 
-    def start_submission(self, index, name):
+    def start_submission(self, submission_id, name):
         """
-        Initialize a new submission and tell any open gradebook clients about
-        it.
+        Set a submission ID to be the current submission ID.
 
-        :param index: The index of the submission.
+        :param submission_id: The ID of the submission.
         :param name: The name of the owner of the submission.
         """
         # Make a new Grade object for this submission
-        if index not in self._grades:
-            self._grades[index] = grades.SubmissionGrade(
+        if submission_id not in self._grades_by_submission:
+            self._grades_by_submission[submission_id] = grades.SubmissionGrade(
                 name, self._grade_structure, self._md)
-        self._current_submission_index = index
-        self._send_client_event("start_submission", {
-            "id": index
-        })
+        self._current_submission_id = submission_id
 
     def log_submission(self, log):
         """
-        Add log info for the last-started submission.
+        Add log info for the current submission.
 
         :param log: The HTML log info
         """
-        if len(self._grades):
-            self._grades[self._current_submission_index].log += log
-
-    def end_of_submissions(self):
-        """
-        Tell any open gradebook clients that there are no more submissions and
-        total up all the grades.
-        """
-        self._is_done = True
-        self._send_client_event("done", {
-            "grades": self._get_grades()
-        })
+        if len(self._grades_by_submission):
+            self._grades_by_submission[self._current_submission_id].log += log
 
     def event(self, event):
         """
@@ -546,7 +386,9 @@ class GradeBook:
             raise TypeError("Event must be a subclass of GradeBookEvent")
 
         # Run the event on this GradeBook
-        event.handle(self)
+        sse = event.handle(self)
+        if sse:
+            self._send_client_event(sse)
 
     def run(self, hostname, port, log_level=logging.WARNING, debug=False):
         """
@@ -576,17 +418,3 @@ class GradeBook:
         Get a function representing the server as a WSGI app.
         """
         return self._app.wsgi_app
-
-    @staticmethod
-    def check_compiled_jsx():
-        """
-        Check JSX_DIR and JSX_COMPILED and compile jsx files if necessary.
-
-        Requirements:
-        - Node
-        - NPM packages: babel-cli, babel-preset-react, babel-preset-es2015
-        """
-        subprocess.check_call(["babel", "--presets", "react,es2015",
-                               JSX_DIR,
-                               "--out-file", JSX_COMPILED,
-                               "--source-maps", "--minified"])

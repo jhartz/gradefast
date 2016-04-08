@@ -158,17 +158,25 @@ class Submission:
     """
     Class representing a submission by a certain user.
     """
-    def __init__(self, name, path, base=""):
+    def __init__(self, name, full_name, path, base=""):
         """
         Initialize a new Submission.
         
         :param name: The name of the submission (i.e. the user)
+        :param full_name: The full name of the submission (i.e. the full
+               filename of the folder containing the submission)
         :param path: The path of the root of the submission
         :param base: The base path of where all the submissions are
         """
         self.name = name
+        self.full_name = full_name
         self.path = path
         self.base = base
+
+    def __str__(self):
+        if self.name != self.full_name:
+            return "%s (%s)" % (self.name, self.full_name)
+        return self.name
 
 
 class FancyIO:
@@ -501,16 +509,17 @@ class Grader:
                 continue
             
             # Make some details for this submission in this directory
-            submission = Submission(item,
-                                    os.path.join(submissions_directory, item),
-                                    submissions_directory)
+            submission_name = item
             for group in match.groups():
                 if group:
-                    submission.name = group
+                    submission_name = group
                     break
+            submission = Submission(submission_name, item,
+                                    os.path.join(submissions_directory, item),
+                                    submissions_directory)
             
             # Add this submission to our list
-            self._io.print("Found submission: " + submission.name)
+            self._io.print("Found submission: " + str(submission))
             self._submissions.append(submission)
 
         # Sort the submissions by name
@@ -615,8 +624,8 @@ class Grader:
                 index = min(max(index, 1), total)
             elif what_to_do == "l":
                 # List all the submissions (and indices)
-                for index, submission in enumerate(self._submissions, start=1):
-                    self._io.print("%d: %s" % (index, submission))
+                for i, submission in enumerate(self._submissions, start=1):
+                    self._io.print("%d: %s" % (i, submission))
             else:
                 # Run next_submission
                 self._event(events.SubmissionStart(index, next_submission.name))
@@ -971,7 +980,7 @@ class CommandRunner:
                 break
 
         # Alrighty, it's command-running time!
-        self._run_command(cmd, path, env, (submission.name, cmd["name"]))
+        self._run_command(cmd, path, env, (str(submission), cmd["name"]))
 
         # All done with the command!
         # Ask user what they want to do

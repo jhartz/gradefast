@@ -19,8 +19,11 @@ To compile the React JSX files, you will need a working install of
 [Node.js](https://nodejs.org/) and [NPM](https://www.npmjs.com/). To install
 the Node dependencies:
 
-    npm install --global babel-cli
-    npm install  # to install babel-presets-... locally
+    npm install --global grunt-cli
+    npm install  # to install other build requirements locally
+
+Before running GradeFast, you must run `grunt` in the same directory as
+`Gruntfile.js`.
 
 ### Optional Dependencies
 
@@ -33,6 +36,14 @@ Also, use Python 3 (in case you, like me, still live in ye olden days of
 having `python` symlinked to Python 2)
 
 ## Usage
+
+Before running GradeFast, you need to build the JavaScript. To do this, run
+`grunt` in the same directory as `Gruntfile.js`.
+
+Alternatively, you can have grunt watch the JS files for changes and
+automatically recompile them. To do this, run `grunt watchme`
+
+Finally, to start GradeFast, run:
 
     python3 -m gradefast YAML_FILE [HOSTNAME [PORT]]
 

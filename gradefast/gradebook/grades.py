@@ -12,7 +12,7 @@ FEEDBACK_HTML_TEMPLATES = {
             """font-size: 10pt; line-height: 1.3;">%s"""
             """<p style="font-size: 11pt;">%s</p></div>""",
 
-    # (points added/deducted, reason); used by "item" and "section"
+    # (points added/deducted, reason); used by "item" and "section" for hints
     "credit": """<div style="text-indent: -20px; margin-left: 20px;">"""
               """<b>%+d:</b> <i>%s</i></div>""",
 
@@ -83,6 +83,108 @@ class BadValueException(Exception):
     pass
 
 
+class BadStructureException(Exception):
+    """Exception resulting from a bad grade structure passed into Grader"""
+    pass
+
+
+def bad_structure_warning(msg):
+    """Warn about something relating to the grade structure"""
+    print("\n*** STRUCTURE WARNING:", msg)
+
+
+def check_grade_structure(st):
+    """
+    Check a grade structure and raise a BadStructureException if the structure
+    is invalid. If not, return the maximum score.
+
+    :param st: The grade structure to check.
+    :return: The maximum score for this grade structure.
+    """
+    if not isinstance(st, list):
+        raise BadStructureException("Grade structure is not a list")
+
+    max_score = 0
+
+    for grade in st:
+        # Check "name"
+        if "name" not in grade or not isinstance(grade["name"], str) or \
+                not grade["name"]:
+            raise BadStructureException("Grade item missing a name")
+
+        # Make sure the name is trimmed of trailing whitespace
+        grade["name"] = grade["name"].strip()
+
+        # Check stuff specific to grade sections
+        if "grades" in grade:
+            # Check "deduct percent if late" (used to be "deductPercentIfLate")
+            if "deductPercentIfLate" in grade and \
+                    "deduct percent if late" not in grade:
+                grade["deduct percent if late"] = grade["deductPercentIfLate"]
+            if "deduct percent if late" in grade:
+                if grade["deduct percent if late"] < 0 or \
+                   grade["deduct percent if late"] > 100:
+                    raise BadStructureException(
+                        "Grade score " + grade["name"] + " has an invalid " +
+                        "\"deduct percent if late\"")
+
+            max_score += check_grade_structure(grade["grades"])
+
+        # Check stuff specific to grade scores
+        elif "points" in grade:
+            # Check "points"
+            if grade["points"] < 0:
+                raise BadStructureException(
+                    "Points in \"%s\" must be at least zero" % grade["name"])
+            max_score += grade["points"]
+
+            # Check "default points"
+            if "default points" in grade:
+                if grade["default points"] < 0:
+                    raise BadStructureException(
+                        "Default points in \"%s\" must be at least zero" %
+                        grade["name"])
+                if grade["default points"] > grade["points"]:
+                    raise BadStructureException(
+                        "Default points in \"%s\" must be less than total points" %
+                        grade["name"])
+        else:
+            raise BadStructureException(
+                "Grade item \"%s\" needs one of either points or grades" %
+                grade["name"])
+
+        # Check for old, deprecated versions of "hints"
+        bad_hints = []
+        for old in ["section deductions", "deductions", "point hints"]:
+            if old in grade:
+                bad_structure_warning("Found deprecated \"%s\" in \"%s\"" %
+                                      (old, grade["name"]) +
+                                      " (converted to hints)")
+                bad_hints += grade[old]
+        if len(bad_hints):
+            if "hints" not in grade:
+                grade["hints"] = []
+            for bad_hint in bad_hints:
+                grade["hints"].append({
+                    "name": bad_hint.get("name", "HINT"),
+                    "value": bad_hint.get("value", 0) or
+                    (-1 * bad_hint.get("minus", 0))
+                })
+
+        # Check "hints"
+        if "hints" in grade:
+            for hint in grade["hints"]:
+                if "name" not in hint:
+                    raise BadStructureException("Hint in \"%s\" missing name" %
+                                                grade["name"])
+                if "value" not in hint:
+                    raise BadStructureException(
+                        "Hint \"%s\" in \"%s\" missing value" %
+                        (hint["name"].trim(), grade["name"]))
+
+    return max_score
+
+
 class GradeItem:
     """
     Superclass for GradeScore, GradeSection, and GradeRoot
@@ -98,6 +200,8 @@ class GradeItem:
         self._md = markdown
         self.name = None
         self.enabled = None
+        self.hints = []
+        self.hints_set = {}
 
         if structure:
             self.name = structure["name"]
@@ -111,6 +215,10 @@ class GradeItem:
                     self.note = structure["notes"]
                 except KeyError:
                     pass
+
+            if "hints" not in structure:
+                structure["hints"] = []
+            self.hints = structure["hints"]
 
     def enumerate_all(self, include_disabled=False):
         """
@@ -175,6 +283,15 @@ class GradeItem:
         """
         self.enabled = is_enabled
 
+    def set_hint(self, index, is_enabled):
+        """
+        Set whether a specific hint is enabled for this grade item.
+
+        :param index: The index of the hint
+        :param is_enabled: Whether the hint should be set to enabled
+        """
+        self.hints_set[index] = is_enabled
+
 
 class GradeScore(GradeItem):
     """
@@ -191,11 +308,6 @@ class GradeScore(GradeItem):
 
         self.comments = structure["default comments"] \
             if "default comments" in structure else ""
-
-        if "point hints" not in structure:
-            structure["point hints"] = []
-        self.point_hint_values = structure["point hints"]
-        self.point_hint_set = {}
 
     def enumerate_all(self, include_disabled=False):
         if self.enabled or include_disabled:
@@ -232,9 +344,9 @@ class GradeScore(GradeItem):
         feedback = FEEDBACK_HTML_TEMPLATES[header_name] % \
             (self._md(self.name), score)
 
-        # Add point hints, if applicable
-        for index, hint in enumerate(self.point_hint_values):
-            if self.point_hint_set.get(index):
+        # Add hints, if applicable
+        for index, hint in enumerate(self.hints):
+            if self.hints_set.get(index):
                 feedback += FEEDBACK_HTML_TEMPLATES["credit"] % \
                             (hint["value"], self._md(hint["name"]))
 
@@ -253,15 +365,6 @@ class GradeScore(GradeItem):
         """
         self.score = make_number(score)
 
-    def set_point_hint(self, index, is_enabled):
-        """
-        Set whether a specific point hint is enabled for this grade item.
-
-        :param index: The index of the point hint
-        :param is_enabled: Whether the point hint should be set to enabled
-        """
-        self.point_hint_set[index] = is_enabled
-
 
 class GradeSection(GradeItem):
     """
@@ -273,11 +376,6 @@ class GradeSection(GradeItem):
 
         self.late_deduction = make_number(structure["deduct percent if late"]) \
             if "deduct percent if late" in structure else 0
-
-        if "section deductions" not in structure:
-            structure["section deductions"] = []
-        self.section_deduction_values = structure["section deductions"]
-        self.section_deduction_set = {}
 
         self.children = _create_tree_from_structure(structure["grades"],
                                                     **kwargs)
@@ -313,10 +411,10 @@ class GradeSection(GradeItem):
             individual_points += [(self.name + ": " + name, score)
                                   for name, score in item_points]
 
-        # Account for any section deductions
-        for index, deduction in enumerate(self.section_deduction_values):
-            if self.section_deduction_set.get(index):
-                points_earned -= deduction["minus"]
+        # Account for any hints
+        for index, hint in enumerate(self.hints):
+            if self.hints_set.get(index):
+                points_earned += hint["value"]
 
         # Check if it's late
         if is_late and self.late_deduction:
@@ -341,12 +439,12 @@ class GradeSection(GradeItem):
             points_possible
         )
 
-        # Add section deduction feedback
-        for index, deduction in enumerate(self.section_deduction_values):
-            if self.section_deduction_set.get(index):
+        # Add hint feedback
+        for index, hint in enumerate(self.hints):
+            if self.hints_set.get(index):
                 feedback += FEEDBACK_HTML_TEMPLATES["credit"] % (
-                    -1 * deduction["minus"],
-                    self._md(deduction["name"])
+                    hint["value"],
+                    self._md(hint["name"])
                 )
 
         # Add lateness feedback if necessary
@@ -450,7 +548,7 @@ class SubmissionGrade:
     def __init__(self, name, grade_structure, markdown):
         """
         :param name: The name of the owner of the submission being graded
-        :param grade_structure: A list of grading items (see GradeBook)
+        :param grade_structure: A list of grade items (see GradeBook class)
         :param markdown: A configured instance of mistune.Markdown,
             or a compatible polyfill function
         """
@@ -487,6 +585,7 @@ class SubmissionGrade:
         Find all the grade items in the grade structure that have this name.
 
         :param name: The name to look for
+        :param include_disabled: Whether to include disabled grade items
         :return: A generator that yields GradeItem subclass instances
         """
         for item in self._grades.enumerate_all(include_disabled):
@@ -495,14 +594,12 @@ class SubmissionGrade:
 
     def add_value_to_all_grades(self, path, name, value):
         """
-        Add a new possible section deduction or point hint to ALL grade
-        structures (by modifying an array still tied into the original
-        grade_structure).
+        Add a new possible hint to ALL grade structures (by modifying an array
+        still tied into the original grade_structure).
 
         :param path: A list of ints that acts as a path of indices representing
             a location within the grade item tree
-        :param name: The name of the list to add to (for example, "point hints"
-            or "section deductions")
+        :param name: The name of the list to add to (for example, "hints")
         :param value: The value to add
         """
         if len(path) == 0:
