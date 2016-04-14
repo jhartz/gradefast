@@ -19,10 +19,12 @@ const GradeBook = React.createClass({
             section = <Submission showListHandler={this.showList} />;
         } else {
             // We don't get an included header, so make one here
-            header = <header>
-                <HeaderContent showScore={false} />
-                <h1>GradeFast</h1>
-            </header>;
+            header = (
+                <header>
+                    <HeaderContent showScore={false} />
+                    <h1>GradeFast</h1>
+                </header>
+            );
             // Show the submission list, or a message if we don't have one yet
             if (this.props.list.size) {
                 section = <SubmissionList submissions={this.props.list}
