@@ -1,6 +1,16 @@
 TODO
 ====
 
+Links for current redesign:
+
+- https://facebook.github.io/react/docs/forms.html
+- http://redux.js.org/docs/basics/UsageWithReact.html
+- http://teropa.info/blog/2015/09/10/full-stack-redux-tutorial.html#the-client-application
+- https://facebook.github.io/immutable-js/docs/
+- https://facebook.github.io/react/docs/pure-render-mixin.html
+
+Little TODOs:
+
 - When we send which submission we're on to the gradebook, pass in the index too
   (so that when we go back or jump around it don't throw it off)
 - For sections, add a "scale" option that takes a ratio to scale the section by
@@ -53,9 +63,10 @@ TODO
   match the requirement)
 - For point hints, if no value is specified, then it doesn't change the point
   total -- just shows a message to the user.
-- https://facebook.github.io/react/docs/pure-render-mixin.html
 
 - TODO: TODOs IN THE FILES THEMSELVES!!!
+
+Big TODOs:
 
 - Save files (spec'd in YAML config)
 - In grade book, make a "note book" where we store commonly used notes, and we
