@@ -73,9 +73,12 @@ class GradeBook:
 
             def parse_md(*args, **kwargs):
                 text = markdown(*args, **kwargs).strip()
-                # Convert paragraphs to <br> tags
-                if text.startswith("<p>") and text.endswith("</p>"):
-                    text = text[3:-4].replace("</p>\n<p>", "<br>")
+                # Stylize p tags
+                text = text.replace(
+                    '<p>', '<p style="margin: 3px 0">')
+                #if text.startswith("<p>") and text.endswith("</p>"):
+                #    text = text[3:-4].replace("</p>\n<p>", "<br>")
+
                 # Stylize code tags
                 text = text.replace(
                     '<code>', '<code style="background-color: rgba(0, 0, 0, '
