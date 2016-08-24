@@ -39,14 +39,11 @@ Little TODOs:
   run before starting any grading, and after all the grading is complete.
   (Store that the pre-run was run so that it'll store in the savefile)
 - When asking whether a directory satisfies our innate human needs, and the
-  user enters a new one, make it relative to the *current working directory*,
+  user enters a new one, make it relative to the *current directory*,
   NOT the root of the submission.
-- FIXME: TODO: Not in Kansas anymore
 - New YAML file command environmental variable: GRADEFAST_ROOT (the path to the
   GradeFast package / main script)
 - Option to "steal back" terminal/cmd window focus after running a command
-- Better styling for <code> items in the finished source (so they look more
-  like GitHub)
 - For comments, instead of textareas, show the rendered Markdown, then, on
   click, switch it to a textarea (until it loses focus)
 - For "folder"s in the command section of the YAML file, add "confirm" option
@@ -55,7 +52,8 @@ Little TODOs:
 - When running a command, ability to NOT do diff, or to enter a different diff
   filename. (same w/ input)
 - Add ability to specify a max running time for a process (useful for
-  background commands)
+  background commands), and then some sort of action if it's cut off (like
+  above idea of using program output as comment text)
 - Better ability to select a folder (some sort of fancy CLI folder select
   dialog)
 - When specifying a folder, add ability to specify "required files" that must

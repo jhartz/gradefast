@@ -132,7 +132,7 @@ class GradeBook:
 
         # AJAX endpoint to update grades based on an action
         @app.route("/gradefast/_update", methods=["POST"])
-        def _gradefast_update(command):
+        def _gradefast_update():
             try:
                 grade = self._get_grade(flask.request.form["submission_id"])
                 if grade is None:
@@ -401,7 +401,7 @@ class GradeBook:
         :param port: The port to run on
         :param log_level: The level to set the Werkzeug logger at
         :param debug: Whether to start the server in debug mode (prints
-            tracebacks with 500 errors)
+            tracebacks with "HTTP 500" errors)
         """
         # Set logging level
         server_log = logging.getLogger("werkzeug")
