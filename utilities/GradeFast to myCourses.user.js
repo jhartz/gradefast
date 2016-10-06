@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GradeFast to myCourses
 // @namespace    https://mycourses.rit.edu/
-// @version      0.1
+// @version      0.2
 // @description  Gets grades from GradeFast and puts them into a myCourses grade book
 // @author       Jake Hartz
 // @include      https://mycourses.rit.edu/d2l/lms/grades/admin/enter/*
@@ -11,6 +11,10 @@
 var grades = [];
 var gotGrades = false;
 var $a;
+
+var FEEDBACK_REPLACEMENTS = [
+    [/\+0:/g, "-"]
+];
 
 window.addEventListener("load", function (event) {
     setTimeout(function () {
@@ -82,31 +86,25 @@ function matchRowsAndGrades(jsonGrades) {
     // Loop through each table row
     $(".dsh_c").each(function () {
         try {
-            var row = this.parentNode.parentNode.parentNode;
-            if (row.nodeName.toLowerCase() != "tr") {
-                console.log("Found container whose ancestor was not a table row: ", this, row);
+            var $row = $(this).closest("tr");
+            if ($row.length === 0) {
+                console.log("Found container whose ancestor was not a table row: ", this, $row);
                 return;
             }
-            var $row = $(row);
             
             var $gradeInput = $(this).find("input");
-            if ($gradeInput.length == 0) {
+            if ($gradeInput.length === 0) {
                 console.log("Found container without an input inside: ", this);
                 return;
             }
             
-            var $feedbackBtn = $row.find("img[id^='IMG_comments']");
-            if ($feedbackBtn.length == 0) {
-                console.log("Found table row without a feedback button: ", row);
-                return;
-            }
-            $feedbackBtn = $feedbackBtn.parent();
-            if ($feedbackBtn[0].nodeName.toLowerCase() != "a") {
-                console.log("Found feedback button that wasn't an anchor: ", $feedbackBtn[0]);
+            var $feedbackBtn = $row.find("a[id^='ICN_Feedback']");
+            if ($feedbackBtn.length === 0) {
+                console.log("Found table row without a feedback button: ", $row);
                 return;
             }
             
-            var name = this.parentNode.parentNode.parentNode.getElementsByTagName("td")[1].textContent.trim();
+            var name = $row[0].getElementsByTagName("th")[0].textContent.trim();
             console.log("Found table row with name: " + name);
             
             // Find a grade that matches this name
@@ -145,7 +143,7 @@ function matchRowsAndGrades(jsonGrades) {
 }
 
 function enterGrades() {
-    if (grades.length == 0) {
+    if (grades.length === 0) {
         // All done
         alert("Done entering grades");
         gotGrades = false;
@@ -158,11 +156,17 @@ function enterGrades() {
     grade.$gradeInput.val("" + grade.score).change();
     setTimeout(function () {
         // Open the feedback iframe
-        grade.$feedbackBtn.click();
+        if (!click(grade.$feedbackBtn)) {
+            console.log("Couldn't click Feedback button for grade", grade);
+            alert("Couldn't click Feedback button!");
+            return;
+        }
+        
         setTimeout(function () {
             // Get the Feedback iframe
             var $feedbackIframe = $("iframe").not("[id^='overallComments']");
-            if ($feedbackIframe.length == 0) {
+            if ($feedbackIframe.length === 0) {
+                console.log("Couldn't find Feedback iframe for grade", grade);
                 alert("Couldn't find Feedback iframe!");
                 return;
             }
@@ -172,20 +176,26 @@ function enterGrades() {
             
             // Click the "Edit HTML" button
             if (!click($feedbackIframe.contents().find("a[title='HTML Source Editor']"))) {
+                console.log("Couldn't click Edit HTML button for grade", grade);
                 alert("Couldn't click Edit HTML button!");
                 return;
             }
             
             setTimeout(function () {
                 // Get the Edit HTML iframe
-                var $htmlIframe = $("iframe.d2l-dialog-frame");
-                if ($htmlIframe.length == 0) {
+                var $htmlIframe = $("iframe.d2l-dialog-frame[src*='blank']");
+                if ($htmlIframe.length != 1) {
+                    console.log("Couldn't find Edit HTML iframe for grade", grade, $htmlIframe);
                     alert("Couldn't find Edit HTML iframe!");
                     return;
                 }
                 
+                // Do any replacements necessary in the feedback contents
+                var fb = FEEDBACK_REPLACEMENTS.reduce(function (fb, replacement, index) {
+                    return fb.replace(replacement[0], replacement[1]);
+                }, "" + grade.feedback);
                 // There should only be one textarea
-                $htmlIframe.contents().find("textarea").val("" + grade.feedback).change();
+                $htmlIframe.contents().find("textarea").val(fb).change();
                 
                 // Click the save button
                 if (!click($htmlIframe.contents().find("a.vui-button-primary"))) {
@@ -199,8 +209,8 @@ function enterGrades() {
                     enterGrades(grades);
                 }, 200);
                 */
-            }, 2000);
-        }, 2000);
+            }, 2500);
+        }, 2500);
     }, 500);
 }
 
