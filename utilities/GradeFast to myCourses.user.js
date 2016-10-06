@@ -33,7 +33,7 @@ window.addEventListener("load", function (event) {
 
             var server = prompt("GradeFast server:", "http://127.0.0.1:8051");
             if (!server) return;
-            
+
             // Get the JSON grade data
             var xhr = GM_xmlhttpRequest({
                 method: "GET",
@@ -41,7 +41,7 @@ window.addEventListener("load", function (event) {
                 onload: function (response) {
                     if (response.status != 200) {
                         alert("Request failed: " + response.status + " (" + response.statusText + "):\n" +
-                              response.responseText);
+                            response.responseText);
                         return;
                     }
 
@@ -63,7 +63,7 @@ window.addEventListener("load", function (event) {
                 },
                 onerror: function (response) {
                     alert("Request failed: " + response.status + " (" + response.statusText + ")\n" +
-                          response.responseText);
+                        response.responseText);
                 }
             });
         });
@@ -82,7 +82,7 @@ function click($el) {
 function matchRowsAndGrades(jsonGrades) {
     // A list of objects with: "score", "feedback", "$gradeInput", "$feedbackBtn"
     var gradesToEnter = [];
-    
+
     // Loop through each table row
     $(".dsh_c").each(function () {
         try {
@@ -91,22 +91,22 @@ function matchRowsAndGrades(jsonGrades) {
                 console.log("Found container whose ancestor was not a table row: ", this, $row);
                 return;
             }
-            
+
             var $gradeInput = $(this).find("input");
             if ($gradeInput.length === 0) {
                 console.log("Found container without an input inside: ", this);
                 return;
             }
-            
+
             var $feedbackBtn = $row.find("a[id^='ICN_Feedback']");
             if ($feedbackBtn.length === 0) {
                 console.log("Found table row without a feedback button: ", $row);
                 return;
             }
-            
+
             var name = $row[0].getElementsByTagName("th")[0].textContent.trim();
             console.log("Found table row with name: " + name);
-            
+
             // Find a grade that matches this name
             var grade;
             for (var i = 0; i < jsonGrades.length; i++) {
@@ -118,7 +118,7 @@ function matchRowsAndGrades(jsonGrades) {
                     break;
                 }
             }
-            
+
             // Did we find a matching grade?
             if (!grade) {
                 console.log("No matching grade found");
@@ -136,7 +136,7 @@ function matchRowsAndGrades(jsonGrades) {
             alert("Error doing table row\nSee error console");
         }
     });
-    
+
     // Start entering the grades!
     grades = gradesToEnter;
     enterGrades();
@@ -150,7 +150,7 @@ function enterGrades() {
         $a.html("<i>Import Grades from GradeFast</i>");
         return;
     }
-    
+
     // Enter the first grade
     var grade = grades.shift();
     grade.$gradeInput.val("" + grade.score).change();
@@ -161,7 +161,7 @@ function enterGrades() {
             alert("Couldn't click Feedback button!");
             return;
         }
-        
+
         setTimeout(function () {
             // Get the Feedback iframe
             var $feedbackIframe = $("iframe").not("[id^='overallComments']");
@@ -170,17 +170,17 @@ function enterGrades() {
                 alert("Couldn't find Feedback iframe!");
                 return;
             }
-            
+
             // Click the "Toggle Fullscreen" button
             click($feedbackIframe.contents().find("a[title='Toggle Fullscreen']"));
-            
+
             // Click the "Edit HTML" button
             if (!click($feedbackIframe.contents().find("a[title='HTML Source Editor']"))) {
                 console.log("Couldn't click Edit HTML button for grade", grade);
                 alert("Couldn't click Edit HTML button!");
                 return;
             }
-            
+
             setTimeout(function () {
                 // Get the Edit HTML iframe
                 var $htmlIframe = $("iframe.d2l-dialog-frame[src*='blank']");
@@ -189,23 +189,23 @@ function enterGrades() {
                     alert("Couldn't find Edit HTML iframe!");
                     return;
                 }
-                
+
                 // Do any replacements necessary in the feedback contents
                 var fb = FEEDBACK_REPLACEMENTS.reduce(function (fb, replacement, index) {
                     return fb.replace(replacement[0], replacement[1]);
                 }, "" + grade.feedback);
                 // There should only be one textarea
                 $htmlIframe.contents().find("textarea").val(fb).change();
-                
+
                 // Click the save button
                 if (!click($htmlIframe.contents().find("a.vui-button-primary"))) {
                     alert("Couldn't click Save button!");
                     return;
                 }
-                
+
                 /*
                 setTimeout(function () {
-                    // Recurse to do the rest
+                // Recurse to do the rest
                     enterGrades(grades);
                 }, 200);
                 */
