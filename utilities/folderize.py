@@ -4,6 +4,8 @@ submitted multiple flat files.
 
 Creates a folder based on their name that matches what gradefast expects,
 and moves all of the flat files into that folder.
+
+Author: Chris Lentner <chris@lentner.me>
 """
 ext = "\.py" # regex fragment for the filetype
 

@@ -17,13 +17,12 @@ export function reportError(completed, path, status, details, event) {
     alert(pre + (details ? `:\n\n${details}` : `.`));
 }
 
-function post(path, data, onsuccess) {
+export function post(index, action, onsuccess) {
+    var path = "_update";
+
     var fd = new FormData();
-    if (data) {
-        Object.keys(data).forEach((key) => {
-            fd.append(key, data[key]);
-        });
-    }
+    fd.append("submission_id", index);
+    fd.append("action", JSON.stringify(action));
 
     var xhr = new XMLHttpRequest();
 
@@ -39,8 +38,9 @@ function post(path, data, onsuccess) {
 
         // Check the data's status
         if (jsonData && jsonData.status === "Aight") {
-            // Woohoo, all good! Update the things
-            alert("TODO");
+            // Woohoo, all good!
+            console.log("DEBUG: POST response:", jsonData);
+            onsuccess(jsonData);
         } else {
             // Bleh, not good :(
             reportError(true, path, xhr.statusText, JSON.stringify(jsonData, null, 2), event);
@@ -51,6 +51,6 @@ function post(path, data, onsuccess) {
         reportError(false, path, xhr.statusText, xhr.responseText, event);
     }, false);
 
-    xhr.open("GET", base + "_/" + path, true);
+    xhr.open("POST", base + path, true);
     xhr.send(fd);
 }

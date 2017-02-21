@@ -1,8 +1,15 @@
 # GradeFast
 
-Python program to grade lots of programming labs or similar projects.
+*Automate and speed up your grading*
+
+GradeFast is a Python/JavaScript program that eliminates the repetitive parts
+of grading programming assignments and lets you focus on what's important:
+helping students learn from their mistakes. Best of all, it lets you help them
+without putting much time into it!
 
 ## Dependencies
+
+### Python
 
 GradeFast requires **Python *3.4*** or later!
 
@@ -14,36 +21,28 @@ Additionally, these packages are required:
  - [Mistune](https://pypi.python.org/pypi/mistune/) to parse markdown
  - [Flask](https://pypi.python.org/pypi/Flask) because... what isn't shipped
    with a web server these days?
-
-To compile the React JSX files, you will need a working install of
-[Node.js](https://nodejs.org/) and [NPM](https://www.npmjs.com/). To install
-the Node dependencies:
-
-    npm install --global grunt-cli
-    npm install  # to install other build requirements locally
-
-Before running GradeFast, you must run `grunt` in the same directory as
-`Gruntfile.js`.
-
-### Optional Dependencies
-
- - [pyreadline](https://pypi.python.org/pypi/pyreadline) - if you want
-   autocomplete support but your system doesn't have GNU readline (e.g.
+ - [pyreadline](https://pypi.python.org/pypi/pyreadline) (OPTIONAL) - if you
+   want autocomplete support but your system doesn't have GNU readline (e.g.
    Windows and Mac OS X). Even with this module, readline support is still
    rather buggy on non-GNU-like platforms.
 
-Also, use Python 3 (in case you, like me, still live in ye olden days of
-having `python` symlinked to Python 2)
+### JavaScript
+
+The frontend UI is browser-based. To compile the JavaScript files, you will
+need a working install of [Node.js](https://nodejs.org/) and
+[NPM](https://www.npmjs.com/).
+
+To install the Node dependencies and compile the JavaScript files, run:
+
+    npm install
+    npm run build
 
 ## Usage
 
-Before running GradeFast, you need to build the JavaScript. To do this, run
-`grunt` in the same directory as `Gruntfile.js`.
+Before running GradeFast, you need to compile the JavaScript components (see
+the JavaScript dependencies above).
 
-Alternatively, you can have grunt watch the JS files for changes and
-automatically recompile them. To do this, run `grunt watchme`
-
-Finally, to start GradeFast, run:
+Then, to start GradeFast, run:
 
     python3 -m gradefast YAML_FILE [HOSTNAME [PORT]]
 

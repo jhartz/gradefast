@@ -25,11 +25,15 @@ const GradeBook = React.createClass({
                     <h1>GradeFast</h1>
                 </header>
             );
-            // Show the submission list, or a message if we don't have one yet
-            if (this.props.list.size) {
+            // Show the loading message, if needed
+            if (this.props.submissionIsLoading) {
+                section = <section><h2>Loading...</h2></section>;
+            } else if (this.props.list.size) {
+                // Show the submission list (showList must be true)
                 section = <SubmissionList submissions={this.props.list}
-                                          goToSubmissionHandler={this.goToSubmission} />;
+                                          goToSubmissionHandler={this.goToSubmission}/>;
             } else {
+                // Tell the user to get their ass moving
                 section = <section><h2>Start a submission, dammit!</h2></section>;
             }
         }
@@ -46,7 +50,8 @@ function mapStateToProps(state) {
     return {
         submissionIndex: state.get("submission_index"),
         showList: state.get("list_visible"),
-        list: state.get("list")
+        list: state.get("list"),
+        submissionIsLoading: state.get("submission_is_loading")
     };
 }
 

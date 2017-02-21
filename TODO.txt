@@ -61,6 +61,10 @@ Little TODOs:
   match the requirement)
 - For point hints, if no value is specified, then it doesn't change the point
   total -- just shows a message to the user.
+- Keep track of the timestamps of when we start/finish a submission, so at the
+  end we have some interesting stats on how long it took us to grade.
+- If a hint is worth 0, then don't include the point number in the feedback.
+- Hints can be "secret", meaning they're not shown to the user in the feedback
 
 - TODO: TODOs IN THE FILES THEMSELVES!!!
 

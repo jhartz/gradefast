@@ -1,5 +1,7 @@
 import * as s from './store'
 import HeaderContent from './HeaderContent.jsx'
+import GradeSection from './GradeSection.jsx'
+import GradeItem from './GradeItem.jsx'
 
 const Submission = React.createClass({
     handleOverallCommentsChange(event) {
@@ -36,9 +38,27 @@ const Submission = React.createClass({
                     }}>{this.props.index}: {this.props.name || "GradeFast"}</a></h1>
                 </header>
                 <section>
+                    {this.props.grades.map(function (grade, index) {
+                        // We need to have a "key" for each thing here...
+                        // https://facebook.github.io/react/docs/lists-and-keys.html#keys
+                        return ((grade.has("children") && grade.get("children")) ?
+                            (<GradeSection key={index} grade={grade} />) :
+                            (<GradeItem key={index} grade={grade} />));
+                    })}
+                    <table className="bigtable">
+                        <tbody>
+
+                        </tbody>
+                    </table>
+                    <h3>Submission Info</h3>
                     <div>
+                        <p>{this.props.name}, is late? {JSON.stringify(this.props.isLate)}, etc.</p>
+                        <p>Overall Comments:</p>
+                        <pre>{this.props.overallComments}</pre>
+                        <p>Grades:</p>
                         <pre>{JSON.stringify(this.props.grades, null, 4)}</pre>
                         <hr />
+                        <p>Grade Structure:</p>
                         <pre>{JSON.stringify(this.props.gradeStructure, null, 4)}</pre>
                     </div>
                 </section>

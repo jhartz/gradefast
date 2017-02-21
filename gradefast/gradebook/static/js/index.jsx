@@ -37,13 +37,19 @@ var Container = React.createClass({
                 // Update our list of submissions
                 store.dispatch(s.actions.setList(jsonData.list));
             }
+            /*
             if (jsonData.grade_structure) {
                 // Update our grade structure with a new one
                 store.dispatch(s.actions.setGradeStructure(jsonData.grade_structure));
             }
+            */
             if (jsonData.submission_index) {
                 // Tell the forces at large to go to this submission
                 store.dispatch(s.actions.goToSubmission(jsonData.submission_index));
+            }
+
+            if (!jsonData.list && !jsonData.submission_index) {
+                console.error("TODO: INVALID EVENT");
             }
         });
 
@@ -60,7 +66,7 @@ var Container = React.createClass({
 });
 
 window.addEventListener("load", (event) => {
-    store = Redux.createStore(s.app);
+    store = Redux.createStore(s.app, Redux.applyMiddleware(ReduxThunk.default));
     store.dispatch(s.actions.setList(initialList));
     store.dispatch(s.actions.setGradeStructure(initialGradeStructure));
     if (initialSubmissionIndex) {
