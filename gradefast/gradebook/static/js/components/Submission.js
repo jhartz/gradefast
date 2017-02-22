@@ -1,3 +1,4 @@
+import * as Immutable from "immutable";
 import * as React from "react";
 import * as ReactRedux from "react-redux";
 
@@ -5,8 +6,7 @@ import {actions} from "../actions";
 import {store} from "../store";
 
 import HeaderContent from "./HeaderContent";
-import GradeSection from "./GradeSection";
-import GradeItem from "./GradeItem";
+import GradeList from "./GradeList";
 
 const Submission = React.createClass({
     handleOverallCommentsChange(event) {
@@ -30,7 +30,7 @@ const Submission = React.createClass({
 
     render() {
         return (
-            <div>
+            <div className="container">
                 <header>
                     <HeaderContent showScore={true}
                                    currentScore={this.props.currentScore}
@@ -43,19 +43,8 @@ const Submission = React.createClass({
                     }}>{this.props.index}: {this.props.name || "GradeFast"}</a></h1>
                 </header>
                 <section>
-                    {this.props.grades.map(function (grade, index) {
-                        // We need to have a "key" for each thing here...
-                        // https://facebook.github.io/react/docs/lists-and-keys.html#keys
-                        return ((grade.has("children") && grade.get("children")) ?
-                            (<GradeSection key={index} grade={grade} />) :
-                            (<GradeItem key={index} grade={grade} />));
-                    })}
-                    <table className="bigtable">
-                        <tbody>
-
-                        </tbody>
-                    </table>
-                    <h3>Submission Info</h3>
+                    <GradeList path={Immutable.List()} grades={this.props.grades} />
+                    <h3>DEBUG: Submission Info</h3>
                     <div>
                         <p>{this.props.name}, is late? {JSON.stringify(this.props.isLate)}, etc.</p>
                         <p>Overall Comments:</p>

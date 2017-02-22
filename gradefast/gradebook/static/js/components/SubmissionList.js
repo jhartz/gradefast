@@ -1,3 +1,5 @@
+import * as React from "react";
+
 export default ({submissions, goToSubmissionHandler}) => (
     <section>
         <h2>Submissions</h2>

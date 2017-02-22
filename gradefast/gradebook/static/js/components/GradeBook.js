@@ -18,18 +18,19 @@ const GradeBook = React.createClass({
     },
 
     render() {
-        let header, section;
         if (this.props.submissionIndex !== null && !this.props.showList) {
             // Show the current submission (includes header)
-            section = <Submission showListHandler={this.showList} />;
+            return <Submission showListHandler={this.showList} />;
         } else {
             // We don't get an included header, so make one here
-            header = (
+            const header = (
                 <header>
                     <HeaderContent showScore={false} />
                     <h1>GradeFast</h1>
                 </header>
             );
+
+            let section;
             // Show the loading message, if needed
             if (this.props.submissionIsLoading) {
                 section = <section><h2>Loading...</h2></section>;
@@ -46,13 +47,13 @@ const GradeBook = React.createClass({
                     </section>
                 );
             }
+            return (
+                <div className="container">
+                    {header}
+                    {section}
+                </div>
+            );
         }
-        return (
-            <div>
-                {header}
-                {section}
-            </div>
-        );
     }
 });
 

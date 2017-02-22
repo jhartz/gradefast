@@ -16,17 +16,17 @@ const Container = React.createClass({
     },
 
     closeEventSource() {
-        if (this.state.evtSource) {
-            this.state.evtSource.close();
-            this.setState({evtSource: null});
+        if (this.state.eventSource) {
+            this.state.eventSource.close();
+            this.setState({eventSource: null});
         }
     },
 
     componentDidMount() {
-        const evtSource = new EventSource(base + "events.stream");
-        this.setState({evtSource});
+        const eventSource = new EventSource(CONFIG.BASE + "events.stream");
+        this.setState({eventSource});
 
-        evtSource.addEventListener("update", (event) => {
+        eventSource.addEventListener("update", (event) => {
             // Parse the JSON data
             let jsonData;
             try {
@@ -59,7 +59,7 @@ const Container = React.createClass({
             }
         });
 
-        evtSource.addEventListener("done", (event) => {
+        eventSource.addEventListener("done", (event) => {
             // All done! Close the event source
             console.log("EVENT: Closing event source");
             this.closeEventSource();
@@ -77,5 +77,5 @@ window.addEventListener("load", (event) => {
             <ReactRedux.Provider store={store}>
                 <Container />
             </ReactRedux.Provider>,
-        document.getElementById("container"));
+        document.getElementById("root"));
 }, false);

@@ -7,20 +7,22 @@
 </head>
 <body>
 
-<div id="container"></div>
+<div id="root"></div>
 
 <script type="text/javascript">
-var initialList = {{ initial_list|safe }};
-var initialGradeStructure = {{ initial_grade_structure|safe }};
-var initialSubmissionIndex = {{ initial_submission_index|safe }};
+var CONFIG = {
+    INITIAL_LIST: {{ initial_list|safe }},
+    INITIAL_GRADE_STRUCTURE: {{ initial_grade_structure|safe }},
+    INITIAL_SUBMISSION_INDEX: {{ initial_submission_index|safe }},
 
-// Whether to make sure when enabling or disabling hints (on grade scores) that
-// applying the hint doesn't make us go out of the grade item's range
-var check_hint_range = {{ check_hint_range|safe }};
+    // Whether to make sure when enabling or disabling hints (on grade scores) that
+    // applying the hint doesn't make us go out of the grade item's range
+    CHECK_HINT_RANGE: {{ check_hint_range|safe }},
 
-// usually /gradefast/
-var base = location.pathname.substring(0, location.pathname.lastIndexOf("gradebook"));
-var styleBase = "/static/style/";
+    // usually /gradefast/
+    BASE: location.pathname.substring(0, location.pathname.lastIndexOf("gradebook")),
+    STYLE_BASE: "/static/style/"
+};
 </script>
 <script type="text/javascript" src="/static/dist/bundle.js"></script>
 

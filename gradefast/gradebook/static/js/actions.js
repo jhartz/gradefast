@@ -126,6 +126,30 @@ export const actions = {
         // GRADE_ADD_HINT, GRADE_EDIT_HINT
         // The hint ones use "item"; the others don't
         return dispatchActionAndTellServer({type, path, value, item});
+    },
+
+    grade_setEnabled(path, value) {
+        return this.setOnGrade(GRADE_SET_ENABLED, path, value);
+    },
+
+    grade_setScore(path, value) {
+        return this.setOnGrade(GRADE_SET_SCORE, path, value);
+    },
+
+    grade_setComments(path, value) {
+        return this.setOnGrade(GRADE_SET_COMMENTS, path, value);
+    },
+
+    grade_setHint(path, item, value) {
+        return this.setOnGrade(GRADE_SET_HINT, path, value, item);
+    },
+
+    grade_addHint(path, value) {
+        return this.setOnGrade(GRADE_ADD_HINT, path, value, item);
+    },
+
+    grade_editHint(path, item, value) {
+        return this.setOnGrade(GRADE_EDIT_HINT, path, value, item);
     }
 };
 

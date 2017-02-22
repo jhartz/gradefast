@@ -17,10 +17,10 @@ export default React.createClass({
         return (
             <h2><span>
                 {score}
-                <a href={`${base}grades.csv`} title="Download Grades as CSV"
-                   target="_blank"><img src={`${styleBase}csv.png`} /></a>
-                <a href={`${base}grades.json`} title="Download Grades as JSON"
-                   target="_blank"><img src={`${styleBase}json.png`} /></a>
+                <a href={`${CONFIG.BASE}grades.csv`} title="Download Grades as CSV"
+                   target="_blank"><img src={`${CONFIG.STYLE_BASE}csv.png`} /></a>
+                <a href={`${CONFIG.BASE}grades.json`} title="Download Grades as JSON"
+                   target="_blank"><img src={`${CONFIG.STYLE_BASE}json.png`} /></a>
             </span></h2>
         );
     }

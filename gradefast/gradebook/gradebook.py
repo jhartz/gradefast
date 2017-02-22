@@ -294,10 +294,9 @@ class GradeBook:
                 })
         elif "path" in action and "value" in action:
             # We have a command with a path
-            path = action["path"].split(".")
-            if len(path) <= 1:
+            path = action["path"]
+            if len(path) == 0:
                 raise grades.BadPathException()
-            path = path[1:]
 
             grade_item = grade.get_by_path(path)
             value = action["value"]
