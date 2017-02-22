@@ -1,8 +1,14 @@
-import {reportError} from './common'
-import GradeBook from './GradeBook.jsx'
-import * as s from './store'
+import * as React from "react";
+import * as ReactDOM from "react-dom";
+import * as ReactRedux from "react-redux";
 
-var Container = React.createClass({
+import {reportError} from "./common";
+import {actions} from "./actions";
+import {store, initStore} from "./store";
+
+import GradeBook from "./components/GradeBook";
+
+const Container = React.createClass({
     render() {
         return (
             <GradeBook />
@@ -17,12 +23,12 @@ var Container = React.createClass({
     },
 
     componentDidMount() {
-        var evtSource = new EventSource(base + "events.stream");
+        const evtSource = new EventSource(base + "events.stream");
         this.setState({evtSource});
 
         evtSource.addEventListener("update", (event) => {
             // Parse the JSON data
-            var jsonData;
+            let jsonData;
             try {
                 jsonData = JSON.parse(event.data);
             } catch (err) {
@@ -35,17 +41,17 @@ var Container = React.createClass({
 
             if (jsonData.list) {
                 // Update our list of submissions
-                store.dispatch(s.actions.setList(jsonData.list));
+                store.dispatch(actions.setList(jsonData.list));
             }
             /*
             if (jsonData.grade_structure) {
                 // Update our grade structure with a new one
-                store.dispatch(s.actions.setGradeStructure(jsonData.grade_structure));
+                store.dispatch(actions.setGradeStructure(jsonData.grade_structure));
             }
             */
             if (jsonData.submission_index) {
                 // Tell the forces at large to go to this submission
-                store.dispatch(s.actions.goToSubmission(jsonData.submission_index));
+                store.dispatch(actions.goToSubmission(jsonData.submission_index));
             }
 
             if (!jsonData.list && !jsonData.submission_index) {
@@ -66,12 +72,7 @@ var Container = React.createClass({
 });
 
 window.addEventListener("load", (event) => {
-    store = Redux.createStore(s.app, Redux.applyMiddleware(ReduxThunk.default));
-    store.dispatch(s.actions.setList(initialList));
-    store.dispatch(s.actions.setGradeStructure(initialGradeStructure));
-    if (initialSubmissionIndex) {
-        store.dispatch(s.actions.goToSubmission(initialSubmissionIndex));
-    }
+    initStore();
     ReactDOM.render(
             <ReactRedux.Provider store={store}>
                 <Container />

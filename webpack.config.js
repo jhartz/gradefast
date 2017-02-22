@@ -14,9 +14,10 @@ module.exports = {
             }
         ]
     },
-    entry: "./gradefast/gradebook/static/js/index.jsx",
+    entry: "./gradefast/gradebook/static/js/index.js",
     output: {
         filename: "bundle.js",
-        path: path.resolve(__dirname, "gradefast/gradebook/static/dist/bundle.js")
-    }
+        path: path.resolve(__dirname, "gradefast/gradebook/static/dist/")
+    },
+    devtool: "#source-map"
 };

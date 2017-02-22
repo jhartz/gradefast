@@ -7,7 +7,7 @@
  * @param {Event} [event] - An error or event object to log.
  */
 export function reportError(completed, path, status, details, event) {
-    var pre;
+    let pre;
     if (completed) {
         pre = `Invalid response from ${path} (status: ${status})`;
     } else {
@@ -18,17 +18,17 @@ export function reportError(completed, path, status, details, event) {
 }
 
 export function post(index, action, onsuccess) {
-    var path = "_update";
+    const path = "_update";
 
-    var fd = new FormData();
+    const fd = new FormData();
     fd.append("submission_id", index);
     fd.append("action", JSON.stringify(action));
 
-    var xhr = new XMLHttpRequest();
+    const xhr = new XMLHttpRequest();
 
     xhr.addEventListener("load", (event) => {
         // Parse the JSON data
-        var jsonData;
+        let jsonData;
         try {
             jsonData = JSON.parse(xhr.responseText);
         } catch (err) {

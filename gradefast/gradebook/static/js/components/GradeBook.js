@@ -1,19 +1,24 @@
-import * as s from './store'
-import Submission from './Submission.jsx'
-import HeaderContent from './HeaderContent.jsx'
-import SubmissionList from './SubmissionList.jsx'
+import * as React from "react";
+import * as ReactRedux from "react-redux";
+
+import {actions} from "../actions";
+import {store} from "../store";
+
+import Submission from "./Submission";
+import HeaderContent from "./HeaderContent";
+import SubmissionList from "./SubmissionList";
 
 const GradeBook = React.createClass({
     showList() {
-        store.dispatch(s.actions.setListVisibility(true));
+        store.dispatch(actions.setListVisibility(true));
     },
 
     goToSubmission(index) {
-        store.dispatch(s.actions.goToSubmission(index));
+        store.dispatch(actions.goToSubmission(index));
     },
 
     render() {
-        var header, section;
+        let header, section;
         if (this.props.submissionIndex !== null && !this.props.showList) {
             // Show the current submission (includes header)
             section = <Submission showListHandler={this.showList} />;
@@ -34,7 +39,12 @@ const GradeBook = React.createClass({
                                           goToSubmissionHandler={this.goToSubmission}/>;
             } else {
                 // Tell the user to get their ass moving
-                section = <section><h2>Start a submission, dammit!</h2></section>;
+                section = (
+                    <section>
+                        <h2>Start a submission, dammit!</h2>
+                        <p className="centered"><a href="https://www.youtube.com/watch?v=oY47hdblMto" target="_blank">Clock's a-tickin'</a></p>
+                    </section>
+                );
             }
         }
         return (

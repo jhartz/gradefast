@@ -1,6 +1,8 @@
+import * as React from "react";
+
 export default React.createClass({
     render() {
-        var score;
+        let score;
         if (this.props.showScore) {
             score = <span>
                 <label>Current Score: </label>{this.props.currentScore}&nbsp;/&nbsp;{this.props.maxScore}

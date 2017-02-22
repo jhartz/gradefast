@@ -73,6 +73,15 @@ section {
     color: #011826;
 }
 
+a {
+    color: inherit;
+    text-decoration: underline;
+}
+
+a:hover {
+    text-decoration: none;
+}
+
 .box {
     margin: 8px auto;
     max-width: 80%;
@@ -106,7 +115,7 @@ header h2 img {
     vertical-align: middle;
 }
 
-section h2 {
+section h2, .centered {
     text-align: center;
 }
 

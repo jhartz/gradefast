@@ -9,7 +9,7 @@ structure of the grading and the commands to run. For more, see README.md.
 
 Licensed under the MIT License. For more, see the LICENSE file.
 
-Author: Jake Hartz <jhartz@mail.rit.edu>
+Author: Jake Hartz <jake@hartz.io>
 """
 
 from .grader import Grader

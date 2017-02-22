@@ -3,7 +3,7 @@ Events that can be passed to an instance of the GradeBook class.
 
 Licensed under the MIT License. For more, see the LICENSE file.
 
-Author: Jake Hartz <jhartz@mail.rit.edu>
+Author: Jake Hartz <jake@hartz.io>
 """
 
 import json

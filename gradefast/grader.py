@@ -4,7 +4,7 @@ Grader class to handle the grading subsystem
 
 Licensed under the MIT License. For more, see the LICENSE file.
 
-Author: Jake Hartz <jhartz@mail.rit.edu>
+Author: Jake Hartz <jake@hartz.io>
 """
 import sys
 import os
@@ -924,7 +924,11 @@ class CommandRunner:
         :return: True to move on to the next command,
                  False to move on to the next submission
         """
-        self._io.status("-" * 50)
+        status_title = ("-" * 4) + submission.name
+        if len(status_title) < 50:
+            status_title += "-" * (50 - len(status_title))
+        self._io.status(status_title)
+
         self._io.status("::: " + cmd["name"])
         self._io.print_bright("    " + cmd["command"])
         self._io.print("")

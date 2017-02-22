@@ -3,7 +3,7 @@ The GradeBook HTTP server.
 
 Licensed under the MIT License. For more, see the LICENSE file.
 
-Author: Jake Hartz <jhartz@mail.rit.edu>
+Author: Jake Hartz <jake@hartz.io>
 """
 import os
 import sys
@@ -109,7 +109,6 @@ class GradeBook:
         def _gradefast_gradebook_HTM():
             return flask.render_template(
                 "gradebook.html",
-                PRODUCTION=False,
                 initial_list=json.dumps([]),
                 initial_grade_structure=json.dumps(self._grade_structure),
                 initial_submission_index=json.dumps(self._current_submission_id),
@@ -134,21 +133,26 @@ class GradeBook:
         @app.route("/gradefast/_update", methods=["POST"])
         def _gradefast_update():
             try:
+                if "submission_id" not in flask.request.form:
+                    return json.dumps({
+                        "status": "Missing submission ID"
+                    })
                 grade = self._get_grade(flask.request.form["submission_id"])
                 if grade is None:
                     return json.dumps({
                         "status": "Invalid submission ID"
                     })
 
-                action = flask.request.form["action"]
-                try:
-                    action = json.loads(action)
-                except json.JSONDecodeError:
-                    return json.dumps({
-                        "status": "Invalid action"
-                    })
+                if "action" in flask.request.form:
+                    action = flask.request.form["action"]
+                    try:
+                        action = json.loads(action)
+                    except json.JSONDecodeError:
+                        return json.dumps({
+                            "status": "Invalid action"
+                        })
 
-                self._parse_action(action, grade)
+                    self._parse_action(action, grade)
 
                 # Return the current state of this grade
                 points_earned, points_total, _ = grade.get_score()
@@ -159,7 +163,7 @@ class GradeBook:
                     "overall_comments": grade.overall_comments,
                     "current_score": points_earned,
                     "max_score": points_total,
-                    "values": grade.get_values()
+                    "grades": grade.get_plain_grades()
                 })
             except grades.BadPathException:
                 return json.dumps({
@@ -250,7 +254,7 @@ class GradeBook:
         :param action: The action to run (as a dict)
         :param grade: The GradeStructure instance to execute the action on
         """
-        type = action["type"]
+        type = action["type"] if "type" in action else None
         if type == "SET_LATE" and "is_late" in action:
             # Set whether the submission is marked as late
             grade.is_late = bool(action["is_late"])
@@ -259,10 +263,31 @@ class GradeBook:
             grade.overall_comments = action["overall_comments"]
         elif type == "ADD_HINT" and "path" in action and "name" in action and \
                 "value" in action:
-            # Change the grade structure (MUA HA HA HA)
+            # Add a hint by changing the grade structure (MUA HA HA HA)
+            path = action["path"].split(".")
+            if len(path) <= 1:
+                raise grades.BadPathException()
+            path = path[1:]
+
             grade.add_value_to_all_grades(
-                action["path"],
+                path,
                 "hints",
+                {
+                    "name": action["name"],
+                    "value": grades.make_number(action["value"])
+                })
+        elif type == "EDIT_HINT" and "path" in action and "name" in action and \
+                "value" in action and "item" in action:
+            # Edit a hint by changing the grade structure (MUA HA HA HA)
+            path = action["path"].split(".")
+            if len(path) <= 1:
+                raise grades.BadPathException()
+            path = path[1:]
+
+            grade.replace_value_for_all_grades(
+                path,
+                "hints",
+                action["index"],
                 {
                     "name": action["name"],
                     "value": grades.make_number(action["value"])
@@ -272,24 +297,19 @@ class GradeBook:
             path = action["path"].split(".")
             if len(path) <= 1:
                 raise grades.BadPathException()
-
             path = path[1:]
-            index = None
-            if type == "SET_HINT":
-                index = path[-1]
-                path = path[:-1]
 
-            grade_item = grade.get_by_path(path[1:])
+            grade_item = grade.get_by_path(path)
             value = action["value"]
 
             if type == "SET_ENABLED":
                 grade_item.set_enabled(bool(value))
             elif type == "SET_POINTS":
-                grade_item.set_points(value)
+                grade_item.set_score(value)
             elif type == "SET_COMMENTS":
                 grade_item.set_comments(value)
-            elif type == "SET_HINT":
-                grade_item.set_hint(index, bool(value))
+            elif type == "SET_HINT" and "index" in action:
+                grade_item.set_hint(action["index"], bool(value))
 
     def get_grades(self):
         """

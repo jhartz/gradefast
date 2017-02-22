@@ -4,7 +4,7 @@ Run gradefast with the input of a YAML file.
 
 Licensed under the MIT License. For more, see the LICENSE file.
 
-Author: Jake Hartz <jhartz@mail.rit.edu>
+Author: Jake Hartz <jake@hartz.io>
 """
 import os
 import sys

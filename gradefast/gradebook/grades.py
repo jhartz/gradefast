@@ -3,7 +3,7 @@ Classes and methods for handling grades and feedback for submissions.
 
 Licensed under the MIT License. For more, see the LICENSE file.
 
-Author: Jake Hartz <jhartz@mail.rit.edu>
+Author: Jake Hartz <jake@hartz.io>
 """
 
 FEEDBACK_HTML_TEMPLATES = {
@@ -202,6 +202,7 @@ class GradeItem:
         self.enabled = None
         self.hints = []
         self.hints_set = {}
+        self.note = None
 
         if structure:
             self.name = structure["name"]
@@ -264,6 +265,16 @@ class GradeItem:
             any children
         """
         raise NotImplementedError("get_feedback must be implemented by "
+                                  "subclass")
+
+    def to_plain_data(self):
+        """
+        Get a representation of this grade item as plain data (just lists,
+        dicts, etc.)
+
+        :return: A dictionary representing this grade item.
+        """
+        raise NotImplementedError("to_plain_data must be implemented by "
                                   "subclass")
 
     def enumerate_enabled_children(self):
@@ -357,6 +368,19 @@ class GradeScore(GradeItem):
 
         return feedback
 
+    def to_plain_data(self):
+        return {
+            "name": self.name,
+            "enabled": self.enabled,
+            "hints": self.hints,
+            "hints_set": self.hints_set,
+            "note": self.note,
+            # TODO: Update the JS side of things to make the proper "points" vs. "score" distinction
+            "points": self.points,
+            "score": self.score,
+            "comments": self.comments
+        }
+
     def set_score(self, score):
         """
         Set the points (score) for this grade item.
@@ -364,6 +388,14 @@ class GradeScore(GradeItem):
         :param score: The earned score (anything castable to float)
         """
         self.score = make_number(score)
+
+    def set_comments(self, comments):
+        """
+        Set the comments for this grade item.
+
+        :param comments: The new comment
+        """
+        self.comments = comments
 
 
 class GradeSection(GradeItem):
@@ -461,6 +493,16 @@ class GradeSection(GradeItem):
 
         return feedback
 
+    def to_plain_data(self):
+        return {
+            "name": self.name,
+            "enabled": self.enabled,
+            "hints": self.hints,
+            "hints_set": self.hints_set,
+            "note": self.note,
+            "children": [child.to_plain_data() for child in self.children]
+        }
+
 
 class GradeRoot(GradeItem):
     """
@@ -471,6 +513,10 @@ class GradeRoot(GradeItem):
         super().__init__(None, **kwargs)
 
         self.children = _create_tree_from_structure(structure, **kwargs)
+
+    def enumerate_all(self, include_disabled=False):
+        for item in self.children:
+            yield from item.enumerate_all()
 
     def get_point_titles(self, include_disabled=False):
         items = []
@@ -498,13 +544,12 @@ class GradeRoot(GradeItem):
 
         return points_earned, points_possible, individual_points
 
-    def enumerate_all(self, include_disabled=False):
-        for item in self.children:
-            yield from item.enumerate_all()
-
     def get_feedback(self, is_late, depth=0):
         return "\n".join(item.get_feedback(is_late, depth + 1)
                          for item in self.children)
+
+    def to_plain_data(self):
+        return [child.to_plain_data() for child in self.children]
 
 
 def _create_tree_from_structure(structure, **kwargs):
@@ -612,6 +657,31 @@ class SubmissionGrade:
         else:
             raise BadPathException("%s not found at path %s" % (name, path))
 
+    def replace_value_for_all_grades(self, path, name, index, value):
+        """
+        Replace an existing hint for ALL grade structures (by modifying an
+        array still tied into the original grade_structure).
+
+        :param path: A list of ints that acts as a path of indices representing
+            a location within the grade item tree
+        :param name: The name of the list to add to (for example, "hints")
+        :param index: The index of the list item to replace
+        :param value: The value to add
+        """
+        if len(path) == 0:
+            raise BadPathException()
+        item = self.get_by_path(path)
+
+        # Replace the item
+        if hasattr(item, name):
+            lst = getattr(item, name)
+            if index < 0 or len(lst) >= index:
+                raise BadPathException("Invalid index %s in %s at path %s" %
+                                       (index, name, path))
+            lst[index] = value
+        else:
+            raise BadPathException("%s not found at path %s" % (name, path))
+
     def get_score(self):
         """
         Calculate the total score (all points added up) for this submission.
@@ -629,6 +699,12 @@ class SubmissionGrade:
         return FEEDBACK_HTML_TEMPLATES["base"] % (
                 self._grades.get_feedback(self.is_late),
                 self._md(self.overall_comments))
+
+    def get_plain_grades(self):
+        """
+        Get the grade values as plain old lists and dicts.
+        """
+        return self._grades.to_plain_data()
 
     ###########################################################################
 

@@ -1,26 +1,31 @@
-import * as s from './store'
-import HeaderContent from './HeaderContent.jsx'
-import GradeSection from './GradeSection.jsx'
-import GradeItem from './GradeItem.jsx'
+import * as React from "react";
+import * as ReactRedux from "react-redux";
+
+import {actions} from "../actions";
+import {store} from "../store";
+
+import HeaderContent from "./HeaderContent";
+import GradeSection from "./GradeSection";
+import GradeItem from "./GradeItem";
 
 const Submission = React.createClass({
     handleOverallCommentsChange(event) {
-        store.dispatch(s.actions.setOverallComments(event.target.value));
+        store.dispatch(actions.setOverallComments(event.target.value));
         this.resizeOverallComments();
     },
 
     resizeOverallComments() {
-        var elem = this.refs.overallComments;
+        const elem = this.refs.overallComments;
         // Reset the height
         elem.style.height = "auto";
         // Calculate new height (min 40px, max 140px)
-        var newHeight = Math.max(Math.min(elem.scrollHeight + 3, 140), 40);
+        const newHeight = Math.max(Math.min(elem.scrollHeight + 3, 140), 40);
         elem.style.height = newHeight + "px";
         //elem.parentNode.style.height = (newHeight + 27) + "px";
     },
     
     setLate(isLate) {
-        store.dispatch(s.actions.setLate(isLate));
+        store.dispatch(actions.setLate(isLate));
     },
 
     render() {

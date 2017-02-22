@@ -4,11 +4,6 @@
     <meta charset="UTF-8">
     <title>GradeFast grade book</title>
     <link rel="stylesheet" type="text/css" href="/static/style/style.css">
-    <script type="text/javascript" src="/static/lib/immutable.min.js"></script>
-    <script type="text/javascript" src="/static/lib/react{% if PRODUCTION %}.min{% endif %}.js"></script>
-    <script type="text/javascript" src="/static/lib/react-dom{% if PRODUCTION %}.min{% endif %}.js"></script>
-    <script type="text/javascript" src="/static/lib/redux.min.js"></script>
-    <script type="text/javascript" src="/static/lib/react-redux{% if PRODUCTION %}.min{% endif %}.js"></script>
 </head>
 <body>
 
@@ -24,12 +19,10 @@ var initialSubmissionIndex = {{ initial_submission_index|safe }};
 var check_hint_range = {{ check_hint_range|safe }};
 
 // usually /gradefast/
-var base = location.pathname.substring(0, location.pathname.indexOf("gradebook"));
+var base = location.pathname.substring(0, location.pathname.lastIndexOf("gradebook"));
 var styleBase = "/static/style/";
-
-var store;
 </script>
-<script type="text/javascript" src="/static/build/bundle.js"></script>
+<script type="text/javascript" src="/static/dist/bundle.js"></script>
 
 </body>
 </html>
