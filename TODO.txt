@@ -93,6 +93,6 @@ Big TODOs:
       delete the earlier one
     - Actually, in general, delete the earlier one for any submissions that
       have multiple submissions (unless one is on time and other is late)
-- Continuous integration that builds NPM dist and then zips everything up and
-  throws it on gh-pages (to make it easier to download and run right away on a
-  new machine)
+- Push the "dist/" folder to GitHub, so that people can use GradeFast without
+  needing npm. (But, with a big fat notice in the README that, if they modify
+  any of the JS files, they'll need to "npm run build" to see the effects)
