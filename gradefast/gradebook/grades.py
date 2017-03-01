@@ -639,8 +639,8 @@ class SubmissionGrade:
 
     def add_value_to_all_grades(self, path, name, value):
         """
-        Add a new possible hint to ALL grade structures (by modifying an array
-        still tied into the original grade_structure).
+        Add a new list value (e.g. a new possible hint) to ALL grade structures
+        (by modifying a list still tied into the original grade_structure).
 
         :param path: A list of ints that acts as a path of indices representing
             a location within the grade item tree
@@ -659,14 +659,15 @@ class SubmissionGrade:
 
     def replace_value_for_all_grades(self, path, name, index, value):
         """
-        Replace an existing hint for ALL grade structures (by modifying an
-        array still tied into the original grade_structure).
+        Replace an existing list value (e.g. for modifying a hint for ALL grade
+        structures (by modifying a list still tied into the original
+        grade_structure).
 
         :param path: A list of ints that acts as a path of indices representing
             a location within the grade item tree
-        :param name: The name of the list to add to (for example, "hints")
+        :param name: The name of the list to modify (for example, "hints")
         :param index: The index of the list item to replace
-        :param value: The value to add
+        :param value: The new value
         """
         if len(path) == 0:
             raise BadPathException()
