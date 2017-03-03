@@ -7,8 +7,8 @@ import GradeHeader from "./GradeHeader";
 import GradeList from "./GradeList";
 
 const GradeSection = React.createClass({
-    handleSetEnabled(event) {
-        store.dispatch(actions.grade_setEnabled(this.props.path, event.target.checked));
+    handleSetEnabled(isEnabled) {
+        store.dispatch(actions.grade_setEnabled(this.props.path, isEnabled));
     },
 
     render() {
@@ -16,13 +16,14 @@ const GradeSection = React.createClass({
             <div>
                 <GradeHeader path={this.props.path}
                              grade={this.props.grade}
-                             setEnabledHandler={this.handleSetEnabled}
+                             hintsTitle="Section Hints"
+                             onSetEnabled={this.handleSetEnabled}
                 />
-                <p>GradeSection: path is {JSON.stringify(this.props.path)}</p>
-                <p>TODO: Section deductions</p>
-                <div className="row-children">
-                    <GradeList path={this.props.path} grades={this.props.grade.get("children")} />
-                </div>
+                {!this.props.grade.get("enabled") ? undefined :
+                    <div className="row-children">
+                        <GradeList path={this.props.path} grades={this.props.grade.get("children")}/>
+                    </div>
+                }
             </div>
         );
     }

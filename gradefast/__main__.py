@@ -6,7 +6,8 @@ Licensed under the MIT License. For more, see the LICENSE file.
 
 Author: Jake Hartz <jake@hartz.io>
 """
-import sys, os
+import sys
+import os
 
 from .runyaml import run
 
@@ -14,21 +15,21 @@ from .runyaml import run
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8051
 
+USAGE = """
+    "YAML_FILE" contains the structure of the grading and the commands to run.
+    "HOSTNAME"  is the hostname to run the grade book HTTP server on.
+                Default: localhost
+    "PORT"      is the port to run the grade book HTTP server on.
+                Default: 8051
+"""
+
 
 if __name__ == "__main__":
     # Make sure that we have a YAML file
     if len(sys.argv) <= 1:
         print("Usage: %s -m gradefast YAML_FILE [HOSTNAME [PORT]]" %
               os.path.basename(sys.executable))
-        print("")
-        print("    \"YAML_FILE\" contains the structure of the grading and " +
-              "the commands to run.")
-        print("    \"HOSTNAME\"  is the hostname to run the grade book HTTP " +
-              "server on.")
-        print("                Default: localhost")
-        print("    \"PORT\"      is the port to run the grade book HTTP " +
-              "server on.")
-        print("                Default: 8051")
+        print(USAGE)
         sys.exit(2)
 
     # Figure out the hostname and port for the server

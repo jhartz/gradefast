@@ -1,3 +1,6 @@
+import {actions} from "./actions";
+import {store} from "./store";
+
 /**
  * Report an HTTP request error.
  * @param {boolean} completed - Whether the request actually completed.
@@ -19,11 +22,12 @@ export function reportError(completed, path, status, details, event) {
 
 const XHR_POST_ENDPOINT = CONFIG.BASE + "_update";
 
-export function post(index, action, onsuccess) {
-    console.log("DEBUG: POST request action:", JSON.parse(JSON.stringify(action)));
+export function post(index, action) {
+    //console.log("DEBUG: POST request action:", JSON.parse(JSON.stringify(action)));
 
     const fd = new FormData();
     fd.append("submission_id", index);
+    fd.append("client_id", "" + CONFIG.CLIENT_ID);
     fd.append("action", JSON.stringify(action));
 
     const xhr = new XMLHttpRequest();
@@ -37,12 +41,24 @@ export function post(index, action, onsuccess) {
             reportError(true, path, xhr.statusText, xhr.responseText, event);
             return;
         }
-        console.log("DEBUG: POST response:", jsonData);
+        //console.log("DEBUG: POST response:", jsonData);
 
         // Check the data's status
         if (jsonData && jsonData.status === "Aight") {
             // Woohoo, all good!
-            onsuccess(jsonData);
+            // TODO: This should be handled by the server in a server-sent event
+            if (jsonData.submission_update) {
+                store.dispatch(actions.initSubmission(
+                    jsonData.originating_client_id,
+                    jsonData.submission_update.index,
+                    jsonData.submission_update.name,
+                    jsonData.submission_update.is_late,
+                    jsonData.submission_update.overall_comments,
+                    jsonData.submission_update.current_score,
+                    jsonData.submission_update.max_score,
+                    jsonData.submission_update.grades
+                ))
+            }
         } else {
             // Bleh, not good :(
             reportError(true, XHR_POST_ENDPOINT, xhr.statusText, JSON.stringify(jsonData, null, 2), event);
@@ -61,7 +77,7 @@ export function post(index, action, onsuccess) {
  * Generate an element ID from a set of keys.
  */
 export function id() {
-    let str = "";
+    let str = "id";
     for (let i = 0; i < arguments.length; i++) {
         str += "_" + arguments[i];
     }

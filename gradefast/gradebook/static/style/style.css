@@ -103,6 +103,11 @@ h6 {
     font-size: 14px;
 }
 
+div.subtitle {
+    font-weight: bold;
+    font-style: italic;
+}
+
 summary {
     cursor: default;
 }
@@ -124,8 +129,13 @@ input.big-checkbox {
     zoom: 1.5;
 }
 
-.points-input {
-    width: 60px;
+input[type=number] {
+    max-width: 3.5em;
+}
+
+input.flat, button.flat {
+    border: 1px solid;
+    box-shadow: 1px 1px 1px rgba(0, 0, 0, 0.17);
 }
 
 textarea {
@@ -155,12 +165,20 @@ div.row-children {
     margin-left: 20px;
 }
 
-div.row-notes {
-    float: right;
+table.header-table > tbody > tr > td {
+    vertical-align: top;
 }
 
-hr.row-divider {
-    clear: both;
+table.header-table > tbody > tr > td:first-child {
+    min-width: 50%;
+}
+
+table.hint-table {
+    width: 100%;
+}
+
+table.hint-table > tbody > tr > td {
+    vertical-align: top;
 }
 
 /*

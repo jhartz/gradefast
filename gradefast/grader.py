@@ -18,10 +18,7 @@ import io
 try:
     import readline
 except ImportError:
-    #try:
-    #    import pyreadline as readline
-    #except ImportError:
-        readline = None
+    readline = None
 
 try:
     from colorama import init, Fore, Back, Style
@@ -35,7 +32,7 @@ except ImportError:
 from .gradebook import events
 
 
-def _cmd_exists(cmd):
+def _cmd_exists(cmd: str) -> bool:
     """Determine whether a command exists on this system"""
     return subprocess.call(["which", cmd], stdout=subprocess.DEVNULL,
                            stderr=subprocess.DEVNULL) == 0

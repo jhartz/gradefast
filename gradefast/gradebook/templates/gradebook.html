@@ -11,12 +11,14 @@
 
 <script type="text/javascript">
 var CONFIG = {
+    CLIENT_ID: {{ client_id|safe }},
+
     INITIAL_LIST: {{ initial_list|safe }},
-    INITIAL_GRADE_STRUCTURE: {{ initial_grade_structure|safe }},
+    //INITIAL_GRADE_STRUCTURE: {{ initial_grade_structure|safe }},
     INITIAL_SUBMISSION_INDEX: {{ initial_submission_index|safe }},
 
-    // Whether to make sure when enabling or disabling hints (on grade scores) that
-    // applying the hint doesn't make us go out of the grade item's range
+    // The default value for whether to make sure that, when enabling or disabling hints (on grade
+    // scores), applying the hint doesn't make us go out of the grade item's range
     CHECK_HINT_RANGE: {{ check_hint_range|safe }},
 
     // usually /gradefast/

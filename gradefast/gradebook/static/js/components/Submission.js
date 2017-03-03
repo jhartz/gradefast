@@ -5,25 +5,15 @@ import * as ReactRedux from "react-redux";
 import {actions} from "../actions";
 import {store} from "../store";
 
+import SizingTextarea from "./SizingTextarea";
 import HeaderContent from "./HeaderContent";
 import GradeList from "./GradeList";
 
 const Submission = React.createClass({
-    handleOverallCommentsChange(event) {
-        store.dispatch(actions.setOverallComments(event.target.value));
-        this.resizeOverallComments();
+    handleOverallCommentsChange(value) {
+        store.dispatch(actions.setOverallComments(value));
     },
 
-    resizeOverallComments() {
-        const elem = this.refs.overallComments;
-        // Reset the height
-        elem.style.height = "auto";
-        // Calculate new height (min 40px, max 140px)
-        const newHeight = Math.max(Math.min(elem.scrollHeight + 3, 140), 40);
-        elem.style.height = newHeight + "px";
-        //elem.parentNode.style.height = (newHeight + 27) + "px";
-    },
-    
     setLate(isLate) {
         store.dispatch(actions.setLate(isLate));
     },
@@ -44,30 +34,16 @@ const Submission = React.createClass({
                 </header>
                 <section>
                     <GradeList path={Immutable.List()} grades={this.props.grades} />
-                    <h3>DEBUG: Submission Info</h3>
-                    <div>
-                        <p>{this.props.name}, is late? {JSON.stringify(this.props.isLate)}, etc.</p>
-                        <p>Overall Comments:</p>
-                        <pre>{this.props.overallComments}</pre>
-                        <p>Grades:</p>
-                        <pre>{JSON.stringify(this.props.grades, null, 4)}</pre>
-                        <hr />
-                        <p>Grade Structure:</p>
-                        <pre>{JSON.stringify(this.props.gradeStructure, null, 4)}</pre>
-                    </div>
                 </section>
                 <footer>
-                    <textarea ref="overallComments" style={{height: "100%"}}
-                              placeholder="Overall Comments (Markdown-parsed)"
-                              value={this.props.overallComments}
-                              onChange={this.handleOverallCommentsChange} />
+                    <SizingTextarea onChange={this.handleOverallCommentsChange}
+                                    placeholder="Overall Comments (Markdown-parsed)"
+                                    value={this.props.overallComments}
+                                    minRows={3}
+                    />
                 </footer>
             </div>
         );
-    },
-
-    componentDidMount() {
-        this.resizeOverallComments();
     }
 });
 
@@ -79,8 +55,7 @@ function mapStateToProps(state) {
         overallComments: state.get("submission_overall_comments"),
         currentScore: state.get("submission_current_score"),
         maxScore: state.get("submission_max_score"),
-        grades: state.get("submission_grades"),
-        gradeStructure: state.get("grade_structure")
+        grades: state.get("submission_grades")
     };
 }
 

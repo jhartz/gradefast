@@ -11,60 +11,56 @@ Links for current redesign:
 
 Little TODOs:
 
-- When we send which submission we're on to the gradebook, pass in the index too
-  (so that when we go back or jump around it don't throw it off)
-- For sections, add a "scale" option that takes a ratio to scale the section by
-  (or a string representing a fraction)
-- subprocess.CREATE_NEW_PROCESS_GROUP (if it's a background process)
-  Then catch Ctrl-C manually (in the "Waiting" stage) and do process.terminate()
-  Also test the current functionality on linux... and this might be useful:
+- When we send which submission we're on to the gradebook, pass in the index too (so that when we
+  go back or jump around it don't throw it off)
+- For sections, add a "scale" option that takes a ratio to scale the section by (or a string
+  representing a fraction)
+- subprocess.CREATE_NEW_PROCESS_GROUP (if it's a background process). Then catch Ctrl-C manually
+  (in the "Waiting" stage) and do process.terminate(). Also test the current functionality on
+  linux; and this might be useful:
   http://stackoverflow.com/questions/18255730/popen-new-process-group-on-linux
-- Like entering grades on mycourses, mark background in gradebook when a grade
-  item is modified
-- For grade structures, add "collapsible" option to collapse the structure if
-  it's either 0 or 100 (and with no comments/point hints/section deductions,
-  and all grade items are exactly full points)
+- Like entering grades on mycourses, mark background in gradebook when a grade item is modified
+- For grade structures, add "collapsible" option to collapse the structure if it's either 0 or 100
+  (and with no comments/point hints/section deductions, and all grade items are exactly full points)
 - Unicode issues (in comments, shows up weird in CSV file)
-- 3 states for grade structures: enabled, disabled, or collapsed, in which case
-  any sub grades are not shown, and we just enter one big point value, one big
-  comment.
-- Add "check point hint range" into YAML file
-- Better signaling between gradebook and grader (can still be 1-way, since the
-  gradebook shouldn't really have to communicate with the grader).
+- 3 states for grade structures: enabled, disabled, or collapsed, in which case any sub grades are
+  not shown, and we just enter one big point value, one big comment.
+- Add "check point hint range" into YAML file (this should *really* be an option for each
+  individual grade item, maybe with a global default)
+- Better signaling between gradebook and grader (can still be 1-way, since the gradebook shouldn't
+  really have to communicate with the grader).
   Things we could do with this:
   - Make a section in the YAML commands to take the output of a command (or
     the last line of output) and use that as the grade for a certain grading
     item (identified by name... if there's more than 1, then they both get it)
-- Make "pre-run" and "post-cleanup" sections in the YAML file with commands to
-  run before starting any grading, and after all the grading is complete.
-  (Store that the pre-run was run so that it'll store in the savefile)
-- When asking whether a directory satisfies our innate human needs, and the
-  user enters a new one, make it relative to the *current directory*,
-  NOT the root of the submission.
-- New YAML file command environmental variable: GRADEFAST_ROOT (the path to the
-  GradeFast package / main script)
+- Make "pre-run" and "post-cleanup" sections in the YAML file with commands to run before starting
+  any grading, and after all the grading is complete. (Store that the pre-run was run so that it'll
+  store in the savefile)
+- When asking whether a directory satisfies our innate human needs, and the user enters a new one,
+  make it relative to the *current directory*, NOT the root of the submission.
+- New YAML file command environmental variable: GRADEFAST_ROOT (the path to the GradeFast package /
+  main script)
 - Option to "steal back" terminal/cmd window focus after running a command
-- For comments, instead of textareas, show the rendered Markdown, then, on
-  click, switch it to a textarea (until it loses focus)
-- For "folder"s in the command section of the YAML file, add "confirm" option
-  that defaults to true, but if set to false, skips the "Does this folder
-  satisfy your innate human needs?" prompt
-- When running a command, ability to NOT do diff, or to enter a different diff
-  filename. (same w/ input)
-- Add ability to specify a max running time for a process (useful for
-  background commands), and then some sort of action if it's cut off (like
-  above idea of using program output as comment text)
-- Better ability to select a folder (some sort of fancy CLI folder select
-  dialog)
-- When specifying a folder, add ability to specify "required files" that must
-  be in the folder (and option with it to look thru sub-folders to see if any
-  match the requirement)
-- For point hints, if no value is specified, then it doesn't change the point
-  total -- just shows a message to the user.
-- Keep track of the timestamps of when we start/finish a submission, so at the
-  end we have some interesting stats on how long it took us to grade.
+- For comments, instead of textareas, show the rendered Markdown, then, on click, switch it to a
+  textarea (until it loses focus)
+- For "folder"s in the command section of the YAML file, add "confirm" option that defaults to true,
+  but if set to false, skips the "Does this folder satisfy your innate human needs?" prompt
+- When running a command, ability to NOT do diff, or to enter a different diff filename. (same w/
+  input)
+- Add ability to specify a max running time for a process (useful for background commands), and
+  then some sort of action if it's cut off (like above idea of using program output as comment text)
+- Better ability to select a folder (some sort of fancy CLI folder select dialog)
+- When specifying a folder, add ability to specify "required files" that must be in the folder (and
+  option with it to look thru sub-folders to see if any match the requirement)
+- For point hints, if no value is specified, then it doesn't change the point total -- just shows a
+  message to the user.
+- Keep track of the timestamps of when we start/finish a submission, so at the end we have some
+  interesting stats on how long it took us to grade.
 - If a hint is worth 0, then don't include the point number in the feedback.
-- Hints can be "secret", meaning they're not shown to the user in the feedback
+- Ability to add notes to hints (so, shows up with the name in our view, but not to the user)
+- Change "default points" to "default score" in YAML config
+- In YAML config, "notes" should be allowed to be a list of MD-parsed strings (which we'll show as
+  a HTML list)
 
 - TODO: TODOs IN THE FILES THEMSELVES!!!
 

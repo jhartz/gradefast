@@ -14,6 +14,7 @@ import webbrowser
 import time
 import traceback
 import subprocess
+from typing import Callable
 
 try:
     import yaml
@@ -28,7 +29,7 @@ from .grader import Grader
 from .gradebook import GradeBook
 
 
-def print_bordered_message(*msgs):
+def print_bordered_message(*msgs: str):
     """
     Print a message surrounded by a border.
     :param msgs: The messages to print.
@@ -42,7 +43,7 @@ def print_bordered_message(*msgs):
     print("*" * width + "\n")
 
 
-def load_yaml_data(yaml_file):
+def load_yaml_data(yaml_file: str) -> dict:
     """
     Load and check the YAML file.
     """
@@ -62,7 +63,7 @@ def load_yaml_data(yaml_file):
     return yaml_data
 
 
-def _start_gradebook(grade_structure, grade_name, hostname, port):
+def _start_gradebook(grade_structure: list, grade_name: str, hostname: str, port: int) -> GradeBook:
     """
     Create and start the GradeBook web server.
     """
@@ -78,7 +79,7 @@ def _start_gradebook(grade_structure, grade_name, hostname, port):
     return gradebook
 
 
-def _run_grader(yaml_data, yaml_directory, on_event):
+def _run_grader(yaml_data: dict, yaml_directory: str, on_event: Callable[..., None]):
     """
     Create and run the Grader CLI.
     """
@@ -103,8 +104,7 @@ def _run_grader(yaml_data, yaml_directory, on_event):
             # Make sure the terminal shell exists
             terminal_shell_args = yaml_data["config"]["terminal shell"]
             if shutil.which(terminal_shell_args[0]) is None:
-                raise FileNotFoundError("Could not find \"terminal shell\" " +
-                                        "from config file")
+                raise FileNotFoundError("Could not find \"terminal shell\" from config file")
 
             # Re-define the terminal shell function to use their command
             def terminal_shell(path, env):
@@ -116,14 +116,12 @@ def _run_grader(yaml_data, yaml_directory, on_event):
         if "command shell" in yaml_data["config"]:
             command_shell = yaml_data["config"]["command shell"]
             if shutil.which(command_shell[0]) is None:
-                raise FileNotFoundError("Could not find \"command shell\" " +
-                                        "from config file")
+                raise FileNotFoundError("Could not find \"command shell\" from config file")
 
-    grader.run_commands(yaml_data["commands"], yaml_directory,
-                        command_shell, terminal_shell)
+    grader.run_commands(yaml_data["commands"], yaml_directory, command_shell, terminal_shell)
 
 
-def run(yaml_file, hostname, port):
+def run(yaml_file: str, hostname: str, port: int):
     """
     Start gradefast based on a YAML file and server parameters.
 
@@ -135,10 +133,9 @@ def run(yaml_file, hostname, port):
     yaml_data = load_yaml_data(yaml_file)
 
     # Create and start the grade book WSGI app
-    gradebook = _start_gradebook(
-        yaml_data["grades"],
-        os.path.splitext(os.path.basename(yaml_file))[0],
-        hostname, port)
+    gradebook = _start_gradebook(yaml_data["grades"],
+                                 os.path.splitext(os.path.basename(yaml_file))[0],
+                                 hostname, port)
 
     # First, sleep for a bit to give some time for the web server to start up
     time.sleep(0.5)
@@ -155,18 +152,21 @@ def run(yaml_file, hostname, port):
         print("")
 
         # Finally... let's start grading!
-        _run_grader(yaml_data, os.path.dirname(yaml_file),
-                    lambda evt: gradebook.event(evt))
+        _run_grader(yaml_data, os.path.dirname(yaml_file), lambda evt: gradebook.event(evt))
+
+        print("")
+        print_bordered_message("Grading complete!")
+    except (InterruptedError, KeyboardInterrupt):
+        print("")
+        print_bordered_message("INTERRUPTED")
     except:
         print("")
         print_bordered_message("ERROR RUNNING GRADER")
         traceback.print_exc()
     finally:
         print("")
-        print_bordered_message(
-            "Grading complete!",
-            "Download the gradebook and any other data you need.",
-            "Once you exit the server, the gradebook is lost.")
+        print("Download the gradebook and any other data you need.")
+        print("Once you exit the server, the gradebook is lost.")
         print("")
         try:
             input("Press Enter to exit server... ")

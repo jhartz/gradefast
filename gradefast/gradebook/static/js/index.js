@@ -39,23 +39,18 @@ const Container = React.createClass({
             if (!jsonData) return;
             console.log("EVENT (update):", jsonData);
 
-            if (jsonData.list) {
-                // Update our list of submissions
-                store.dispatch(actions.setList(jsonData.list));
-            }
-            /*
-            if (jsonData.grade_structure) {
-                // Update our grade structure with a new one
-                store.dispatch(actions.setGradeStructure(jsonData.grade_structure));
-            }
-            */
-            if (jsonData.submission_index) {
-                // Tell the forces at large to go to this submission
-                store.dispatch(actions.goToSubmission(jsonData.submission_index));
-            }
-
-            if (!jsonData.list && !jsonData.submission_index) {
-                console.error("TODO: INVALID EVENT");
+            switch (jsonData.update_type) {
+                // TODO: This update_type is not implemented yet on the server
+                case "UpdateList":
+                    // Update our list of submissions
+                    store.dispatch(actions.setList(jsonData.list));
+                    break;
+                case "SubmissionStart":
+                    // Tell the forces at large to go to this submission
+                    store.dispatch(actions.goToSubmission(jsonData.submission_index));
+                    break;
+                default:
+                    console.error("INVALID UPDATE EVENT");
             }
         });
 

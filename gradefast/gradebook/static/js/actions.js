@@ -8,8 +8,6 @@ const INIT_SUBMISSION = "INIT_SUBMISSION";
 const SET_LIST_VISIBILITY = "SET_LIST_VISIBILITY";
 const SET_LIST = "SET_LIST";
 
-const SET_GRADE_STRUCTURE = "SET_GRADE_STRUCTURE";
-
 // These string values are also recognized by the GradeBook server
 // (see GradeBook::_parse_action in gradebook.py)
 
@@ -33,18 +31,7 @@ function dispatchActionAndTellServer(action) {
 
         // Send the action to the server, too
         const index = getState().get("submission_index");
-        post(index, action, function (jsonData) {
-            // Update locally with anything new from the server
-            dispatch(actions.initSubmission(
-                index,
-                jsonData.name,
-                jsonData.is_late,
-                jsonData.overall_comments,
-                jsonData.current_score,
-                jsonData.max_score,
-                jsonData.grades
-            ));
-        });
+        post(index, action);
     }
 }
 
@@ -52,20 +39,11 @@ export const actions = {
     goToSubmission(index) {
         return function (dispatch) {
             // Inform everyone that the request is starting
+            // (and that this is the new submission index)
             dispatch(actions.loadingSubmission(index));
 
             // Request the submission data from the server
-            post(index, {}, function (jsonData) {
-                dispatch(actions.initSubmission(
-                    index,
-                    jsonData.name,
-                    jsonData.is_late,
-                    jsonData.overall_comments,
-                    jsonData.current_score,
-                    jsonData.max_score,
-                    jsonData.grades
-                ));
-            });
+            post(index, {});
         };
     },
 
@@ -76,10 +54,10 @@ export const actions = {
         };
     },
 
-    initSubmission(index, name, is_late, overall_comments, current_score, max_score, grades) {
+    initSubmission(originating_client_id, index, name, is_late, overall_comments, current_score, max_score, grades) {
         return {
             type: INIT_SUBMISSION,
-            index, name, is_late, overall_comments, current_score, max_score,
+            originating_client_id, index, name, is_late, overall_comments, current_score, max_score,
             grades: Immutable.fromJS(grades)
         }
     },
@@ -98,13 +76,6 @@ export const actions = {
         }
     },
 
-    setGradeStructure(grade_structure) {
-        return {
-            type: SET_GRADE_STRUCTURE,
-            grade_structure: Immutable.fromJS(grade_structure)
-        }
-    },
-
     setLate(is_late) {
         return dispatchActionAndTellServer({
             type: SET_LATE,
@@ -119,37 +90,46 @@ export const actions = {
         });
     },
 
-    setOnGrade(type, path, value, item) {
-        // This is a catch-all for...
-        // GRADE_SET_ENABLED, GRADE_SET_SCORE,
-        // GRADE_SET_COMMENTS, GRADE_SET_HINT,
-        // GRADE_ADD_HINT, GRADE_EDIT_HINT
-        // The hint ones use "item"; the others don't
-        return dispatchActionAndTellServer({type, path, value, item});
-    },
-
     grade_setEnabled(path, value) {
-        return this.setOnGrade(GRADE_SET_ENABLED, path, value);
+        return dispatchActionAndTellServer({
+            type: GRADE_SET_ENABLED,
+            path, value
+        });
     },
 
     grade_setScore(path, value) {
-        return this.setOnGrade(GRADE_SET_SCORE, path, value);
+        return dispatchActionAndTellServer({
+            type: GRADE_SET_SCORE,
+            path, value
+        });
     },
 
     grade_setComments(path, value) {
-        return this.setOnGrade(GRADE_SET_COMMENTS, path, value);
+        return dispatchActionAndTellServer({
+            type: GRADE_SET_COMMENTS,
+            path, value
+        });
     },
 
-    grade_setHint(path, item, value) {
-        return this.setOnGrade(GRADE_SET_HINT, path, value, item);
+    grade_setHint(path, index, value) {
+        return dispatchActionAndTellServer({
+            type: GRADE_SET_HINT,
+            path, index, value
+        });
     },
 
-    grade_addHint(path, value) {
-        return this.setOnGrade(GRADE_ADD_HINT, path, value, item);
+    grade_addHint(path, content) {
+        return dispatchActionAndTellServer({
+            type: GRADE_ADD_HINT,
+            path, content
+        });
     },
 
-    grade_editHint(path, item, value) {
-        return this.setOnGrade(GRADE_EDIT_HINT, path, value, item);
+    grade_editHint(path, index, content) {
+        return dispatchActionAndTellServer({
+            type: GRADE_EDIT_HINT,
+            path, index, content
+        });
     }
 };
 
@@ -194,11 +174,11 @@ const initialGradeState = Immutable.Map({
 function gradeReducer(state, action) {
     if (!state) state = initialGradeState;
 
-    if (state.children) {
-        state = state.set("children", cloneGradeChildren(state.children, action));
+    if (state.has("children")) {
+        state = state.set("children", cloneGradeChildren(state.get("children"), action));
     }
 
-    if (!action.path || action.path.length == 0) {
+    if (action.path.size == 0) {
         // We've reached the place where we apply this operation
         switch (action.type) {
             case GRADE_SET_ENABLED:
@@ -211,12 +191,13 @@ function gradeReducer(state, action) {
                 state = state.set("comments", action.value);
                 break;
             case GRADE_SET_HINT:
-                state = state.set("hints_set", state.get("hints_set").set(action.item, action.value));
+                state = state.set("hints_set", state.get("hints_set").set("" + action.index, action.value));
                 break;
             case GRADE_ADD_HINT:
+                state = state.set("hints", state.get("hints").push(Immutable.fromJS(action.content)));
+                break;
             case GRADE_EDIT_HINT:
-                // We'll ignore this for now; the server will send the new
-                // grade structure eventually
+                state = state.set("hints", state.get("hints").set(action.index, Immutable.fromJS(action.content)));
                 break;
             case GRADE_NOOP:
                 // No-op; we're only here for the cloning
@@ -240,9 +221,7 @@ const initialState = Immutable.Map({
     "submission_overall_comments": "",
     "submission_current_score": 0,
     "submission_max_score": 0,
-    "submission_grades": Immutable.List(),
-
-    "grade_structure": Immutable.List()
+    "submission_grades": Immutable.List()
 });
 
 export function app(state, action) {
@@ -251,22 +230,33 @@ export function app(state, action) {
     let passOnAction = false;
     switch (action.type) {
         case LOADING_SUBMISSION:
-            state = state.set("submission_is_loading", true);
+            state = state.merge({
+                "submission_is_loading": true,
+                "submission_index": action.index
+            });
             break;
 
         case INIT_SUBMISSION:
-            state = state.merge({
-                "list_visible": false,
+            const wasLoading = state.get("submission_is_loading");
+            if (action.index === state.get("submission_index")) {
+                state = state.merge({
+                    "list_visible": false,
 
-                "submission_is_loading": false,
-                "submission_index": action.index,
-                "submission_name": action.name,
-                "submission_is_late": action.is_late,
-                "submission_overall_comments": action.overall_comments,
-                "submission_current_score": action.current_score,
-                "submission_max_score": action.max_score,
-                "submission_grades": action.grades
-            });
+                    "submission_is_loading": false,
+                    "submission_name": action.name,
+                    "submission_is_late": action.is_late,
+                    "submission_current_score": action.current_score,
+                    "submission_max_score": action.max_score
+                });
+                if (wasLoading || action.originating_client_id !== CONFIG.CLIENT_ID) {
+                    // Either we were just loading this submission, or some other client
+                    // updated a grade, so merge in the latest grades
+                    state = state.merge({
+                        "submission_overall_comments": action.overall_comments,
+                        "submission_grades": action.grades
+                    });
+                }
+            }
             break;
         case SET_LIST_VISIBILITY:
             state = state.set("list_visible", action.visible);
@@ -276,13 +266,10 @@ export function app(state, action) {
             break;
 
         case SET_LATE:
-            state = state.set("is_late", action.is_late);
+            state = state.set("submission_is_late", action.is_late);
             break;
         case SET_OVERALL_COMMENTS:
-            state = state.set("overall_comments", action.overall_comments);
-            break;
-        case SET_GRADE_STRUCTURE:
-            state = state.set("grade_structure", action.grade_structure);
+            state = state.set("submission_overall_comments", action.overall_comments);
             break;
 
         default:

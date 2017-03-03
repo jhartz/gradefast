@@ -43,7 +43,21 @@ const GradeBook = React.createClass({
                 section = (
                     <section>
                         <h2>Start a submission, dammit!</h2>
-                        <p className="centered"><a href="https://www.youtube.com/watch?v=oY47hdblMto" target="_blank">Clock's a-tickin'</a></p>
+                        <p className="centered">
+                            <a href="https://www.youtube.com/watch?v=oY47hdblMto"
+                               title="The Clock Was Tickin'"
+                               target="_blank">Clock's a-tickin'</a>.
+                        </p>
+                        <p className="centered">
+                            <a href="https://www.youtube.com/watch?v=Me85PztkYP0"
+                               title="Land Locked Blues"
+                               target="_blank">The whole world must watch the sad comic display</a>.
+                        </p>
+                        <p className="centered">
+                            <a href="https://www.youtube.com/watch?v=SNX-rQsMRJs"
+                               title="Noah's Worst Nightmare"
+                               target="_blank">It's a great time to be alive</a>.
+                        </p>
                     </section>
                 );
             }
