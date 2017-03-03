@@ -22,11 +22,14 @@ export function reportError(completed, path, status, details, event) {
 
 const XHR_POST_ENDPOINT = CONFIG.BASE + "_update";
 
-export function post(index, action) {
-    //console.log("DEBUG: POST request action:", JSON.parse(JSON.stringify(action)));
+export function post(submission_id, action = {}) {
+    console.log("POST request:",
+        "submission_id:", submission_id,
+        "client_id", CONFIG.CLIENT_ID,
+        "action:", JSON.parse(JSON.stringify(action)));
 
     const fd = new FormData();
-    fd.append("submission_id", index);
+    fd.append("submission_id", "" + submission_id);
     fd.append("client_id", "" + CONFIG.CLIENT_ID);
     fd.append("action", JSON.stringify(action));
 
@@ -41,7 +44,7 @@ export function post(index, action) {
             reportError(true, path, xhr.statusText, xhr.responseText, event);
             return;
         }
-        //console.log("DEBUG: POST response:", jsonData);
+        console.log("POST response:", jsonData);
 
         // Check the data's status
         if (jsonData && jsonData.status === "Aight") {
@@ -50,7 +53,7 @@ export function post(index, action) {
             if (jsonData.submission_update) {
                 store.dispatch(actions.initSubmission(
                     jsonData.originating_client_id,
-                    jsonData.submission_update.index,
+                    jsonData.submission_update.submission_id,
                     jsonData.submission_update.name,
                     jsonData.submission_update.is_late,
                     jsonData.submission_update.overall_comments,

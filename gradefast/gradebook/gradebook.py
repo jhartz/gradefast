@@ -74,10 +74,8 @@ class GradeBook:
                 text = markdown(*args, **kwargs).strip()
                 # Stylize p tags
                 text = text.replace('<p>', '<p style="margin: 3px 0">')
-                #if text.startswith("<p>") and text.endswith("</p>"):
-                #    text = text[3:-4].replace("</p>\n<p>", "<br>")
 
-                # Stylize code tags
+                # Stylize code tags (even though MyCourses cuts out the background anyway...)
                 text = text.replace(
                     '<code>', '<code style="background-color: rgba(0, 0, 0, '
                               '0.04); padding: 1px 3px; border-radius: 5px;">')
@@ -111,8 +109,7 @@ class GradeBook:
                 "gradebook.html",
                 client_id=self._client_id,
                 initial_list=json.dumps([]),
-                initial_grade_structure=json.dumps(self._grade_structure),
-                initial_submission_index=json.dumps(self._current_submission_id),
+                initial_submission_id=json.dumps(self._current_submission_id),
                 is_done=json.dumps(self.is_done),
                 # TODO: implement (from YAML file)
                 check_hint_range=json.dumps(False))
@@ -151,11 +148,10 @@ class GradeBook:
                     })
                 try:
                     submission_id = int(flask.request.form["submission_id"])
+                    grade = self.get_grade(submission_id)
                 except ValueError:
-                    return json.dumps({
-                        "status": "Invalid submission ID"
-                    })
-                grade = self.get_grade(submission_id)
+                    submission_id = None  # mostly to shut up pycharm
+                    grade = None
                 if grade is None:
                     return json.dumps({
                         "status": "Invalid submission ID"
@@ -181,7 +177,7 @@ class GradeBook:
                     "status": "Aight",
                     "originating_client_id": client_id,
                     "submission_update": {
-                        "index": submission_id,
+                        "submission_id": submission_id,
                         "name": grade.name,
                         "is_late": grade.is_late,
                         "overall_comments": grade.overall_comments,
@@ -258,16 +254,16 @@ class GradeBook:
         :param submission_id: The ID to test
         :return: a Grade if valid, or None otherwise
         """
-        int_index = None
         try:
-            int_index = int(submission_id)
+            submission_id = int(submission_id)
         except ValueError:
+            submission_id = None
             pass
-        if int_index is None:
+        if submission_id is None:
             return None
-        if int_index not in self._grades_by_submission:
+        if submission_id not in self._grades_by_submission:
             return None
-        return self._grades_by_submission[int_index]
+        return self._grades_by_submission[submission_id]
 
     def _parse_action(self, client_id: int, action: dict, grade: grades.SubmissionGrade):
         """
@@ -441,10 +437,11 @@ class GradeBook:
         if client_update:
             self._send_client_update(client_update)
 
-    def run(self, hostname: str, port: int, log_level = logging.WARNING, debug: bool = False):
+    def run(self, hostname: str, port: int, log_level: Union[str, int] = logging.WARNING,
+            debug: bool = False):
         """
         Start the Flask server (using Werkzeug internally).
-        
+
         :param hostname: The hostname to run on
         :param port: The port to run on
         :param log_level: The level to set the Werkzeug logger at

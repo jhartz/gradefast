@@ -47,7 +47,7 @@ const Container = React.createClass({
                     break;
                 case "SubmissionStart":
                     // Tell the forces at large to go to this submission
-                    store.dispatch(actions.goToSubmission(jsonData.submission_index));
+                    store.dispatch(actions.goToSubmission(jsonData.submission_id));
                     break;
                 default:
                     console.error("INVALID UPDATE EVENT");

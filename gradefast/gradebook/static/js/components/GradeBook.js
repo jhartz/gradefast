@@ -13,12 +13,12 @@ const GradeBook = React.createClass({
         store.dispatch(actions.setListVisibility(true));
     },
 
-    goToSubmission(index) {
-        store.dispatch(actions.goToSubmission(index));
+    goToSubmission(submission_id) {
+        store.dispatch(actions.goToSubmission(submission_id));
     },
 
     render() {
-        if (this.props.submissionIndex !== null && !this.props.showList) {
+        if (this.props.submission_id !== null && !this.props.list_visible) {
             // Show the current submission (includes header)
             return <Submission showListHandler={this.showList} />;
         } else {
@@ -32,7 +32,7 @@ const GradeBook = React.createClass({
 
             let section;
             // Show the loading message, if needed
-            if (this.props.submissionIsLoading) {
+            if (this.props.submission_is_loading) {
                 section = <section><h2>Loading...</h2></section>;
             } else if (this.props.list.size) {
                 // Show the submission list (showList must be true)
@@ -73,10 +73,10 @@ const GradeBook = React.createClass({
 
 function mapStateToProps(state) {
     return {
-        submissionIndex: state.get("submission_index"),
-        showList: state.get("list_visible"),
+        submission_id: state.get("submission_id"),
+        list_visible: state.get("list_visible"),
         list: state.get("list"),
-        submissionIsLoading: state.get("submission_is_loading")
+        submission_is_loading: state.get("submission_is_loading")
     };
 }
 

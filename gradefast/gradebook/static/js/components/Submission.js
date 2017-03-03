@@ -5,7 +5,7 @@ import * as ReactRedux from "react-redux";
 import {actions} from "../actions";
 import {store} from "../store";
 
-import SizingTextarea from "./SizingTextarea";
+import CommentsTextarea from "./CommentsTextarea";
 import HeaderContent from "./HeaderContent";
 import GradeList from "./GradeList";
 
@@ -23,23 +23,30 @@ const Submission = React.createClass({
             <div className="container">
                 <header>
                     <HeaderContent showScore={true}
-                                   currentScore={this.props.currentScore}
-                                   maxScore={this.props.maxScore}
-                                   isLate={this.props.isLate}
+                                   currentScore={this.props.current_score}
+                                   maxScore={this.props.max_score}
+                                   isLate={this.props.is_late}
                                    setLateHandler={this.setLate} />
                     <h1><a href="#" onClick={(event) => {
                         event.preventDefault();
                         this.props.showListHandler();
-                    }}>{this.props.index}: {this.props.name || "GradeFast"}</a></h1>
+                    }}>{this.props.submission_id}: {this.props.name || "GradeFast"}</a></h1>
                 </header>
                 <section>
                     <GradeList path={Immutable.List()} grades={this.props.grades} />
                 </section>
                 <footer>
-                    <SizingTextarea onChange={this.handleOverallCommentsChange}
-                                    placeholder="Overall Comments (Markdown-parsed)"
-                                    value={this.props.overallComments}
-                                    minRows={3}
+                    <CommentsTextarea onChange={this.handleOverallCommentsChange}
+                                      placeholder="Overall Comments (Markdown-parsed)"
+                                      value={this.props.overall_comments}
+                                      valueHTML={this.props.overall_comments
+                                          .replace(/&/g, "&amp;")
+                                          .replace(/"/g, "&quot;")
+                                          .replace(/</g, "&lt;")
+                                          .replace(/>/g, "&gt;")
+                                          .replace(/\n/g, "<br />")
+                                          + '<p><small>TODO: Render markdown</small></p>'}
+                                      minRows={3}
                     />
                 </footer>
             </div>
@@ -49,12 +56,12 @@ const Submission = React.createClass({
 
 function mapStateToProps(state) {
     return {
-        index: state.get("submission_index"),
+        submission_id: state.get("submission_id"),
         name: state.get("submission_name"),
-        isLate: state.get("submission_is_late"),
-        overallComments: state.get("submission_overall_comments"),
-        currentScore: state.get("submission_current_score"),
-        maxScore: state.get("submission_max_score"),
+        is_late: state.get("submission_is_late"),
+        overall_comments: state.get("submission_overall_comments"),
+        current_score: state.get("submission_current_score"),
+        max_score: state.get("submission_max_score"),
         grades: state.get("submission_grades")
     };
 }

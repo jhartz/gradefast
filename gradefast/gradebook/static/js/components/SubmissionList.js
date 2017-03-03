@@ -5,14 +5,14 @@ export default ({submissions, goToSubmissionHandler}) => (
         <h2>Submissions</h2>
         <ul>
             {
-                submissions.filter((item) => {
-                    return !!item;
-                }).map((item, index) => {
-                    return <li>
+                submissions.filter((submission) => {
+                    return !!submission;
+                }).map((submission) => {
+                    return <li key={submission.id}>
                         <a href="#" onClick={(event) => {
                             event.preventDefault();
-                            goToSubmissionHandler(index);
-                        }}>{index}: <strong>{item.name}</strong></a>
+                            goToSubmissionHandler(submission.id);
+                        }}>{submission.id}: <strong>{submission.name}</strong></a>
                     </li>;
                 })
             }

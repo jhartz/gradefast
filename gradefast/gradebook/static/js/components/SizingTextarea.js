@@ -6,6 +6,14 @@ const SizingTextarea = React.createClass({
         this.resize();
     },
 
+    handleFocus(event) {
+        this.props.onFocus && this.props.onFocus();
+    },
+
+    handleBlur(event) {
+        this.props.onBlur && this.props.onBlur();
+    },
+
     resize() {
         const maxHeightPx = this.props.maxHeightPx || 140;
 
@@ -27,6 +35,8 @@ const SizingTextarea = React.createClass({
                          placeholder={this.props.placeholder || ""}
                          value={this.props.value}
                          onChange={this.handleChange}
+                         onFocus={this.handleFocus}
+                         onBlur={this.handleBlur}
                          rows={this.props.minRows || 1}
         />
     },

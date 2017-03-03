@@ -30,34 +30,34 @@ function dispatchActionAndTellServer(action) {
         dispatch(action);
 
         // Send the action to the server, too
-        const index = getState().get("submission_index");
-        post(index, action);
+        const submission_id = getState().get("submission_id");
+        post(submission_id, action);
     }
 }
 
 export const actions = {
-    goToSubmission(index) {
+    goToSubmission(submission_id) {
         return function (dispatch) {
             // Inform everyone that the request is starting
-            // (and that this is the new submission index)
-            dispatch(actions.loadingSubmission(index));
+            // (and that this is the new submission ID)
+            dispatch(actions.loadingSubmission(submission_id));
 
             // Request the submission data from the server
-            post(index, {});
+            post(submission_id, {});
         };
     },
 
-    loadingSubmission(index) {
+    loadingSubmission(submission_id) {
         return {
             type: LOADING_SUBMISSION,
-            index
+            submission_id
         };
     },
 
-    initSubmission(originating_client_id, index, name, is_late, overall_comments, current_score, max_score, grades) {
+    initSubmission(originating_client_id, submission_id, name, is_late, overall_comments, current_score, max_score, grades) {
         return {
             type: INIT_SUBMISSION,
-            originating_client_id, index, name, is_late, overall_comments, current_score, max_score,
+            originating_client_id, submission_id, name, is_late, overall_comments, current_score, max_score,
             grades: Immutable.fromJS(grades)
         }
     },
@@ -215,7 +215,7 @@ const initialState = Immutable.Map({
     "list": Immutable.List(),
 
     "submission_is_loading": false,
-    "submission_index": null,
+    "submission_id": null,
     "submission_name": "",
     "submission_is_late": false,
     "submission_overall_comments": "",
@@ -232,13 +232,13 @@ export function app(state, action) {
         case LOADING_SUBMISSION:
             state = state.merge({
                 "submission_is_loading": true,
-                "submission_index": action.index
+                "submission_id": action.submission_id
             });
             break;
 
         case INIT_SUBMISSION:
             const wasLoading = state.get("submission_is_loading");
-            if (action.index === state.get("submission_index")) {
+            if (action.submission_id === state.get("submission_id")) {
                 state = state.merge({
                     "list_visible": false,
 

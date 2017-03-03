@@ -79,7 +79,7 @@ class SubmissionStart(GradeBookEvent):
         gradebook_instance.start_submission(self.submission_id, self.name)
         return ClientUpdate("update", {
             "update_type": "SubmissionStart",
-            "submission_index": self.submission_id
+            "submission_id": self.submission_id
         })
 
 
