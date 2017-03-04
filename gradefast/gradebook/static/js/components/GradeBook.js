@@ -4,8 +4,8 @@ import * as ReactRedux from "react-redux";
 import {actions} from "../actions";
 import {store} from "../store";
 
+import Header from "./Header";
 import Submission from "./Submission";
-import HeaderContent from "./HeaderContent";
 import SubmissionList from "./SubmissionList";
 
 const GradeBook = React.createClass({
@@ -18,17 +18,15 @@ const GradeBook = React.createClass({
     },
 
     render() {
+        // XXX: It's probably not a good idea to set "document.title" here...
+
         if (this.props.submission_id !== null && !this.props.list_visible) {
-            // Show the current submission (includes header)
+            document.title = this.props.submission_name + " - GradeFast";
+
+            // Show the current submission (this includes div.container with header/section/footer)
             return <Submission showListHandler={this.showList} />;
         } else {
-            // We don't get an included header, so make one here
-            const header = (
-                <header>
-                    <HeaderContent showScore={false} />
-                    <h1>GradeFast</h1>
-                </header>
-            );
+            document.title = "GradeFast";
 
             let section;
             // Show the loading message, if needed
@@ -61,9 +59,12 @@ const GradeBook = React.createClass({
                     </section>
                 );
             }
+
             return (
                 <div className="container">
-                    {header}
+                    <Header showScore={false}>
+                        <h1>GradeFast</h1>
+                    </Header>
                     {section}
                 </div>
             );
@@ -74,6 +75,7 @@ const GradeBook = React.createClass({
 function mapStateToProps(state) {
     return {
         submission_id: state.get("submission_id"),
+        submission_name: state.get("submission_name"),
         list_visible: state.get("list_visible"),
         list: state.get("list"),
         submission_is_loading: state.get("submission_is_loading")

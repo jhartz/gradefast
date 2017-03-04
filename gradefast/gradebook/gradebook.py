@@ -318,7 +318,7 @@ class GradeBook:
                         "value": grades.make_number(action["content"]["value"])
                     })
 
-        if type in ("SET_ENABLED", "SET_POINTS", "SET_COMMENTS", "SET_HINT"):
+        if type in ("SET_ENABLED", "SET_SCORE", "SET_COMMENTS", "SET_HINT"):
             # We have a command with a path/value
             if "path" in action and "value" in action:
                 path = action["path"]
@@ -330,10 +330,12 @@ class GradeBook:
 
                 if type == "SET_ENABLED":
                     grade_item.set_enabled(bool(value))
-                elif type == "SET_POINTS":
-                    grade_item.set_score(value)
+                elif type == "SET_SCORE":
+                    if isinstance(grade_item, grades.GradeScore):
+                        grade_item.set_score(value)
                 elif type == "SET_COMMENTS":
-                    grade_item.set_comments(value)
+                    if isinstance(grade_item, grades.GradeScore):
+                        grade_item.set_comments(value)
                 elif type == "SET_HINT" and "index" in action:
                     grade_item.set_hint(action["index"], bool(value))
 

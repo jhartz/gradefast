@@ -2,8 +2,8 @@ import * as React from "react";
 import * as ReactDOM from "react-dom";
 import * as ReactRedux from "react-redux";
 
-import {reportError} from "./common";
 import {actions} from "./actions";
+import {reportError} from "./common";
 import {store, initStore} from "./store";
 
 import GradeBook from "./components/GradeBook";

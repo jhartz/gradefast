@@ -1,9 +1,9 @@
 import * as React from "react";
 
-import {actions} from "../actions";
-import {store} from "../store";
+import {actions} from "../../actions";
+import {id} from "../../common";
+import {store} from "../../store";
 
-import {id} from "../common";
 import SizingTextarea from "./SizingTextarea";
 
 const HintTable = React.createClass({
@@ -38,7 +38,8 @@ const HintTable = React.createClass({
         this.setState({
             currentlyEditing: index,
             oldValue: this.props.hints.get(index).get("value") || 0,
-            textareaValue: this.props.hints.get(index).get("name") || ""
+            textareaValue: this.props.hints.get(index).get("name") || "",
+            numberValue: "" + (this.props.hints.get(index).get("value") || 0)
         });
     },
 
@@ -108,7 +109,6 @@ const HintTable = React.createClass({
                             </td>
                             <td style={{width: "1px", whiteSpace: "nowrap"}}>
                                 <input type="number"
-                                       className="flat"
                                        size="5"
                                        value={this.state.numberValue}
                                        onChange={this.handleNumberChange}
@@ -116,18 +116,16 @@ const HintTable = React.createClass({
                             </td>
                             <td>
                                 <SizingTextarea onChange={this.handleTextareaChange}
+                                                placeholder="Hint Name (Markdown-parsed)"
                                                 value={this.state.textareaValue}
-                                                className="flat"
                                                 style={{width: "100%"}}
                                 />
                             </td>
                             <td style={{width: "1px", whiteSpace: "nowrap"}}>
                                 <input type="submit"
-                                       className="flat"
                                        value="Save"
                                 />
-                                <button className="flat"
-                                        type="button"
+                                <button type="button"
                                         onClick={this.handleCancel}>Cancel</button>
                             </td>
                         </tr>
@@ -152,8 +150,7 @@ const HintTable = React.createClass({
                                 </label>
                             </td>
                             <td style={{width: "1px", whiteSpace: "nowrap"}}>
-                                <button className="flat"
-                                        type="button"
+                                <button type="button"
                                         onClick={(event) => this.handleEditHint(event, index)}>
                                     Edit
                                 </button>
@@ -170,7 +167,6 @@ const HintTable = React.createClass({
                         <td style={{width: "1px", whiteSpace: "nowrap"}}>
                             {!this.state.textareaValue ? <span>&nbsp;</span> :
                                 <input type="number"
-                                       className="flat"
                                        size="5"
                                        value={this.state.numberValue}
                                        onChange={this.handleNumberChange}
@@ -179,13 +175,15 @@ const HintTable = React.createClass({
                         </td>
                         <td>
                             <SizingTextarea onChange={this.handleTextareaChange}
+                                            placeholder="Add a new hint (Markdown-parsed)"
                                             value={this.state.textareaValue}
-                                            className="flat"
                                             style={{width: "100%"}}
                             />
                         </td>
                         <td style={{width: "1px", whiteSpace: "nowrap"}}>
-                            <input type="submit" className="flat" value="Add" />
+                            {!this.state.textareaValue ? <span>&nbsp;</span> :
+                                <input type="submit" value="Add"/>
+                            }
                         </td>
                     </tr>
                 }

@@ -3,10 +3,12 @@ import * as React from "react";
 import * as ReactRedux from "react-redux";
 
 import {actions} from "../actions";
+import {SONGS} from "../SONGS";
 import {store} from "../store";
 
-import CommentsTextarea from "./CommentsTextarea";
-import HeaderContent from "./HeaderContent";
+import CommentsTextarea from "./utils/CommentsTextarea";
+
+import Header from "./Header";
 import GradeList from "./GradeList";
 
 const Submission = React.createClass({
@@ -19,20 +21,24 @@ const Submission = React.createClass({
     },
 
     render() {
+        const song = SONGS[Math.floor(Math.random() * SONGS.length)];
+
         return (
             <div className="container">
-                <header>
-                    <HeaderContent showScore={true}
-                                   currentScore={this.props.current_score}
-                                   maxScore={this.props.max_score}
-                                   isLate={this.props.is_late}
-                                   setLateHandler={this.setLate} />
+                <Header showScore={true}
+                        currentScore={this.props.current_score}
+                        maxScore={this.props.max_score}
+                        isLate={this.props.is_late}
+                        onSetLate={this.setLate}>
                     <h1><a href="#" onClick={(event) => {
                         event.preventDefault();
                         this.props.showListHandler();
                     }}>{this.props.submission_id}: {this.props.name || "GradeFast"}</a></h1>
-                </header>
+                </Header>
                 <section>
+                    <div style={{textAlign: "right"}}>
+                        <a href={song.link} target="_blank">{song.snippet}</a>
+                    </div>
                     <GradeList path={Immutable.List()} grades={this.props.grades} />
                 </section>
                 <footer>
@@ -45,8 +51,9 @@ const Submission = React.createClass({
                                           .replace(/</g, "&lt;")
                                           .replace(/>/g, "&gt;")
                                           .replace(/\n/g, "<br />")
-                                          + '<p><small>TODO: Render markdown</small></p>'}
+                                          + '<br /><small>TODO: Render markdown</small>'}
                                       minRows={3}
+                                      maxHeightPx={() => Math.round(document.documentElement.clientHeight * 0.25)}
                     />
                 </footer>
             </div>
