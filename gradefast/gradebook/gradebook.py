@@ -11,6 +11,7 @@ import queue
 import logging
 import csv
 import io
+import random
 import mimetypes
 from collections import OrderedDict
 import traceback
@@ -90,6 +91,8 @@ class GradeBook:
         app = flask.Flask(__name__)
         self._app = app
         self._client_id = 0
+        self._client_keys = {}
+        random.seed()
 
         # Now, initialize the routes for the app
 
@@ -105,9 +108,11 @@ class GradeBook:
         @app.route("/gradefast/gradebook.HTM")
         def _gradefast_gradebook_HTM():
             self._client_id += 1
+            self._client_keys[self._client_id] = str(self._client_id + random.random()) + ".secret"
             return flask.render_template(
                 "gradebook.html",
                 client_id=self._client_id,
+                client_key=json.dumps(self._client_keys[self._client_id]),
                 initial_list=json.dumps([]),
                 initial_submission_id=json.dumps(self._current_submission_id),
                 is_done=json.dumps(self.is_done),
@@ -130,77 +135,71 @@ class GradeBook:
         # AJAX endpoint to update grades based on an action
         @app.route("/gradefast/_update", methods=["POST"])
         def _gradefast_update():
+            def status(s):
+                return json.dumps({"status": s})
+
             try:
                 if "client_id" not in flask.request.form:
-                    return json.dumps({
-                        "status": "Missing client ID"
-                    })
+                    return status("Missing client ID")
                 try:
                     client_id = int(flask.request.form["client_id"])
                 except ValueError:
-                    return json.dumps({
-                        "status": "Invalid client ID"
-                    })
+                    return status("Invalid client ID")
+
+                if "client_key" not in flask.request.form:
+                    return status("Missing client key")
+                if flask.request.form["client_key"] != self._client_keys.get(client_id, None):
+                    return status("Invalid client key")
+
+                if "client_seq" not in flask.request.form:
+                    return status("Missing client seq")
+                try:
+                    client_seq = int(flask.request.form["client_seq"])
+                except ValueError:
+                    return status("Invalid client seq")
 
                 if "submission_id" not in flask.request.form:
-                    return json.dumps({
-                        "status": "Missing submission ID"
-                    })
+                    return status("Missing submission ID")
                 try:
                     submission_id = int(flask.request.form["submission_id"])
-                    grade = self.get_grade(submission_id)
                 except ValueError:
-                    submission_id = None  # mostly to shut up pycharm
-                    grade = None
-                if grade is None:
-                    return json.dumps({
-                        "status": "Invalid submission ID"
-                    })
+                    return status("Invalid submission ID")
 
+                action = {}
                 if "action" in flask.request.form:
-                    action = flask.request.form["action"]
                     try:
-                        action = json.loads(action)
+                        action = json.loads(flask.request.form["action"])
                     except json.JSONDecodeError:
-                        return json.dumps({
-                            "status": "Invalid action"
-                        })
+                        return status("Invalid action")
 
-                    self._parse_action(client_id, action, grade)
+                # Parse the action into a ClientActionEvent (may raise BadSubmissionException)
+                action_event = events.ClientActionEvent(
+                    submission_id, client_id, client_seq, action)
 
-                # Return the current state of this grade
-                # TODO: This should be sent to ALL clients (via a server-sent event)
-                # This should happen at the end of _parse_action (NOT here)
-                # Ideally, this guy should just return "status"
-                points_earned, points_total, _ = grade.get_score()
-                return json.dumps({
-                    "status": "Aight",
-                    "originating_client_id": client_id,
-                    "submission_update": {
-                        "submission_id": submission_id,
-                        "name": grade.name,
-                        "is_late": grade.is_late,
-                        "overall_comments": grade.overall_comments,
-                        "current_score": points_earned,
-                        "max_score": points_total,
-                        "grades": grade.get_plain_grades()
-                    }
-                })
+                # Apply the action (this will send an update through the events stream)
+                # This may raise BadActionException, BadPathException, or BadValueException
+                self.apply_event(action_event)
+
+                # If nothing threw, return that we processed everything successfully
+                return status("Aight")
+
+            except events.ActionEvent.BadSubmissionException:
+                return status("Invalid submission")
+
+            except events.ClientActionEvent.BadActionException:
+                return status("Invalid action")
+
             except grades.BadPathException:
-                return json.dumps({
-                    "status": "Invalid path"
-                })
+                return status("Invalid path")
+
             except grades.BadValueException:
-                return json.dumps({
-                    "status": "Invalid value"
-                })
+                return status("Invalid value")
+
             except Exception as ex:
                 print("\n\nGRADEBOOK AJAX HANDLER EXCEPTION:", ex)
                 print(traceback.format_exc())
                 print("")
-                return json.dumps({
-                    "status": "Look what you did... (seriously, look in the server error console)"
-                })
+                return status("Look what you did... (seriously, look in the server error console)")
 
         # Grades CSV file
         @app.route("/gradefast/grades.csv")
@@ -229,23 +228,25 @@ class GradeBook:
             return flask.Response(self._get_json(), mimetype="application/json")
 
         # Event stream
-        @app.route("/gradefast/events.stream")
-        def _gradefast_events_stream():
+        @app.route("/gradefast/_events")
+        def _gradefast_events():
             def gen():
                 q = queue.Queue()
                 self._subscriptions.append(q)
                 try:
+                    yield events.ClientUpdate("init").encode()
                     while True:
                         ev = q.get()
                         assert isinstance(ev, events.ClientUpdate)
                         yield ev.encode()
-                        if ev.is_done:
-                            break
                 except GeneratorExit:
                     pass
                 finally:
                     self._subscriptions.remove(q)
             return flask.Response(gen(), mimetype="text/event-stream")
+
+    def get_current_submission_id(self):
+        return self._current_submission_id
 
     def get_grade(self, submission_id: Union[str, int]) -> Optional[grades.SubmissionGrade]:
         """
@@ -265,79 +266,51 @@ class GradeBook:
             return None
         return self._grades_by_submission[submission_id]
 
-    def _parse_action(self, client_id: int, action: dict, grade: grades.SubmissionGrade):
+    def apply_event(self, event: events.GradeBookEvent):
         """
-        Parse and execute an action from the JavaScript gradebook.
+        Apply a GradeBook event to this gradebook.
 
-        :param client_id: The ID of the JavaScript gradebook client that initiated this action
-        :param action: The action to run (as a dict)
-        :param grade: The SubmissionGrade instance to execute the action on
+        :param event: An instance of a subclass of events.GradeBookEvent
         """
-        type = action["type"] if "type" in action else None
+        assert isinstance(event, events.GradeBookEvent)
 
-        if type == "SET_LATE":
-            # Set whether the submission is marked as late
-            if "is_late" in action:
-                grade.is_late = bool(action["is_late"])
+        # Run the event on this GradeBook
+        client_event = event.apply(self)
+        # If the event resulted in a client event, send that to all GradeBook JavaScript clients
+        if client_event:
+            self._send_client_update(client_event)
 
-        if type == "SET_OVERALL_COMMENTS":
-            # Set the overall comments of the submission
-            if "overall_comments" in action:
-                grade.overall_comments = action["overall_comments"]
+    def _send_client_update(self, client_update: events.ClientUpdate):
+        """
+        Send a client update to any open GradeBook JavaScript clients.
 
-        if type == "ADD_HINT":
-            # Add a hint by changing the grade structure (MUA HA HA HA)
-            if "path" in action and "content" in action and \
-                    "name" in action["content"] and "value" in action["content"]:
-                path = action["path"]
-                if len(path) == 0:
-                    raise grades.BadPathException()
+        :param client_update: The ClientUpdate to send
+        """
+        assert isinstance(client_update, events.ClientUpdate)
+        for q in self._subscriptions:
+            q.put(client_update)
 
-                grade.add_content_to_all_grades(
-                    path,
-                    "hints",
-                    {
-                        "name": action["content"]["name"],
-                        "value": grades.make_number(action["content"]["value"])
-                    })
+    def start_submission(self, submission_id: int, name: str):
+        """
+        Set a submission ID to be the current submission ID.
 
-        if type == "EDIT_HINT":
-            # Edit a hint by changing the grade structure (MUA HA HA HA)
-            if "path" in action and "index" in action and "content" in action and \
-                    "name" in action["content"] and "value" in action["content"]:
-                path = action["path"]
-                if len(path) == 0:
-                    raise grades.BadPathException()
+        :param submission_id: The ID of the submission.
+        :param name: The name of the owner of the submission.
+        """
+        # Make a new Grade object for this submission
+        if submission_id not in self._grades_by_submission:
+            self._grades_by_submission[submission_id] = grades.SubmissionGrade(
+                name, self._grade_structure, self._md)
+        self._current_submission_id = submission_id
 
-                grade.replace_content_for_all_grades(
-                    path,
-                    "hints",
-                    action["index"],
-                    {
-                        "name": action["content"]["name"],
-                        "value": grades.make_number(action["content"]["value"])
-                    })
+    def log_submission(self, log: str):
+        """
+        Add log info for the current submission.
 
-        if type in ("SET_ENABLED", "SET_SCORE", "SET_COMMENTS", "SET_HINT"):
-            # We have a command with a path/value
-            if "path" in action and "value" in action:
-                path = action["path"]
-                if len(path) == 0:
-                    raise grades.BadPathException()
-
-                grade_item = grade.get_by_path(path)
-                value = action["value"]
-
-                if type == "SET_ENABLED":
-                    grade_item.set_enabled(bool(value))
-                elif type == "SET_SCORE":
-                    if isinstance(grade_item, grades.GradeScore):
-                        grade_item.set_score(value)
-                elif type == "SET_COMMENTS":
-                    if isinstance(grade_item, grades.GradeScore):
-                        grade_item.set_comments(value)
-                elif type == "SET_HINT" and "index" in action:
-                    grade_item.set_hint(action["index"], bool(value))
+        :param log: The HTML log info
+        """
+        if len(self._grades_by_submission):
+            self._grades_by_submission[self._current_submission_id].log += log
 
     def get_grades(self) -> List[OrderedDict]:
         """
@@ -391,53 +364,6 @@ class GradeBook:
         Return a string representing the grades as JSON.
         """
         return json.dumps(self.get_grades())
-
-    def _send_client_update(self, event: events.ClientUpdate):
-        """
-        Send an event to any open gradebook clients.
-        
-        :param event: The ClientUpdate
-        """
-        assert isinstance(event, events.ClientUpdate)
-        # Send this event to any open gradebook clients
-        for q in self._subscriptions:
-            q.put(event)
-
-    def start_submission(self, submission_id: int, name: str):
-        """
-        Set a submission ID to be the current submission ID.
-
-        :param submission_id: The ID of the submission.
-        :param name: The name of the owner of the submission.
-        """
-        # Make a new Grade object for this submission
-        if submission_id not in self._grades_by_submission:
-            self._grades_by_submission[submission_id] = grades.SubmissionGrade(
-                name, self._grade_structure, self._md)
-        self._current_submission_id = submission_id
-
-    def log_submission(self, log: str):
-        """
-        Add log info for the current submission.
-
-        :param log: The HTML log info
-        """
-        if len(self._grades_by_submission):
-            self._grades_by_submission[self._current_submission_id].log += log
-
-    def event(self, event: events.GradeBookEvent):
-        """
-        Handle a GradeBook Event with this gradebook.
-
-        :param event: An instance of a subclass of events.GradeBookEvent
-        """
-        if not isinstance(event, events.GradeBookEvent):
-            raise TypeError("Event must be a subclass of GradeBookEvent")
-
-        # Run the event on this GradeBook
-        client_update = event.handle(self)
-        if client_update:
-            self._send_client_update(client_update)
 
     def run(self, hostname: str, port: int, log_level: Union[str, int] = logging.WARNING,
             debug: bool = False):

@@ -152,7 +152,7 @@ def run(yaml_file: str, hostname: str, port: int):
         print("")
 
         # Finally... let's start grading!
-        _run_grader(yaml_data, os.path.dirname(yaml_file), lambda evt: gradebook.event(evt))
+        _run_grader(yaml_data, os.path.dirname(yaml_file), lambda evt: gradebook.apply_event(evt))
 
         print("")
         print_bordered_message("Grading complete!")

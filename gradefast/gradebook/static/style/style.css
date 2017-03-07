@@ -2,7 +2,7 @@
     box-sizing: border-box
 }
 
-.noselect {
+.no-select {
     -webkit-touch-callout: none;
     -webkit-user-select: none;
     -khtml-user-select: none;
@@ -127,12 +127,16 @@ td, th {
     vertical-align: top;
 }
 
-a {
+a, .link {
     color: inherit;
     text-decoration: underline;
 }
 
-a:hover {
+a:hover, .link:hover {
+    text-decoration: none;
+}
+
+a.no-underline {
     text-decoration: none;
 }
 

@@ -1,6 +1,6 @@
 import * as React from "react";
 
-import {id} from "../common";
+import {id} from "../utils";
 
 export default ({path, grade, onSetEnabled}) => {
     const titleElem = (

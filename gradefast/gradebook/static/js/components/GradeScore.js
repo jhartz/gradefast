@@ -1,7 +1,7 @@
 import * as React from "react";
 
 import {actions} from "../actions";
-import {id} from "../common";
+import {id} from "../utils";
 import {store} from "../store";
 
 import CommentsTextarea from "./utils/CommentsTextarea";

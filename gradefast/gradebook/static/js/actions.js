@@ -1,11 +1,12 @@
 import * as Immutable from "immutable";
 
-import {post} from "./common";
+import {sendUpdate} from "./connection";
 
 // Local state; not propagated to server
+const WAITING_FOR_USER_TO_GET_THEIR_ASS_MOVING = "WAITING_FOR_USER_TO_GET_THEIR_ASS_MOVING";
 const LOADING_SUBMISSION = "LOADING_SUBMISSION";
 const INIT_SUBMISSION = "INIT_SUBMISSION";
-const SET_LIST_VISIBILITY = "SET_LIST_VISIBILITY";
+const TOGGLE_LIST_VISIBILITY = "TOGGLE_LIST_VISIBILITY";
 const SET_LIST = "SET_LIST";
 
 // These string values are also recognized by the GradeBook server
@@ -31,11 +32,17 @@ function dispatchActionAndTellServer(action) {
 
         // Send the action to the server, too
         const submission_id = getState().get("submission_id");
-        post(submission_id, action);
+        sendUpdate(submission_id, action);
     }
 }
 
 export const actions = {
+    waitingForUserToGetTheirAssMoving() {
+        return {
+            type: WAITING_FOR_USER_TO_GET_THEIR_ASS_MOVING
+        };
+    },
+
     goToSubmission(submission_id) {
         return function (dispatch) {
             // Inform everyone that the request is starting
@@ -43,7 +50,7 @@ export const actions = {
             dispatch(actions.loadingSubmission(submission_id));
 
             // Request the submission data from the server
-            post(submission_id, {});
+            sendUpdate(submission_id, {});
         };
     },
 
@@ -54,18 +61,17 @@ export const actions = {
         };
     },
 
-    initSubmission(originating_client_id, submission_id, name, is_late, overall_comments, current_score, max_score, grades) {
+    initSubmission(submission_id, name, is_late, overall_comments, current_score, max_score, grades) {
         return {
             type: INIT_SUBMISSION,
-            originating_client_id, submission_id, name, is_late, overall_comments, current_score, max_score,
+            submission_id, name, is_late, overall_comments, current_score, max_score,
             grades: Immutable.fromJS(grades)
         }
     },
 
-    setListVisibility(visible) {
+    toggleListVisibility() {
         return {
-            type: SET_LIST_VISIBILITY,
-            visible
+            type: TOGGLE_LIST_VISIBILITY
         };
     },
 
@@ -211,10 +217,11 @@ function gradeReducer(state, action) {
 }
 
 const initialState = Immutable.Map({
+    "loading": true,
+
     "list_visible": false,
     "list": Immutable.List(),
 
-    "submission_is_loading": false,
     "submission_id": null,
     "submission_name": "",
     "submission_is_late": false,
@@ -229,37 +236,36 @@ export function app(state, action) {
 
     let passOnAction = false;
     switch (action.type) {
+        case WAITING_FOR_USER_TO_GET_THEIR_ASS_MOVING:
+            state = state.merge({
+                "loading": false
+            });
+            break;
+
         case LOADING_SUBMISSION:
             state = state.merge({
-                "submission_is_loading": true,
+                "loading": true,
                 "submission_id": action.submission_id
             });
             break;
 
         case INIT_SUBMISSION:
-            const wasLoading = state.get("submission_is_loading");
             if (action.submission_id === state.get("submission_id")) {
                 state = state.merge({
+                    "loading": false,
                     "list_visible": false,
 
-                    "submission_is_loading": false,
                     "submission_name": action.name,
                     "submission_is_late": action.is_late,
+                    "submission_overall_comments": action.overall_comments,
                     "submission_current_score": action.current_score,
-                    "submission_max_score": action.max_score
+                    "submission_max_score": action.max_score,
+                    "submission_grades": action.grades
                 });
-                if (wasLoading || action.originating_client_id !== CONFIG.CLIENT_ID) {
-                    // Either we were just loading this submission, or some other client
-                    // updated a grade, so merge in the latest grades
-                    state = state.merge({
-                        "submission_overall_comments": action.overall_comments,
-                        "submission_grades": action.grades
-                    });
-                }
             }
             break;
-        case SET_LIST_VISIBILITY:
-            state = state.set("list_visible", action.visible);
+        case TOGGLE_LIST_VISIBILITY:
+            state = state.set("list_visible", !state.get("list_visible"));
             break;
         case SET_LIST:
             state = state.set("list", action.list);
