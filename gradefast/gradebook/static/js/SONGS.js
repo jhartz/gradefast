@@ -23,16 +23,16 @@
 
 *************************************************************************************************/
 
-// These songs are used for the song snippet at the top of the gradebook.
+// These songs are used for the song snippet in the gradebook footer
 
 // I welcome PR's for more songs here!
 // Pick one of your favorite songs, and choose a line or 2 from the lyrics.
 
-// Only rule is: no more than one song per artist. (Make sure to put the
-// artist in a comment so future people know that that artist is out.)
+// Only rule is: no more than one song per artist. (Make sure to put the artist in a comment so
+// future people know that that artist is out.)
 
-// The snippet can be from any part of the song; in fact, it is encouraged
-// to take it from some part of the song that most people won't recognize!
+// The snippet can be from any part of the song; in fact, it is encouraged to take it from some
+// part of the song that most people won't recognize!
 
 export const SONGS = [
     {
@@ -79,15 +79,20 @@ export const SONGS = [
         // Car Seat Headrest
         snippet: "It's not a race at all",
         link: "https://www.youtube.com/watch?v=ccztRby3FAk"
+    },
+    {
+        // David Bowie
+        snippet: "Can you hear me, Major Tom?",
+        link: "https://www.youtube.com/watch?v=iYYRH4apXDo"
+    },
+    {
+        // Beck
+        snippet: "Got a couple of couches, sleep on the love seat.\n" +
+            "Someone keeps saying' I'm insane to complain, about a shotgun wedding and a stain on my shirt.\n" +
+            "Don't believe everything that you breathe; you get a parking violation and a maggot on your sleeve.\n" +
+            "So shave your face, with some mace in the dark;\n" +
+            "Saving' all your food stamps, and burning' down the trailer park.\n" +
+            "Yo. ... Cut it.",
+        link: "https://www.youtube.com/watch?v=6xHh8bSX-zc"
     }
 ];
-
-// A bit of history: Why does GradeFast include a random song at the top of
-// the gradebook interface? Well, there's a CSS property in the stylesheet
-// that puts a border at the top of each grade section and each grade score,
-// and I didn't feel like making a special rule to not put a border above the
-// first one. So, I put a song link there!
-
-// Maybe someday I'll add a "grading background music" feature to GradeFast
-// that will use these songs to play background music while you grade.
-// But, probably not :P
