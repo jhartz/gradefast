@@ -8,6 +8,8 @@ Author: Jake Hartz <jake@hartz.io>
 
 from typing import Any, Callable, Iterable, List, Optional, Tuple, Union
 
+from . import utils
+
 Path = Union[int, str]
 Score = Union[int, float]
 # Will usually be passed to "make_number" to convert to a Score
@@ -92,36 +94,42 @@ class BadValueException(Exception):
     pass
 
 
-class BadStructureException(Exception):
-    """Exception resulting from a bad grade structure passed into Grader"""
-    pass
-
-
-def bad_structure_warning(msg: Any):
-    """Warn about something relating to the grade structure"""
-    print("\n*** STRUCTURE WARNING:", msg)
-
-
-def check_grade_structure(st: list) -> Score:
+def check_grade_structure(st: list, _path: List[int] = None) -> bool:
     """
-    Check a grade structure and raise a BadStructureException if the structure is invalid. If not,
-    return the maximum score.
+    Check a grade structure and print any errors.
 
     :param st: The grade structure to check.
-    :return: The maximum score for this grade structure.
+    :param _path: The path to the current point in the structure (only used in recursive calls).
+    :return: True if the grade structure is valid, False otherwise.
     """
+    found_error = False
+    if _path is None:
+        _path = []
+
+    def warn(*args):
+        utils.print_error("STRUCTURE WARNING:", *args, start="", end="")
+
+    def error(*args):
+        nonlocal found_error
+        utils.print_error("STRUCTURE ERROR:", *args, start="", end="")
+        found_error = True
+
     if not isinstance(st, list):
-        raise BadStructureException("Grade structure is not a list")
+        error("Grade structure is not a list")
+        return False
 
-    max_score = 0.0
+    for index, grade in enumerate(st, start=1):
+        path = _path.copy()
+        path.append(index)
 
-    for grade in st:
         # Check "name"
         if "name" not in grade or not isinstance(grade["name"], str) or not grade["name"]:
-            raise BadStructureException("Grade item missing a name")
+            error("Grade item", path, "missing a name")
 
         # Make sure the name is trimmed of trailing whitespace
         grade["name"] = grade["name"].strip()
+
+        title = "#" + ".".join(str(p) for p in path) + " (\"" + grade["name"] + "\")"
 
         # Check stuff specific to grade sections
         if "grades" in grade:
@@ -130,38 +138,31 @@ def check_grade_structure(st: list) -> Score:
                 grade["deduct percent if late"] = grade["deductPercentIfLate"]
             if "deduct percent if late" in grade:
                 if grade["deduct percent if late"] < 0 or grade["deduct percent if late"] > 100:
-                    raise BadStructureException(
-                        "Grade score " + grade["name"] + " has an invalid " +
-                        "\"deduct percent if late\"")
+                    error("Grade section", title, "has an invalid \"deduct percent if late\"")
 
-            max_score += check_grade_structure(grade["grades"])
+            found_error = check_grade_structure(grade["grades"], path) or found_error
 
         # Check stuff specific to grade scores
         elif "points" in grade:
             # Check "points"
             if grade["points"] < 0:
-                raise BadStructureException(
-                    "Points in \"%s\" must be at least zero" % grade["name"])
-            max_score += grade["points"]
+                error("Points in grade score", title, "must be at least zero")
 
             # Check "default points"
             if "default points" in grade:
                 if grade["default points"] < 0:
-                    raise BadStructureException(
-                        "Default points in \"%s\" must be at least zero" % grade["name"])
+                    error("Default points in grade score", title, "must be at least zero")
                 if grade["default points"] > grade["points"]:
-                    raise BadStructureException(
-                        "Default points in \"%s\" must be less than total points" % grade["name"])
+                    error("Default points in grade score", title, "must be less than total points")
         else:
-            raise BadStructureException(
-                "Grade item \"%s\" needs one of either points or grades" % grade["name"])
+            error("Grade item", title, "needs one of either \"points\" or \"grades\"")
 
         # Check for old, deprecated versions of "hints"
         bad_hints = []
         for old in ["section deductions", "deductions", "point hints"]:
             if old in grade:
-                bad_structure_warning("Found deprecated \"%s\" in \"%s\"" % (old, grade["name"]) +
-                                      " (converted to hints)")
+                warn("Found deprecated \"%s\"" % old, "in grade item", title,
+                     "(converted to hints)")
                 bad_hints += grade[old]
         if len(bad_hints):
             if "hints" not in grade:
@@ -176,13 +177,12 @@ def check_grade_structure(st: list) -> Score:
         if "hints" in grade:
             for hint in grade["hints"]:
                 if "name" not in hint:
-                    raise BadStructureException("Hint in \"%s\" missing name" % grade["name"])
+                    error("Hint in", title, "missing name")
                 if "value" not in hint:
-                    raise BadStructureException(
-                        "Hint \"%s\" in \"%s\" missing value" %
-                        (hint["name"].trim(), grade["name"]))
+                    error("Hint \"%s\"" % hint["name"].trim(), "in grade item", title,
+                          "is missing a \"value\"")
 
-    return max_score
+    return not found_error
 
 
 class GradeItem:
