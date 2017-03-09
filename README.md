@@ -46,9 +46,12 @@ or, for more detailed usage:
 
 ## But... how do I use this thing?
 
-First, you must make a YAML file for whatever you want to grade that includes the structure of the
-grades and the commands to run on each submission. For more info, see the
-[YAML Format page](https://github.com/jhartz/gradefast/wiki/YAML-Format) on the GradeFast wiki.
+See the [GradeFast wiki](https://github.com/jhartz/gradefast/wiki).
+
+**tl,dr;** First, you must make a YAML-formatted configuration file the assignment that you want to
+grade. This file includes the structure of the grades and the commands to run on each submission.
+For more info, see the [YAML Format page](https://github.com/jhartz/gradefast/wiki/YAML-Format) on
+the GradeFast wiki.
 
 Want to delve deeper or use individual parts of GradeFast as part of your larger, superior project?
 Check out the `runyaml.py` module to see how the other GradeFast modules and packages are used.
