@@ -6,7 +6,7 @@ Licensed under the MIT License. For more, see the LICENSE file.
 Author: Jake Hartz <jake@hartz.io>
 """
 
-from typing import Any, Callable, Iterable, List, Optional, Tuple, Union
+from typing import Any, Iterable, List, Optional, Tuple, Union
 
 from . import utils
 
@@ -189,14 +189,12 @@ class GradeItem:
     """
     Superclass for GradeScore, GradeSection, and GradeRoot
     """
-    def __init__(self, structure: Optional[dict], markdown: Callable[[str], str]):
+    def __init__(self, structure: Optional[dict]):
         """
         Initialize the basic components of a GradeItem
 
         :param structure: The grade structure dictionary for this grade item
-        :param markdown: A configured instance of mistune.Markdown, or a compatible function
         """
-        self._md = markdown
         self.name = None
         self.enabled = None
         self.hints = []
@@ -339,18 +337,18 @@ class GradeScore(GradeItem):
 
         # Generate dat feedback
         feedback = FEEDBACK_HTML_TEMPLATES[header_name] % \
-            (self._md(self.name), score)
+            (utils.markdown_to_html(self.name), score)
 
         # Add hints, if applicable
         for index, hint in enumerate(self.hints):
             if self.hints_set.get(index):
                 feedback += FEEDBACK_HTML_TEMPLATES["credit"] % \
-                            (hint["value"], self._md(hint["name"]))
+                            (hint["value"], utils.markdown_to_html(hint["name"]))
 
         # Now, add any comments
         if self.comments:
             feedback += FEEDBACK_HTML_TEMPLATES["item_body"] % \
-                self._md(self.comments)
+                utils.markdown_to_html(self.comments)
 
         return feedback
 
@@ -449,7 +447,7 @@ class GradeSection(GradeItem):
         if depth < 2:
             header_name += "_top"
         feedback = FEEDBACK_HTML_TEMPLATES[header_name] % (
-            self._md(self.name),
+            utils.markdown_to_html(self.name),
             points_earned,
             points_possible
         )
@@ -459,7 +457,7 @@ class GradeSection(GradeItem):
             if self.hints_set.get(index):
                 feedback += FEEDBACK_HTML_TEMPLATES["credit"] % (
                     hint["value"],
-                    self._md(hint["name"])
+                    utils.markdown_to_html(hint["name"])
                 )
 
         # Add lateness feedback if necessary
@@ -563,7 +561,7 @@ def get_point_titles(structure: List[dict], include_disabled: bool = False) \
     :return: A list of item titles represented by tuples: (name, points)
     """
     # Create a temporary GradeItem tree based on this structure
-    grades = GradeRoot(structure, markdown=lambda s: s)
+    grades = GradeRoot(structure)
     return grades.get_point_titles(include_disabled)
 
 
@@ -572,15 +570,13 @@ class SubmissionGrade:
     Represents a submission's grade.
     """
 
-    def __init__(self, name: str, grade_structure: List[dict], markdown: Callable[[str], str]):
+    def __init__(self, name: str, grade_structure: List[dict]):
         """
         :param name: The name of the owner of the submission being graded
         :param grade_structure: A list of grade items (see GradeBook class)
-        :param markdown: A configured instance of mistune.Markdown, or a compatible function
         """
         self.name = name
-        self._grades = GradeRoot(grade_structure, markdown=markdown)
-        self._md = markdown
+        self._grades = GradeRoot(grade_structure)
         self.log = ""
 
         self.is_late = False
@@ -676,7 +672,7 @@ class SubmissionGrade:
         Patch together all the grade comments for this submission.
         """
         return FEEDBACK_HTML_TEMPLATES["base"] % (self._grades.get_feedback(self.is_late),
-                                                  self._md(self.overall_comments))
+                                                  utils.markdown_to_html(self.overall_comments))
 
     def get_plain_grades(self) -> List[dict]:
         """

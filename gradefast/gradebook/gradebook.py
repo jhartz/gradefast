@@ -16,21 +16,14 @@ import threading
 from collections import OrderedDict
 from typing import List, Optional, Union
 
-try:
-    import mistune
-except ImportError:
-    mistune = None
+from . import events, grades, utils
 
 try:
     import flask
 except ImportError:
-    print("")
-    print("*** Couldn't find Flask package!")
-    print("    Please install 'flask' and try again.")
-    print("")
+    flask = None
+    utils.print_error("Couldn't find Flask package! Please install 'flask' and try again.")
     sys.exit(1)
-
-from . import events, grades, utils
 
 
 class GradeBook:
@@ -80,31 +73,6 @@ class GradeBook:
         # Secret key used by the client for sending updates to the _update AJAX endpoint.
         # This is sent to the client through the client's events stream after authentication.
         self._client_update_keys = {}
-
-        # Set up Mistune (Markdown)
-        if mistune is None:
-            print("")
-            print("*** Couldn't find mistune package!")
-            print("    Items will not be Markdown-parsed.")
-            print("")
-
-            def parse_md(*args, **kwargs):
-                return args[0]
-        else:
-            markdown = mistune.Markdown(renderer=mistune.Renderer(hard_wrap=True))
-
-            def parse_md(*args, **kwargs):
-                text = markdown(*args, **kwargs).strip()
-                # Stylize p tags
-                text = text.replace('<p>', '<p style="margin: 3px 0">')
-
-                # Stylize code tags (even though MyCourses cuts out the background anyway...)
-                text = text.replace(
-                    '<code>', '<code style="background-color: rgba(0, 0, 0, '
-                              '0.04); padding: 1px 3px; border-radius: 5px;">')
-                return text
-
-        self._md = parse_md
 
         # Set up MIME type for JS source map
         mimetypes.add_type("application/json", ".map")
@@ -168,7 +136,7 @@ class GradeBook:
 
         # GradeBook page (yes, the HTM is solely for trolling, teehee)
         @app.route("/gradefast/gradebook.HTM")
-        def _gradefast_gradebook_HTM():
+        def _gradefast_gradebook_html():
             client_id = uuid.uuid4()
             self._client_ids.add(client_id)
             return flask.render_template(
@@ -404,7 +372,7 @@ class GradeBook:
         # Make a new Grade object for this submission
         if submission_id not in self._grades_by_submission:
             self._grades_by_submission[submission_id] = grades.SubmissionGrade(
-                name, self._grade_structure, self._md)
+                name, self._grade_structure)
         self._current_submission_id = submission_id
 
     def log_submission(self, log: str):

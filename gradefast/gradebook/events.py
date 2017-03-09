@@ -255,8 +255,6 @@ class ClientActionEvent(ActionEvent):
         if "path" not in action:
             raise ClientActionEvent.BadActionException()
         path = action["path"]
-        if len(path) == 0:
-            raise grades.BadPathException()
 
         if type == "ADD_HINT":
             # Add a hint by changing the grade structure (MUA HA HA HA)
