@@ -4,12 +4,34 @@ import {parseJson, post, reportResponseError} from "./utils";
 
 let eventSource = null;
 let client_seq = 0;
+let update_key = null;
+
+export function sendAuthRequest() {
+    post(CONFIG.BASE + "_auth", {
+        client_id: CONFIG.CLIENT_ID,
+        device: navigator.userAgent
+    });
+}
+
+function authKeysReceived(new_data_key, new_update_key) {
+    console.log("Received auth keys");
+    update_key = new_update_key;
+    store.dispatch(actions.setDataKey(new_data_key));
+
+    // Now that we are authenticated, move on from the "Loading" screen
+    store.dispatch(actions.setList(CONFIG.INITIAL_LIST));
+    if (typeof CONFIG.INITIAL_SUBMISSION_ID === "number") {
+        store.dispatch(actions.goToSubmission(CONFIG.INITIAL_SUBMISSION_ID));
+    } else {
+        store.dispatch(actions.waitingForUserToGetTheirAssMoving());
+    }
+}
 
 export function sendUpdate(submission_id, action = {}) {
     post(CONFIG.BASE + "_update", {
         submission_id: submission_id,
         client_id: CONFIG.CLIENT_ID,
-        client_key: CONFIG.CLIENT_KEY,
+        update_key: update_key,
         client_seq: ++client_seq,
         action: action
     });
@@ -62,20 +84,29 @@ const updateTypeHandlers = {
     }
 };
 
-export function initEventSource() {
-    const path = CONFIG.BASE + "_events";
+export function initEventSource(onReady) {
+    const path = CONFIG.BASE + "_events?client_id=" + encodeURIComponent(CONFIG.CLIENT_ID);
+
+    console.log("EventSource connecting to", path, "...");
     eventSource = new EventSource(path);
 
     eventSource.onerror = (event) => {
         console.error("EventSource ERROR:", event);
     };
 
-    eventSource.addEventListener("init", (event) => {
-        store.dispatch(actions.setList(CONFIG.INITIAL_LIST));
-        if (typeof CONFIG.INITIAL_SUBMISSION_ID === "number") {
-            store.dispatch(actions.goToSubmission(CONFIG.INITIAL_SUBMISSION_ID));
+    eventSource.onopen = (event) => {
+        console.log("EventSource ready");
+        onReady();
+    };
+
+    eventSource.addEventListener("auth", (event) => {
+        let jsonData = parseJson(event.data, path, "event: auth", event);
+        if (!jsonData) return;
+
+        if (jsonData.data_key && jsonData.update_key) {
+            authKeysReceived(jsonData.data_key, jsonData.update_key)
         } else {
-            store.dispatch(actions.waitingForUserToGetTheirAssMoving());
+            reportResponseError(path, "event: auth", "Missing keys", jsonData)
         }
     });
 
@@ -86,7 +117,7 @@ export function initEventSource() {
         if (jsonData.update_type && updateTypeHandlers.hasOwnProperty(jsonData.update_type)) {
             updateTypeHandlers[jsonData.update_type](jsonData.update_data);
         } else {
-            reportResponseError(path, "event: update", "Invalid update_type: " + jsonData.update_type, data);
+            reportResponseError(path, "event: update", "Invalid update_type: " + jsonData.update_type, jsonData);
         }
     });
 }

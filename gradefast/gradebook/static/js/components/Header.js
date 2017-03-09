@@ -36,16 +36,20 @@ const Header = React.createClass({
                 <h2>
                     <span>
                         {score}
-                        <a href={`${CONFIG.BASE}grades.csv`}
-                           title="Download Grades as CSV"
-                           target="_blank">
-                            <img src={`${CONFIG.STYLE_BASE}csv.png`}/>
-                        </a>
-                        <a href={`${CONFIG.BASE}grades.json`}
-                           title="Download Grades as JSON"
-                           target="_blank">
-                            <img src={`${CONFIG.STYLE_BASE}json.png`}/>
-                        </a>
+                        {this.props.data_key === null ? undefined :
+                            <span>
+                                <a href={`${CONFIG.BASE}grades.csv?data_key=${encodeURIComponent(this.props.data_key)}`}
+                                   title="Download Grades as CSV"
+                                   target="_blank">
+                                    <img src={`${CONFIG.STYLE_BASE}csv.png`}/>
+                                </a>
+                                <a href={`${CONFIG.BASE}grades.json?data_key=${encodeURIComponent(this.props.data_key)}`}
+                                   title="Download Grades as JSON"
+                                   target="_blank">
+                                    <img src={`${CONFIG.STYLE_BASE}json.png`}/>
+                                </a>
+                            </span>
+                        }
                     </span>
                 </h2>
                 <h1>
@@ -62,6 +66,7 @@ const Header = React.createClass({
 
 function mapStateToProps(state) {
     return {
+        data_key: state.get("data_key"),
         list_visible: state.get("list_visible"),
 
         current_score: state.get("submission_current_score"),

@@ -12,10 +12,9 @@ Licensed under the MIT License. For more, see the LICENSE file.
 Author: Jake Hartz <jake@hartz.io>
 """
 
-import json
 from typing import Any, Optional
 
-from . import grades
+from . import grades, utils
 
 
 class ClientUpdate:
@@ -25,15 +24,19 @@ class ClientUpdate:
 
     last_id = 0
 
-    def __init__(self, event: str, data: Any = None):
+    def __init__(self, event: str, data: Any = None, requires_authentication: bool = True):
         """
         Create a new ClientUpdate to send to GradeBook JavaScript clients.
 
-        :param event: The name of the event
-        :param data: The data associated with the event (will be json-encoded if it's not a string)
+        :param event: The name of the update
+        :param data: The data associated with this update (will be json-encoded if it's not a
+            string)
+        :param requires_authentication: Whether this update should only be sent to authenticated
+            clients
         """
         self._event = event
-        self._data = data if isinstance(data, str) else json.dumps(data)
+        self._data = data if isinstance(data, str) else utils.to_json(data)
+        self._requires_authentication = requires_authentication
 
         ClientUpdate.last_id += 1
         self._id = ClientUpdate.last_id
@@ -52,6 +55,9 @@ class ClientUpdate:
             "update_type": type,
             "update_data": data or {}
         })
+
+    def requires_authentication(self):
+        return self._requires_authentication
 
     def encode(self) -> str:
         """

@@ -2,7 +2,7 @@ import * as React from "react";
 import * as ReactDOM from "react-dom";
 import * as ReactRedux from "react-redux";
 
-import {initEventSource, closeEventSource} from "./connection";
+import {initEventSource, closeEventSource, sendAuthRequest} from "./connection";
 import {store, initStore} from "./store";
 
 import GradeBook from "./components/GradeBook";
@@ -15,10 +15,13 @@ window.addEventListener("load", (event) => {
             </ReactRedux.Provider>,
         document.getElementById("root"));
 
-    // Once the EventSource connection is created, the server will respond with an initial "init"
-    // message, and that's when we'll kick things off for real.
-    // (Right now, we're just in a "Loading" state.)
-    initEventSource();
+    // This kicks off the whole process. Once the event stream is established, we'll send a POST
+    // request to the _auth endpoint with our client_id, asking for auth keys. Then, if the server
+    // is in the mood, it'll send an "auth" message to the event source with our data_key and
+    // update_key.
+    initEventSource(() => {
+        sendAuthRequest();
+    });
 }, false);
 
 window.addEventListener("unload", (event) => {

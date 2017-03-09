@@ -3,7 +3,8 @@ import * as Immutable from "immutable";
 import {sendUpdate} from "./connection";
 
 // Local state; not propagated to server
-const WAITING_FOR_USER_TO_GET_THEIR_ASS_MOVING = "WAITING_FOR_USER_TO_GET_THEIR_ASS_MOVING";
+const WAITING_FOR_USER_TO_GET_THEIR_ASS_MOVING = "WAIT_FOR_USER_TO_GET_THEIR_ASS_MOVING";
+const SET_DATA_KEY = "SET_DATA_KEY";
 const LOADING_SUBMISSION = "LOADING_SUBMISSION";
 const INIT_SUBMISSION = "INIT_SUBMISSION";
 const TOGGLE_LIST_VISIBILITY = "TOGGLE_LIST_VISIBILITY";
@@ -41,6 +42,13 @@ export const actions = {
         return {
             type: WAITING_FOR_USER_TO_GET_THEIR_ASS_MOVING
         };
+    },
+
+    setDataKey(data_key) {
+        return {
+            type: SET_DATA_KEY,
+            data_key
+        }
     },
 
     goToSubmission(submission_id) {
@@ -218,6 +226,7 @@ function gradeReducer(state, action) {
 
 const initialState = Immutable.Map({
     "loading": true,
+    "data_key": null,
 
     "list_visible": false,
     "list": Immutable.List(),
@@ -239,6 +248,12 @@ export function app(state, action) {
         case WAITING_FOR_USER_TO_GET_THEIR_ASS_MOVING:
             state = state.merge({
                 "loading": false
+            });
+            break;
+
+        case SET_DATA_KEY:
+            state = state.merge({
+                "data_key": action.data_key
             });
             break;
 
