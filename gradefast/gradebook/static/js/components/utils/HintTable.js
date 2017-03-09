@@ -11,9 +11,18 @@ const HintTable = React.createClass({
         return {
             currentlyEditing: -1,
             oldValue: null,
+            forceShowTextarea: false,
             textareaValue: "",
             numberValue: "0"
         };
+    },
+
+    handleAddHintClick(event) {
+        event.preventDefault();
+
+        this.setState({
+            forceShowTextarea: true
+        });
     },
 
     handleTextareaChange(value) {
@@ -38,6 +47,7 @@ const HintTable = React.createClass({
         this.setState({
             currentlyEditing: index,
             oldValue: this.props.hints.get(index).get("value") || 0,
+            forceShowTextarea: false,
             textareaValue: this.props.hints.get(index).get("name") || "",
             numberValue: "" + (this.props.hints.get(index).get("value") || 0)
         });
@@ -174,15 +184,24 @@ const HintTable = React.createClass({
                             }
                         </td>
                         <td>
-                            <SizingTextarea onChange={this.handleTextareaChange}
-                                            placeholder="Add a new hint (Markdown-parsed)"
-                                            value={this.state.textareaValue}
-                                            style={{width: "100%"}}
-                            />
+                            {(this.state.textareaValue || this.state.forceShowTextarea)
+                                ? <SizingTextarea onChange={this.handleTextareaChange}
+                                                  placeholder="Add a new hint (Markdown-parsed)"
+                                                  value={this.state.textareaValue}
+                                                  style={{width: "100%"}}
+                                                  focusOnMount={this.state.forceShowTextarea}
+                                  />
+                                : <a href="#" onClick={this.handleAddHintClick}>Add a new hint</a>
+                            }
                         </td>
                         <td style={{width: "1px", whiteSpace: "nowrap"}}>
-                            {!this.state.textareaValue ? <span>&nbsp;</span> :
-                                <input type="submit" value="Add"/>
+                            {(this.state.textareaValue || this.state.forceShowTextarea)
+                                ? <span>
+                                      <input type="submit" value="Add"/>
+                                      <button type="button"
+                                              onClick={this.handleCancel}>Cancel</button>
+                                  </span>
+                                : <span>&nbsp;</span>
                             }
                         </td>
                     </tr>

@@ -26,7 +26,7 @@ const CommentsTextarea = React.createClass({
     },
 
     render() {
-        if (this.state.focused || !this.props.value) {
+        if (this.state.focused) {
             // It's important that this isn't wrapped with any other element
             // so "fillParent" still works
             return (
@@ -42,7 +42,7 @@ const CommentsTextarea = React.createClass({
                                 minRows={this.props.minRows}
                                 maxHeightPx={this.props.maxHeightPx}
                                 fillParent={this.props.fillParent}
-                                focusOnMount={this.state.focused}
+                                focusOnMount={true}
                 />
             );
         } else {
@@ -52,6 +52,7 @@ const CommentsTextarea = React.createClass({
             } else if (this.props.maxHeightPx) {
                 style.maxHeight = this.props.maxHeightPx + "px";
             }
+
             return (
                 <div className="inset"
                      style={style}
