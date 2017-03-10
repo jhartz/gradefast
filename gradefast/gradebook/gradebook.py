@@ -57,7 +57,7 @@ class GradeBook:
         self.is_done = False
         self._event_lock = threading.Lock()
 
-        # Each instance of the GradeBook JavaScript client is given its own unique ID (a UUID).
+        # Each instance of the GradeBook client is given its own unique ID (a UUID).
         # They are stored in these sets.
         self._client_ids = set()
         self._authenticated_client_ids = set()
@@ -340,7 +340,7 @@ class GradeBook:
             client_update = event.apply(self)
 
             # If the event resulted in a client update, send that to all authenticated GradeBook
-            # JavaScript clients
+            # clients
             if client_update:
                 assert isinstance(client_update, events.ClientUpdate)
                 for client_id in self._authenticated_client_ids:

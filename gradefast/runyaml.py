@@ -69,7 +69,6 @@ def _start_gradebook(grade_structure: list, grade_name: str, hostname: str, port
     """
     gradebook = GradeBook(grade_structure, grade_name)
 
-    # Start the main GradeBook server
     gradebook_thread = threading.Thread(
         target=lambda: gradebook.run(hostname, port, debug=True),
         daemon=True

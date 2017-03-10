@@ -1,5 +1,5 @@
 """
-Utility functions and classes related to the GradeBook HTTP server.
+Utility functions and classes related to the GradeBook server.
 
 Licensed under the MIT License. For more, see the LICENSE file.
 

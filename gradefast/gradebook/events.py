@@ -1,11 +1,11 @@
 """
 This module contains 2 types of events:
     GradeBookEvent (events that are applied to a GradeBook instance), and
-    ClientUpdate (events that are sent to GradeBook JavaScript clients).
+    ClientUpdate (events that are sent to GradeBook clients).
 
 GradeBookEvent instances can return an instance of a ClientUpdate when they are applied to a
-GradeBook. This allows actions taken on GradeBooks to send updates to GradeBook JavaScript clients
-after updating the GradeBook.
+GradeBook. This allows actions taken on GradeBooks to send updates to GradeBook clients after
+updating the GradeBook.
 
 Licensed under the MIT License. For more, see the LICENSE file.
 
@@ -19,14 +19,14 @@ from . import grades, utils
 
 class ClientUpdate:
     """
-    Represents an event that the server is sending to GradeBook JavaScript clients.
+    Represents an event that the server is sending to GradeBook clients.
     """
 
     last_id = 0
 
     def __init__(self, event: str, data: Any = None, requires_authentication: bool = True):
         """
-        Create a new ClientUpdate to send to GradeBook JavaScript clients.
+        Create a new ClientUpdate to send to GradeBook clients.
 
         :param event: The name of the update
         :param data: The data associated with this update (will be json-encoded if it's not a
@@ -44,8 +44,7 @@ class ClientUpdate:
     @staticmethod
     def create_update_event(type: str, data: dict = None) -> "ClientUpdate":
         """
-        Create a new ClientUpdate containing an "update" event to send to GradeBook JavaScript
-        clients.
+        Create a new ClientUpdate containing an "update" event to send to GradeBook clients.
 
         :param type: The type of "update" event (see connection.js).
         :param data: Data corresponding with this type.
@@ -185,7 +184,7 @@ class ActionEvent(GradeBookEvent):
         if more_data:
             data.update(more_data)
 
-        # Update any GradeBook JavaScript clients of the changes
+        # Update any GradeBook clients of the changes
         return ClientUpdate.create_update_event("SUBMISSION_UPDATE", data)
 
     def apply_to_grade(self, grade: grades.SubmissionGrade) -> Optional[dict]:
@@ -193,8 +192,8 @@ class ActionEvent(GradeBookEvent):
         Execute this event's actions on a SubmissionGrade. This must be overridden in subclasses.
 
         :param grade: The SubmissionGrade instance to perform the action on.
-        :return: A dictionary of extra items to send back to GradeBook JavaScript clients with the
-            update event (if applicable).
+        :return: A dictionary of extra items to send back to GradeBook clients with the update
+            event (if applicable).
         """
         raise NotImplementedError("This must be implemented in a subclass of ActionEvent")
 
@@ -213,10 +212,8 @@ class ClientActionEvent(ActionEvent):
     def __init__(self, submission_id: int, client_id: int, client_seq: int, action: dict):
         """
         :param submission_id: The ID of the submission that this action applies to.
-        :param client_id: The ID of the JavaScript GradeBook client that submitted this action
-            event.
-        :param client_seq: The sequence number from the JavaScript GradeBook client that submitted
-            this action event.
+        :param client_id: The ID of the GradeBook client that submitted this action event.
+        :param client_seq: The sequence number from the GradeBook client that submitted this event.
         :param action: The action, directly from the GradeBook client that submitted it.
         """
         super().__init__(submission_id)
