@@ -85,7 +85,12 @@ const updateTypeHandlers = {
 };
 
 export function initEventSource(onReady) {
-    const path = CONFIG.BASE + "_events?client_id=" + encodeURIComponent(CONFIG.CLIENT_ID);
+    const params = {
+        //client_id: CONFIG.CLIENT_ID,
+        events_key: CONFIG.EVENTS_KEY
+    };
+    const path = CONFIG.BASE + "_events?" +
+        Object.keys(params).map((key) => encodeURIComponent(key) + "=" + params[key]).join("&");
 
     console.log("EventSource connecting to", path, "...");
     eventSource = new EventSource(path);

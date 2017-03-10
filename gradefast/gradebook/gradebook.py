@@ -22,7 +22,7 @@ try:
     import flask
 except ImportError:
     flask = None
-    utils.print_error("Couldn't find Flask package! Please install 'flask' and try again.")
+    utils.print_error("Couldn't find Flask package!", "Please install 'flask' and try again.")
     sys.exit(1)
 
 
@@ -62,15 +62,22 @@ class GradeBook:
         self._client_ids = set()
         self._authenticated_client_ids = set()
 
-        # When a client accesses the events stream, it has an "update ququq" (a Queue that update
+        # When a client accesses the events stream, it has an "update queue" (a Queue that update
         # events are sent to).
         self._client_update_queues = {}
 
-        # Secret key used by the client for accessing downloadables (CSV and JSON).
+        # Secret key used by the client and any other integrations for accessing downloadables
+        # (CSV and JSON).
         # This is sent to the client through the client's events stream after authentication.
-        self._client_data_keys = {}
+        self._data_keys = set()
 
-        # Secret key used by the client for sending updates to the _update AJAX endpoint.
+        # Secret key used by the client to access the events stream
+        # (mapping an events key to a client ID).
+        # This is included in the client's HTML page when it is loaded.
+        self._events_keys = {}
+
+        # Secret key used by the client for sending updates to the _update AJAX endpoint
+        # (mapping a client ID to an update key).
         # This is sent to the client through the client's events stream after authentication.
         self._client_update_keys = {}
 
@@ -84,10 +91,10 @@ class GradeBook:
         ###########################################################################################
         # Helper functions for Flask routes
 
-        def check_uuid_key(arg: str, key_map: dict):
+        def check_data_key():
             try:
-                key = uuid.UUID(flask.request.args[arg])
-                if key not in key_map.values():
+                key = uuid.UUID(flask.request.args["data_key"])
+                if key not in self._data_keys:
                     flask.abort(401)
             except ValueError:
                 flask.abort(400)
@@ -128,20 +135,23 @@ class GradeBook:
 
         @app.route("/gradefast/")
         def _gradefast_():
-            return flask.redirect(flask.url_for("_gradefast_gradebook_HTM"))
+            return flask.redirect(flask.url_for("_gradefast_gradebook_html"))
 
         @app.route("/gradefast/gradebook/")
         def _gradefast_gradebook_():
-            return flask.redirect(flask.url_for("_gradefast_gradebook_HTM"))
+            return flask.redirect(flask.url_for("_gradefast_gradebook_html"))
 
         # GradeBook page (yes, the HTM is solely for trolling, teehee)
         @app.route("/gradefast/gradebook.HTM")
         def _gradefast_gradebook_html():
             client_id = uuid.uuid4()
+            events_key = uuid.uuid4()
             self._client_ids.add(client_id)
+            self._events_keys[events_key] = client_id
             return flask.render_template(
                 "gradebook.html",
                 client_id=utils.to_json(client_id),
+                events_key=utils.to_json(events_key),
                 initial_list=utils.to_json([]),
                 initial_submission_id=utils.to_json(self._current_submission_id),
                 is_done=utils.to_json(self.is_done),
@@ -151,7 +161,7 @@ class GradeBook:
         # Grades CSV file
         @app.route("/gradefast/grades.csv")
         def _gradefast_grades_csv():
-            check_uuid_key("data_key", self._client_data_keys)
+            check_data_key()
             csv_stream = self._get_csv()
 
             def gen():
@@ -173,8 +183,7 @@ class GradeBook:
         # Grades JSON file
         @app.route("/gradefast/grades.json")
         def _gradefast_grades_json():
-            check_uuid_key("data_key", self._client_data_keys)
-
+            check_data_key()
             return flask.Response(self._get_json(), mimetype="application/json")
 
         # Log page
@@ -256,8 +265,8 @@ class GradeBook:
                 return json_bad_request("Invalid value")
 
             except Exception as ex:
-                utils.print_error("GRADEBOOK ERROR: Unknown exception (%s) in _update handler"
-                                  % str(ex),
+                utils.print_error("GRADEBOOK ERROR:",
+                                  "Unknown exception (%s) in _update handler" % str(ex),
                                   print_traceback=True)
                 return json_bad_request(
                     "Look what you did... (seriously, look in the server error console)")
@@ -266,12 +275,12 @@ class GradeBook:
         @app.route("/gradefast/_events")
         def _gradefast_events():
             try:
-                client_id = uuid.UUID(flask.request.args["client_id"])
+                events_key = uuid.UUID(flask.request.args["events_key"])
             except ValueError:
                 return flask.abort(400)
-
-            if client_id not in self._client_ids:
+            if events_key not in self._events_keys:
                 return flask.abort(401)
+            client_id = self._events_keys[events_key]
 
             def gen():
                 update_queue = queue.Queue(999)
@@ -339,23 +348,23 @@ class GradeBook:
                         try:
                             self._client_update_queues[client_id].put_nowait(client_update)
                         except queue.Full:
-                            utils.print_error("GRADEBOOK WARNING: Client", client_id,
-                                              "event queue is full")
+                            utils.print_error("GRADEBOOK WARNING:",
+                                              "Client %s event queue is full" % client_id)
 
     def client_is_authenticated(self, client_id: uuid.UUID):
         """
         Indicate that a client ID is now authenticated.
         """
         assert client_id not in self._authenticated_client_ids
-        assert client_id not in self._client_data_keys
         assert client_id not in self._client_update_keys
 
         self._authenticated_client_ids.add(client_id)
-        self._client_data_keys[client_id] = uuid.uuid4()
+        data_key = uuid.uuid4()
+        self._data_keys.add(data_key)
         self._client_update_keys[client_id] = uuid.uuid4()
 
         self._client_update_queues[client_id].put(events.ClientUpdate("auth", {
-            "data_key": self._client_data_keys[client_id],
+            "data_key": data_key,
             "update_key": self._client_update_keys[client_id]
         }))
 

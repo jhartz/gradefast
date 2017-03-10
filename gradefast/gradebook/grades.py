@@ -107,11 +107,11 @@ def check_grade_structure(st: list, _path: List[int] = None) -> bool:
         _path = []
 
     def warn(*args):
-        utils.print_error("STRUCTURE WARNING:", *args, start="", end="")
+        utils.print_error("STRUCTURE WARNING:", *args, start="", sep=" ", end="")
 
     def error(*args):
         nonlocal found_error
-        utils.print_error("STRUCTURE ERROR:", *args, start="", end="")
+        utils.print_error("STRUCTURE ERROR:", *args, start="", sep=" ", end="")
         found_error = True
 
     if not isinstance(st, list):

@@ -12,7 +12,7 @@ import uuid
 from typing import Any
 
 
-def print_error(*messages: Any, start="\n", sep: str = " ", end="\n",
+def print_error(*messages: Any, start="\n", sep: str = "\n", end="\n",
                 print_traceback: bool = False):
     """
     Print an error message, with details.
