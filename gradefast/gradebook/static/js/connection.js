@@ -54,8 +54,6 @@ const updateTypeHandlers = {
         if (data.originating_client_id === CONFIG.CLIENT_ID) {
             if (data.originating_client_seq < client_seq) {
                 // This update is outdated
-                // TODO: This is going to log literally all the time...
-                console.log("Got outdated update");
                 return;
             } else if (data.originating_client_seq > client_seq) {
                 // Umm, somehow someone has been sending events as us...

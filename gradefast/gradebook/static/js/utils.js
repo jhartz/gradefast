@@ -51,8 +51,6 @@ export function parseJson(str, errorPath, errorStatus, ...errorObjects) {
  *      run through JSON.stringify.
  */
 export function post(path, data) {
-    console.log("POST request:", path, data);
-
     const fd = new FormData();
     Object.keys(data).forEach((key) => {
         fd.append(key, typeof data[key] === "string" ? data[key] : JSON.stringify(data[key]));
@@ -62,7 +60,7 @@ export function post(path, data) {
     xhr.addEventListener("load", (event) => {
         let jsonData = parseJson(xhr.responseText, path, xhr.statusText, event);
         if (jsonData && jsonData.status === "Aight") {
-            console.log("POST response:", jsonData);
+            // All good!
         } else {
             reportResponseError(path, xhr.statusText, JSON.stringify(jsonData, null, 2), event, jsonData);
         }
