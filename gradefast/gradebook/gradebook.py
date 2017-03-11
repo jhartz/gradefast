@@ -102,7 +102,7 @@ class GradeBook:
         def json_response(**data):
             return flask.Response(utils.to_json(data), mimetype="application/json")
 
-        def json_bad_request(message: str, **data):
+        def json_bad_request(status: str, **data):
             """
             This function will ALWAYS raise an exception, thus it never actually returns, but you
             can still prefix calls to it with "return" if it...
@@ -110,7 +110,7 @@ class GradeBook:
                 b) makes your code look better, or
                 c) makes you feel better about your life.
             """
-            flask.abort(400, response=json_response(status=message, **data))
+            flask.abort(400, response=json_response(status=status, **data))
 
         def _get_value_from_form(field: str, constructor):
             if field not in flask.request.form:
@@ -198,7 +198,7 @@ class GradeBook:
                 return flask.render_template(
                     "log.html",
                     title="Log for %s" % grade.name,
-                    content=grade.log
+                    content_html=grade.get_log_html()
                 )
 
         # AJAX endpoint to request update and data keys
@@ -258,11 +258,11 @@ class GradeBook:
             except events.ClientActionEvent.BadActionException:
                 return json_bad_request("Invalid action")
 
-            except grades.BadPathException:
-                return json_bad_request("Invalid path")
+            except grades.BadPathException as ex:
+                return json_bad_request("Invalid path", message=ex.message)
 
-            except grades.BadValueException:
-                return json_bad_request("Invalid value")
+            except grades.BadValueException as ex:
+                return json_bad_request("Invalid value", message=ex.message)
 
             except Exception as ex:
                 utils.print_error("GRADEBOOK ERROR:",
@@ -394,12 +394,11 @@ class GradeBook:
         :param log: The HTML log info
         """
         if len(self._grades_by_submission):
-            self._grades_by_submission[self._current_submission_id].log += log
+            self._grades_by_submission[self._current_submission_id].append_log(log)
 
     def get_grades(self) -> List[OrderedDict]:
         """
-        Return a list of ordered dicts representing the scores and feedback for
-        each submission.
+        Return a list of ordered dicts representing the scores and feedback for each submission.
         """
         grade_list = []
 
@@ -432,7 +431,7 @@ class GradeBook:
         # Make the header row
         point_titles = grades.get_point_titles(self._grade_structure)
         row_titles = ["Name", "Total Score", "Percentage", "Feedback", ""] + \
-                     ["(%s) %s" % (pts, title) for title, pts in point_titles]
+                     ["(%s) %s" % (points, title) for title, points in point_titles]
         csv_writer.writerow(row_titles)
 
         # Make the value rows
@@ -443,7 +442,7 @@ class GradeBook:
                 grade["percentage"],
                 grade["feedback"],
                 ""
-            ] + ["" if title not in grade else grade[title] for title, pts in point_titles])
+            ] + ["" if title not in grade else grade[title] for title, _ in point_titles])
 
         # Return the resulting stream
         csv_stream.seek(0)

@@ -62,20 +62,13 @@ const GradeScore = React.createClass({
                     </td>
                     <td>
                         {!this.props.grade.get("enabled") ? undefined :
-                            (this.props.grade.get("note") || "")
-                                .split("\n")
-                                .map((note, index) => <em key={index}>{note}<br /></em>)}
+                            <em dangerouslySetInnerHTML={{__html: this.props.grade.get("note_html")}}/>
+                        }
                         {!this.props.grade.get("enabled") ? undefined :
                             <CommentsTextarea onChange={this.handleCommentsChange}
                                               placeholder="Comments (Markdown-parsed)"
                                               value={this.props.grade.get("comments")}
-                                              valueHTML={this.props.grade.get("comments")
-                                                  .replace(/&/g, "&amp;")
-                                                  .replace(/"/g, "&quot;")
-                                                  .replace(/</g, "&lt;")
-                                                  .replace(/>/g, "&gt;")
-                                                  .replace(/\n/g, "<br />")
-                                              + '<br /><small>TODO: Render markdown</small>'}
+                                              valueHTML={this.props.grade.get("comments_html")}
                                               minRows={2}
                                               fillParent={true}
                             />

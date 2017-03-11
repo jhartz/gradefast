@@ -23,7 +23,7 @@ const Header = React.createClass({
                         &emsp;
                         <input id="late"
                                type="checkbox"
-                               value={this.props.is_late}
+                               checked={this.props.is_late}
                                onChange={this.lateChangeHandler}
                         /><label htmlFor="late"> Late?</label>
                         &emsp;

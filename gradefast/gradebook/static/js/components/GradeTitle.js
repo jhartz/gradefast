@@ -10,7 +10,7 @@ export default ({path, grade, onSetEnabled}) => {
                    className="big-checkbox"
                    checked={grade.get("enabled")}
                    onChange={(event) => onSetEnabled(event.target.checked)}/>
-            {grade.get("name")}
+            <span dangerouslySetInnerHTML={{__html: grade.get("name_html")}} />
         </label>
     );
     switch (path.size) {

@@ -69,11 +69,13 @@ export const actions = {
         };
     },
 
-    initSubmission(submission_id, name, is_late, overall_comments, current_score, max_score, grades) {
+    initSubmission(submission_id, name, is_late, overall_comments, overall_comments_html,
+                   current_score, max_score, grades) {
         return {
             type: INIT_SUBMISSION,
-            submission_id, name, is_late, overall_comments, current_score, max_score,
-            grades: Immutable.fromJS(grades)
+
+            submission_id, name, is_late, overall_comments, overall_comments_html,
+            current_score, max_score, grades: Immutable.fromJS(grades)
         }
     },
 
@@ -169,17 +171,20 @@ function cloneGradeChildren(children, action) {
 
 const initialGradeState = Immutable.Map({
     name: null,
+    name_html: "",
     enabled: true
 
     // We could also have the following things...
     //hints: Immutable.List()
     //hints_set: Immutable.Map()
     //note: string
+    //note_html: string
 
     // If it's a GradeScore...
     //score: number
     //points: number
     //comments: string
+    //comments_html: string
 
     // If it's a GradeSection...
     //children: Immutable.List()
@@ -235,6 +240,7 @@ const initialState = Immutable.Map({
     "submission_name": "",
     "submission_is_late": false,
     "submission_overall_comments": "",
+    "submission_overall_comments_html": "",
     "submission_current_score": 0,
     "submission_max_score": 0,
     "submission_grades": Immutable.List()
@@ -273,6 +279,7 @@ export function app(state, action) {
                     "submission_name": action.name,
                     "submission_is_late": action.is_late,
                     "submission_overall_comments": action.overall_comments,
+                    "submission_overall_comments_html": action.overall_comments_html,
                     "submission_current_score": action.current_score,
                     "submission_max_score": action.max_score,
                     "submission_grades": action.grades

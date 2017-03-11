@@ -42,17 +42,17 @@ class ClientUpdate:
         self._id = ClientUpdate.last_id
 
     @staticmethod
-    def create_update_event(type: str, data: dict = None) -> "ClientUpdate":
+    def create_update_event(update_type: str, update_data: dict = None) -> "ClientUpdate":
         """
         Create a new ClientUpdate containing an "update" event to send to GradeBook clients.
 
-        :param type: The type of "update" event (see connection.js).
-        :param data: Data corresponding with this type.
+        :param update_type: The type of "update" event (see connection.js).
+        :param update_data: Data corresponding with this type.
         :return: An instance of ClientUpdate
         """
         return ClientUpdate("update", {
-            "update_type": type,
-            "update_data": data or {}
+            "update_type": update_type,
+            "update_data": update_data or {}
         })
 
     def requires_authentication(self):
@@ -171,16 +171,10 @@ class ActionEvent(GradeBookEvent):
         more_data = self.apply_to_grade(grade)
 
         # Recalculate the score, etc.
-        points_earned, points_total, _ = grade.get_score()
-        data = {
-            "submission_id": submission_id,
-            "name": grade.name,
-            "is_late": grade.is_late,
-            "overall_comments": grade.overall_comments,
-            "current_score": points_earned,
-            "max_score": points_total,
-            "grades": grade.get_plain_grades()
-        }
+        data = grade.to_plain_data()
+        data.update({
+            "submission_id": submission_id
+        })
         if more_data:
             data.update(more_data)
 
@@ -223,7 +217,7 @@ class ClientActionEvent(ActionEvent):
 
     def apply_to_grade(self, grade: grades.SubmissionGrade) -> dict:
         action = self.action
-        type = action["type"] if "type" in action else None
+        action_type = action["type"] if "type" in action else None
 
         # We return this if we've finished successfully
         # At the end of the method, if we still haven't returned, we raise an exception.
@@ -233,19 +227,19 @@ class ClientActionEvent(ActionEvent):
         }
 
         # It's possible we have no actual action to take, and that's okay
-        if not type:
+        if not action_type:
             return done
 
-        if type == "SET_LATE":
+        if action_type == "SET_LATE":
             # Set whether the submission is marked as late
             if "is_late" in action:
-                grade.is_late = bool(action["is_late"])
+                grade.set_late(bool(action["is_late"]))
                 return done
 
-        if type == "SET_OVERALL_COMMENTS":
+        if action_type == "SET_OVERALL_COMMENTS":
             # Set the overall comments of the submission
             if "overall_comments" in action:
-                grade.overall_comments = action["overall_comments"]
+                grade.set_overall_comments(action["overall_comments"])
                 return done
 
         # All of the other action types have a path
@@ -253,31 +247,23 @@ class ClientActionEvent(ActionEvent):
             raise ClientActionEvent.BadActionException()
         path = action["path"]
 
-        if type == "ADD_HINT":
+        if action_type == "ADD_HINT":
             # Add a hint by changing the grade structure (MUA HA HA HA)
             if "content" in action and \
                     "name" in action["content"] and "value" in action["content"]:
-                grade.add_content_to_all_grades(
-                    path,
-                    "hints",
-                    {
-                        "name": action["content"]["name"],
-                        "value": grades.make_number(action["content"]["value"])
-                    })
+                grade.add_hint_to_all_grades(path,
+                                             action["content"]["name"],
+                                             action["content"]["value"])
                 return done
 
-        if type == "EDIT_HINT":
+        if action_type == "EDIT_HINT":
             # Edit a hint by changing the grade structure (MUA HA HA HA)
             if "index" in action and "content" in action and \
                     "name" in action["content"] and "value" in action["content"]:
-                grade.replace_content_for_all_grades(
-                    path,
-                    "hints",
-                    action["index"],
-                    {
-                        "name": action["content"]["name"],
-                        "value": grades.make_number(action["content"]["value"])
-                    })
+                grade.replace_hint_for_all_grades(path,
+                                                  action["index"],
+                                                  action["content"]["name"],
+                                                  action["content"]["value"])
                 return done
 
         # All of the rest of the action types operate directly on a grade item
@@ -288,21 +274,21 @@ class ClientActionEvent(ActionEvent):
             raise ClientActionEvent.BadActionException()
         value = action["value"]
 
-        if type == "SET_ENABLED":
+        if action_type == "SET_ENABLED":
             grade_item.set_enabled(bool(value))
             return done
 
-        if type == "SET_SCORE":
+        if action_type == "SET_SCORE":
             if isinstance(grade_item, grades.GradeScore):
                 grade_item.set_score(value)
                 return done
 
-        if type == "SET_COMMENTS":
+        if action_type == "SET_COMMENTS":
             if isinstance(grade_item, grades.GradeScore):
                 grade_item.set_comments(value)
                 return done
 
-        if type == "SET_HINT" and "index" in action:
+        if action_type == "SET_HINT" and "index" in action:
             grade_item.set_hint(action["index"], bool(value))
             return done
 

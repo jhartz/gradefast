@@ -73,10 +73,11 @@ const updateTypeHandlers = {
             data.name,
             data.is_late,
             data.overall_comments,
+            data.overall_comments_html,
             data.current_score,
             data.max_score,
             data.grades
-        ))
+        ));
     },
 
     END_OF_SUBMISSIONS(data) {
@@ -92,7 +93,7 @@ export function initEventSource(onReady) {
     const path = CONFIG.BASE + "_events?" +
         Object.keys(params).map((key) => encodeURIComponent(key) + "=" + params[key]).join("&");
 
-    console.log("EventSource connecting to", path, "...");
+    console.log("EventSource connecting to", path);
     eventSource = new EventSource(path);
 
     eventSource.onerror = (event) => {

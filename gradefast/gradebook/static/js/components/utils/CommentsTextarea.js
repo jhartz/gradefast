@@ -52,13 +52,19 @@ const CommentsTextarea = React.createClass({
             } else if (this.props.maxHeightPx) {
                 style.maxHeight = this.props.maxHeightPx + "px";
             }
+            if (this.props.minRows) {
+                style.minHeight = (this.props.minRows + 1) + "em";
+            }
 
             return (
                 <div className="inset"
                      style={style}
-                     onClick={this.handleFocus}
-                     dangerouslySetInnerHTML={{__html: this.props.valueHTML}}
-                />
+                     onClick={this.handleFocus}>
+                    {this.props.value
+                        ? <div dangerouslySetInnerHTML={{__html: this.props.valueHTML}}/>
+                        : <em style={{opacity: 0.7}}>{this.props.placeholder}</em>
+                    }
+                </div>
             );
         }
     }

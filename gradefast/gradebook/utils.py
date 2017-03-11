@@ -36,35 +36,6 @@ def print_error(*messages: Any, start="\n", sep: str = "\n", end="\n",
     print(end, end="")
 
 
-try:
-    import mistune
-    _markdown = mistune.Markdown(renderer=mistune.Renderer(hard_wrap=True))
-except ImportError:
-    print_error("Couldn't find mistune package!",
-                "Comments and hints will not be Markdown-parsed.")
-    mistune = None
-
-
-def markdown_to_html(text: str) -> str:
-    if mistune is None:
-        html = text.replace("&", "&amp;")   \
-                   .replace("\"", "&quot;") \
-                   .replace("<", "&lt;")    \
-                   .replace(">", "&gt;")    \
-                   .replace("\n", "<br>")
-    else:
-        html = _markdown(text).strip()
-        # Stylize p tags
-        html = html.replace('<p>', '<p style="margin: 3px 0">')
-
-        # Stylize code tags (even though MyCourses cuts out the background anyway...)
-        html = html.replace(
-            '<code>', '<code style="background-color: rgba(0, 0, 0, '
-                      '0.04); padding: 1px 3px; border-radius: 5px;">')
-
-    return html
-
-
 class GradeBookJsonEncoder(json.JSONEncoder):
     """
     A custom JSONEncoder that encodes UUIDs as a string containing the hex version of the UUID.

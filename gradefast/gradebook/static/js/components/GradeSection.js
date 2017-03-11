@@ -34,9 +34,8 @@ const GradeSection = React.createClass({
                     </td>
                     <td>
                         {!this.props.grade.get("enabled") ? undefined :
-                            (this.props.grade.get("note") || "")
-                                .split("\n")
-                                .map((note, index) => <em key={index}>{note}<br /></em>)}
+                            <em dangerouslySetInnerHTML={{__html: this.props.grade.get("note_html")}}/>
+                        }
                     </td>
                 </tr></tbody></table>
                 {!this.props.grade.get("enabled") ? undefined :

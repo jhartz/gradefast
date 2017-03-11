@@ -49,11 +49,7 @@ const GradeBook = React.createClass({
                 <CommentsTextarea onChange={this.handleOverallCommentsChange}
                                   placeholder="Overall Comments (Markdown-parsed)"
                                   value={this.props.overall_comments}
-                                  valueHTML={this.props.overall_comments
-                                      .replace(/&/g, "&amp;").replace(/"/g, "&quot;")
-                                      .replace(/</g, "&lt;").replace(/>/g, "&gt;")
-                                      .replace(/\n/g, "<br />")
-                                      + '<br /><small>TODO: Render markdown</small>'}
+                                  valueHTML={this.props.overall_comments_html}
                                   minRows={3}
                                   maxHeightPx={() => Math.round(document.documentElement.clientHeight * 0.25)}
                 />
@@ -117,6 +113,7 @@ function mapStateToProps(state) {
         submission_id: state.get("submission_id"),
         submission_name: state.get("submission_name"),
         overall_comments: state.get("submission_overall_comments"),
+        overall_comments_html: state.get("submission_overall_comments_html"),
         grades: state.get("submission_grades")
     };
 }

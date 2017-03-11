@@ -109,7 +109,7 @@ const HintTable = React.createClass({
                     const isEnabled = this.props.hints_set.get("" + index);
                     if (this.state.currentlyEditing === index) return (
                         <tr key={"editing-" + index}>
-                            <td style={{width: "1px", whiteSpace: "nowrap"}}>
+                            <td style={{width: "1px"}}>
                                 <input type="checkbox"
                                        id={id(this.props.path, index, "enabled")}
                                        disabled="disabled"
@@ -117,7 +117,7 @@ const HintTable = React.createClass({
                                        onChange={(event) => this.handleSetHintEnabled(index, event.target.checked)}
                                 />
                             </td>
-                            <td style={{width: "1px", whiteSpace: "nowrap"}}>
+                            <td style={{width: "1px"}}>
                                 <input type="number"
                                        size="5"
                                        value={this.state.numberValue}
@@ -131,7 +131,7 @@ const HintTable = React.createClass({
                                                 style={{width: "100%"}}
                                 />
                             </td>
-                            <td style={{width: "1px", whiteSpace: "nowrap"}}>
+                            <td style={{width: "1px"}}>
                                 <input type="submit"
                                        value="Save"
                                 />
@@ -142,7 +142,7 @@ const HintTable = React.createClass({
                     );
                     else return (
                         <tr key={"" + index}>
-                            <td style={{width: "1px", whiteSpace: "nowrap"}}>
+                            <td style={{width: "1px"}}>
                                 <input type="checkbox"
                                        id={id(this.props.path, index, "enabled")}
                                        checked={isEnabled}
@@ -151,15 +151,18 @@ const HintTable = React.createClass({
                             </td>
                             <td style={{textAlign: "right", whiteSpace: "nowrap"}}>
                                 <label htmlFor={id(this.props.path, index, "enabled")}>
-                                    <b>{hint.get("value") ? (hint.get("value") + ":") : undefined}&nbsp;</b>
+                                    <strong>{hint.get("value") ? (hint.get("value") + ":") : undefined}&nbsp;</strong>
                                 </label>
                             </td>
                             <td>
                                 <label htmlFor={id(this.props.path, index, "enabled")}>
-                                    <i>{hint.get("name")}</i>
+                                    {hint.get("name_html")
+                                        ? <span dangerouslySetInnerHTML={{__html: hint.get("name_html")}}/>
+                                        : hint.get("name")
+                                    }
                                 </label>
                             </td>
-                            <td style={{width: "1px", whiteSpace: "nowrap"}}>
+                            <td style={{width: "1px"}}>
                                 <button type="button"
                                         onClick={(event) => this.handleEditHint(event, index)}>
                                     Edit
@@ -171,10 +174,10 @@ const HintTable = React.createClass({
 
                 {this.state.currentlyEditing !== -1 ? undefined :
                     <tr>
-                        <td style={{width: "1px", whiteSpace: "nowrap"}}>
+                        <td style={{width: "1px"}}>
                             <input type="checkbox" disabled="disabled" />
                         </td>
-                        <td style={{width: "1px", whiteSpace: "nowrap"}}>
+                        <td style={{width: "1px"}}>
                             {!this.state.textareaValue ? <span>&nbsp;</span> :
                                 <input type="number"
                                        size="5"
@@ -194,14 +197,22 @@ const HintTable = React.createClass({
                                 : <a href="#" onClick={this.handleAddHintClick}>Add a new hint</a>
                             }
                         </td>
-                        <td style={{width: "1px", whiteSpace: "nowrap"}}>
+                        <td style={{width: "1px"}}>
                             {(this.state.textareaValue || this.state.forceShowTextarea)
                                 ? <span>
                                       <input type="submit" value="Add"/>
                                       <button type="button"
                                               onClick={this.handleCancel}>Cancel</button>
                                   </span>
-                                : <span>&nbsp;</span>
+                                : <span>
+                                      {/* This is here just for spacing, so the layout doesn't jump
+                                          when we show the Add/Cancel or the Save/Cancel buttons */}
+                                      <button type="button"
+                                              disabled="disabled"
+                                              style={{visibility: "hidden"}}>
+                                          Cancel
+                                      </button>
+                                  </span>
                             }
                         </td>
                     </tr>
