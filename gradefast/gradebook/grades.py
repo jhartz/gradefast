@@ -54,7 +54,7 @@ FEEDBACK_HTML_TEMPLATES = {
 }
 
 
-def _markdown_to_html(text: str, inline_only=False) -> str:
+def _markdown_to_html(text: str, inline_only: bool = False) -> str:
     if mistune is None:
         html = text.replace("&", "&amp;")   \
                    .replace("\"", "&quot;") \
@@ -233,34 +233,36 @@ class GradeItem:
 
         :param structure: The grade structure dictionary for this grade item
         """
-        self.name = None
-        self.name_html = None
-        self.enabled = None
-        self.hints = []
-        self.hints_set = {}
-        self.note = None
-        self.note_html = None
+        self._name = None
+        self._name_html = None
+        self._enabled = True
+        self._hints = []
+        self._hints_set = {}
+        self._note = None
+        self._note_html = None
+        self._children: List[GradeItem] = None
 
         if structure:
-            self.name = structure["name"]
-            self.name_html = _markdown_to_html(self.name, True)
-            self.enabled = "disabled" not in structure or not structure["disabled"]
+            self._name = structure["name"]
+            self._name_html = _markdown_to_html(self._name, True)
+            if "disabled" in structure and structure["disabled"]:
+                self.set_enabled(False)
 
             try:
-                self.note = structure["note"]
+                self._note = structure["note"]
             except KeyError:
                 try:
-                    self.note = structure["notes"]
+                    self._note = structure["notes"]
                 except KeyError:
                     pass
 
-            if self.note is not None:
-                self.note_html = _markdown_to_html(self.note)
+            if self._note is not None:
+                self._note_html = _markdown_to_html(self._note)
 
             if "hints" not in structure:
                 structure["hints"] = []
-            self.hints = structure["hints"]
-            for hint in self.hints:
+            self._hints = structure["hints"]
+            for hint in self._hints:
                 hint["name_html"] = _markdown_to_html(hint["name"], True)
 
     def enumerate_all(self, include_disabled: bool = False) -> Iterable["GradeItem"]:
@@ -275,10 +277,10 @@ class GradeItem:
         """
         Enumerate over all enabled children (sections and scores) of this grade section.
         """
-        if not hasattr(self, "children"):
+        if self._children is None:
             raise TypeError("This subclass does not have children")
-        for item in self.children:
-            if item.enabled:
+        for item in self._children:
+            if item._enabled:
                 yield item
 
     def get_point_titles(self, include_disabled: bool = False) -> List[Tuple[str, int]]:
@@ -312,6 +314,15 @@ class GradeItem:
         """
         raise NotImplementedError("get_feedback must be implemented by subclass")
 
+    def is_name_like(self, other_name: str) -> bool:
+        """
+        Determine whether the name of this grade item is like the provided name, ignoring case.
+
+        :param other_name: The name to compare against.
+        :return: Whether they are pretty much the same.
+        """
+        return self._name is not None and self._name.lower() == other_name.lower()
+
     def to_plain_data(self) -> POD:
         """
         Get a representation of this grade item as plain data (just lists, dicts, etc.)
@@ -321,20 +332,20 @@ class GradeItem:
         :return: A dictionary or list representing this grade item.
         """
         return {
-            "name": self.name,
-            "name_html": self.name_html,
-            "enabled": self.enabled,
-            "hints": self.hints,
-            "hints_set": self.hints_set,
-            "note": self.note,
-            "note_html": self.note_html
+            "name": self._name,
+            "name_html": self._name_html,
+            "enabled": self._enabled,
+            "hints": self._hints,
+            "hints_set": self._hints_set,
+            "note": self._note,
+            "note_html": self._note_html
         }
 
     def set_enabled(self, is_enabled: bool):
         """
         Set whether this grade item is enabled.
         """
-        self.enabled = is_enabled
+        self._enabled = is_enabled
 
     def set_hint(self, index: int, is_enabled: bool):
         """
@@ -343,7 +354,39 @@ class GradeItem:
         :param index: The index of the hint
         :param is_enabled: Whether the hint should be set to enabled
         """
-        self.hints_set[index] = is_enabled
+        self._hints_set[index] = is_enabled
+
+    def add_hint(self, name: str, value: Score):
+        """
+        Add a new possible hint to this grade item (and all other instances in other submissions)
+        by modifying a list still tied to the original grade_structure.
+
+        :param name: The name of the hint to add
+        :param value: The point value of the hint to add
+        """
+        self._hints.append({
+            "name": name,
+            "name_html": _markdown_to_html(name, True),
+            "value": _make_number(value)
+        })
+
+    def replace_hint(self, index: int, name: str, value: Score):
+        """
+        Replace an existing hint for this grade item (and all other instances in other submissions)
+        by modifying a list still tied into the original grade_structure.
+
+        This may raise a ValueError or an IndexError if "index" is not valid.
+
+        :param index: The index of the hint to replace in the list of hints
+        :param name: The new name of the hint
+        :param value: The new point value of the hint
+        """
+        index = int(index)
+        self._hints[index] = {
+            "name": name,
+            "name_html": _markdown_to_html(name, True),
+            "value": _make_number(value)
+        }
 
 
 class GradeScore(GradeItem):
@@ -354,10 +397,10 @@ class GradeScore(GradeItem):
     def __init__(self, structure: dict):
         super().__init__(structure)
 
-        self.points = _make_number(structure["points"])
-        self.score = None
-        self.comments = None
-        self.comments_html = None
+        self._points = _make_number(structure["points"])
+        self._score = None
+        self._comments = None
+        self._comments_html = None
 
         self.set_score(structure["default points"] if "default points" in structure
                        else structure["points"])
@@ -365,17 +408,21 @@ class GradeScore(GradeItem):
         self.set_comments(structure["default comments"] if "default comments" in structure else "")
 
     def enumerate_all(self, include_disabled: bool = False) -> Iterable[GradeItem]:
-        if self.enabled or include_disabled:
+        if self._enabled or include_disabled:
             yield self
 
     def get_point_titles(self, include_disabled: bool = False) -> List[Tuple[str, Score]]:
-        if self.enabled or include_disabled:
-            return [(self.name, self.points)]
+        if self._enabled or include_disabled:
+            return [(self._name, self._points)]
         else:
             return []
 
     def get_score(self, is_late: bool) -> Tuple[Score, Score, List[Tuple[str, Score]]]:
-        return self.score, self.points, [(self.name, self.score)]
+        score = self._score
+        for index, hint in enumerate(self._hints):
+            if self._hints_set.get(index):
+                score += hint["value"]
+        return score, self._points, [(self._name, score)]
 
     def get_feedback(self, is_late: bool, depth: int = 0) -> str:
         # Bolded header only if depth 2 or less
@@ -385,36 +432,37 @@ class GradeScore(GradeItem):
 
         # Start off with the score
         # (although we skip the score if it's 0 out of 0)
-        score = ""
-        if self.score and not self.points:
+        score, points, _ = self.get_score(is_late)
+        score_feedback = ""
+        if score and not points:
             # No total points, but still points earned
-            score = FEEDBACK_HTML_TEMPLATES["item_score_bonus"] % self.score
-        elif self.points:
+            score_feedback = FEEDBACK_HTML_TEMPLATES["item_score_bonus"] % score
+        elif points:
             # We have total points, and possibly points earned
-            score = FEEDBACK_HTML_TEMPLATES["item_score"] % (self.score, self.points)
+            score_feedback = FEEDBACK_HTML_TEMPLATES["item_score"] % (score, points)
 
         # Generate dat feedback
-        feedback = FEEDBACK_HTML_TEMPLATES[header_name] % (self.name_html, score)
+        feedback = FEEDBACK_HTML_TEMPLATES[header_name] % (self._name_html, score_feedback)
 
         # Add hints, if applicable
-        for index, hint in enumerate(self.hints):
-            if self.hints_set.get(index):
+        for index, hint in enumerate(self._hints):
+            if self._hints_set.get(index):
                 feedback += FEEDBACK_HTML_TEMPLATES["credit"] % (hint["value"], hint["name_html"])
 
         # Now, add any comments
-        if self.comments:
-            feedback += FEEDBACK_HTML_TEMPLATES["item_body"] % self.comments_html
+        if self._comments:
+            feedback += FEEDBACK_HTML_TEMPLATES["item_body"] % self._comments_html
 
         return feedback
 
     def to_plain_data(self) -> POD:
         data = super().to_plain_data()
+        score, points, _ = self.get_score(False)
         data.update({
-            # TODO: Update the JS side of things to make the proper "points" vs. "score" distinction
-            "points": self.points,
-            "score": self.score,
-            "comments": self.comments,
-            "comments_html": self.comments_html
+            "score": score,
+            "points": points,
+            "comments": self._comments,
+            "comments_html": self._comments_html
         })
         return data
 
@@ -424,7 +472,7 @@ class GradeScore(GradeItem):
 
         :param score: The earned score
         """
-        self.score = _make_number(score)
+        self._score = _make_number(score)
 
     def set_comments(self, comments: str):
         """
@@ -432,8 +480,8 @@ class GradeScore(GradeItem):
 
         :param comments: The new comment
         """
-        self.comments = comments
-        self.comments_html = _markdown_to_html(comments)
+        self._comments = comments
+        self._comments_html = _markdown_to_html(comments)
 
 
 class GradeSection(GradeItem):
@@ -444,26 +492,26 @@ class GradeSection(GradeItem):
     def __init__(self, structure: dict):
         super().__init__(structure)
 
-        self.late_deduction = _make_number(structure["deduct percent if late"]) \
+        self._late_deduction = _make_number(structure["deduct percent if late"]) \
             if "deduct percent if late" in structure else 0
 
-        self.children = _create_tree_from_structure(structure["grades"])
+        self._children = _create_tree_from_structure(structure["grades"])
 
     def enumerate_all(self, include_disabled: bool = False) -> Iterable[GradeItem]:
         # If we're not enabled, stop
-        if self.enabled or include_disabled:
+        if self._enabled or include_disabled:
             # First, yield ourself
             yield self
 
             # Next, yield our children
-            for item in self.children:
+            for item in self._children:
                 yield from item.enumerate_all(include_disabled)
 
     def get_point_titles(self, include_disabled: bool = False) -> List[Tuple[str, Score]]:
         items = []
-        if self.enabled or include_disabled:
-            for item in self.children:
-                items += [(self.name + ": " + name, points) for name, points in
+        if self._enabled or include_disabled:
+            for item in self._children:
+                items += [(self._name + ": " + name, points) for name, points in
                           item.get_point_titles(include_disabled)]
         return items
 
@@ -477,17 +525,17 @@ class GradeSection(GradeItem):
             # Add to the total
             points_earned += item_earned
             points_possible += item_possible
-            individual_points += [(self.name + ": " + name, score) for name, score in item_points]
+            individual_points += [(self._name + ": " + name, score) for name, score in item_points]
 
         # Account for any hints
-        for index, hint in enumerate(self.hints):
-            if self.hints_set.get(index):
+        for index, hint in enumerate(self._hints):
+            if self._hints_set.get(index):
                 points_earned += hint["value"]
 
         # Check if it's late
-        if is_late and self.late_deduction:
+        if is_late and self._late_deduction:
             # It's late! Deduct
-            points_earned -= _get_late_deduction(points_earned, self.late_deduction)
+            points_earned -= _get_late_deduction(points_earned, self._late_deduction)
 
         return points_earned, points_possible, individual_points
 
@@ -501,21 +549,21 @@ class GradeSection(GradeItem):
         if depth < 2:
             header_name += "_top"
         feedback = FEEDBACK_HTML_TEMPLATES[header_name] % (
-            self.name_html,
+            self._name_html,
             points_earned,
             points_possible
         )
 
         # Add hint feedback
-        for index, hint in enumerate(self.hints):
-            if self.hints_set.get(index):
+        for index, hint in enumerate(self._hints):
+            if self._hints_set.get(index):
                 feedback += FEEDBACK_HTML_TEMPLATES["credit"] % (hint["value"], hint["name_html"])
 
         # Add lateness feedback if necessary
-        if is_late and self.late_deduction:
+        if is_late and self._late_deduction:
             feedback += FEEDBACK_HTML_TEMPLATES["section_deduction"] % (
-                _get_late_deduction(points_earned, self.late_deduction),
-                self.late_deduction
+                _get_late_deduction(points_earned, self._late_deduction),
+                self._late_deduction
             )
 
         # Add the feedback for any children
@@ -528,7 +576,7 @@ class GradeSection(GradeItem):
     def to_plain_data(self) -> dict:
         data = super().to_plain_data()
         data.update({
-            "children": [child.to_plain_data() for child in self.children]
+            "children": [child.to_plain_data() for child in self._children]
         })
         return data
 
@@ -541,15 +589,15 @@ class GradeRoot(GradeItem):
     def __init__(self, structure: List[dict]):
         super().__init__(None)
 
-        self.children = _create_tree_from_structure(structure)
+        self._children = _create_tree_from_structure(structure)
 
     def enumerate_all(self, include_disabled: bool = False) -> Iterable[GradeItem]:
-        for item in self.children:
+        for item in self._children:
             yield from item.enumerate_all()
 
     def get_point_titles(self, include_disabled: bool = False) -> List[Tuple[str, Score]]:
         items = []
-        for item in self.children:
+        for item in self._children:
             items += item.get_point_titles(include_disabled)
         return items
 
@@ -574,10 +622,10 @@ class GradeRoot(GradeItem):
         return points_earned, points_possible, individual_points
 
     def get_feedback(self, is_late: bool, depth: int = 0) -> str:
-        return "\n".join(item.get_feedback(is_late, depth + 1) for item in self.children)
+        return "\n".join(item.get_feedback(is_late, depth + 1) for item in self._children)
 
     def to_plain_data(self) -> List[POD]:
-        return [child.to_plain_data() for child in self.children]
+        return [child.to_plain_data() for child in self._children]
 
 
 def _create_tree_from_structure(structure: List[dict]) -> List[GradeItem]:
@@ -654,7 +702,7 @@ class SubmissionGrade:
         :return: A generator that yields GradeItem subclass instances
         """
         for item in self._grades.enumerate_all(include_disabled):
-            if item.name == name:
+            if item.is_name_like(name):
                 yield item
 
     def add_hint_to_all_grades(self, path: Path, name: str, value: Score):
@@ -670,11 +718,7 @@ class SubmissionGrade:
         if len(path) == 0:
             raise BadPathException("Path is empty")
 
-        self.get_by_path(path).hints.append({
-            "name": name,
-            "name_html": _markdown_to_html(name, True),
-            "value": _make_number(value)
-        })
+        self.get_by_path(path).add_hint(name, value)
 
     def replace_hint_for_all_grades(self, path: Path, index: int, name: str, value: Score):
         """
@@ -691,20 +735,9 @@ class SubmissionGrade:
             raise BadPathException("Path is empty")
 
         try:
-            index = int(index)
-        except ValueError:
+            self.get_by_path(path).replace_hint(index, name, value)
+        except (ValueError, IndexError):
             raise BadPathException("Invalid hint index %s at path %s" % (index, path))
-
-        item = self.get_by_path(path)
-        if index < 0 or index >= len(item.hints):
-            raise BadPathException("Invalid hint index %s at path %s (%s)" %
-                                   (index, path, item.name))
-
-        item.hints[index] = {
-            "name": name,
-            "name_html": _markdown_to_html(name, True),
-            "value": _make_number(value)
-        }
 
     def get_score(self) -> Tuple[Score, Score, List[Tuple[str, Score]]]:
         """

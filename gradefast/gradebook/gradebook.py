@@ -5,14 +5,15 @@ Licensed under the MIT License. For more, see the LICENSE file.
 
 Author: Jake Hartz <jake@hartz.io>
 """
-import sys
-import queue
-import logging
 import csv
 import io
-import uuid
+import logging
 import mimetypes
+import queue
+import sys
 import threading
+import uuid
+
 from collections import OrderedDict
 from typing import List, Optional, Union
 

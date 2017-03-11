@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Python program to grade lots of programming labs or similar projects.
+GradeFast is a Python and JavaScript program to grade lots of programming labs or similar projects.
 
-The class Grader controls the grading process.
+The Grader class controls the grading process. The GradeBook UI is handled in the gradebook module.
 
 To use a YAML file as input, use the run function. The YAML file details the structure of the
 grading and the commands to run. For more, see README.md.

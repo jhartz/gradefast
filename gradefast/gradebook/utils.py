@@ -9,6 +9,7 @@ Author: Jake Hartz <jake@hartz.io>
 import json
 import traceback
 import uuid
+
 from typing import Any
 
 
@@ -32,22 +33,26 @@ def print_error(*messages: Any, start="\n", sep: str = "\n", end="\n",
 
     print(start, end="")
     for line in message.split("\n"):
-        print("==>", line.rstrip())
+        line = line.rstrip()
+        if line:
+            print("==>", line.rstrip())
+        else:
+            print()
     print(end, end="")
 
 
-class GradeBookJsonEncoder(json.JSONEncoder):
+class GradeBookJSONEncoder(json.JSONEncoder):
     """
     A custom JSONEncoder that encodes UUIDs as a string containing the hex version of the UUID.
     """
 
-    _instance = None
+    _instance: "GradeBookJSONEncoder" = None
 
     @staticmethod
-    def get_instance() -> "GradeBookJsonEncoder":
-        if GradeBookJsonEncoder._instance is None:
-            GradeBookJsonEncoder._instance = GradeBookJsonEncoder()
-        return GradeBookJsonEncoder._instance
+    def get_instance() -> "GradeBookJSONEncoder":
+        if GradeBookJSONEncoder._instance is None:
+            GradeBookJSONEncoder._instance = GradeBookJSONEncoder()
+        return GradeBookJSONEncoder._instance
 
     def default(self, o):
         if isinstance(o, uuid.UUID):
@@ -59,7 +64,7 @@ def to_json(o: Any) -> str:
     """
     Convert an object to a JSON string. For usage, see json.dumps(...).
     """
-    return GradeBookJsonEncoder.get_instance().encode(o)
+    return GradeBookJSONEncoder.get_instance().encode(o)
 
 
 def from_json(*args, **kwargs):

@@ -7,18 +7,20 @@ Licensed under the MIT License. For more, see the LICENSE file.
 Author: Jake Hartz <jake@hartz.io>
 """
 import os
-import sys
 import shutil
+import subprocess
+import sys
 import threading
-import webbrowser
 import time
 import traceback
-import subprocess
+import webbrowser
+
 from typing import Callable
 
 try:
     import yaml
 except ImportError:
+    yaml = None
     print("")
     print("*** Couldn't find YAML package!")
     print("    Please install 'PyYAML' and try again.")
@@ -47,7 +49,6 @@ def load_yaml_data(yaml_file: str) -> dict:
     """
     Load and check the YAML file.
     """
-    yaml_data = None
     try:
         with open(yaml_file, encoding="utf-8") as f:
             yaml_data = yaml.load(f)

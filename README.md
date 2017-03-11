@@ -2,9 +2,9 @@
 
 *Automate and speed up your grading*
 
-GradeFast is a Python/JavaScript program that eliminates the repetitive parts of grading
-programming assignments and lets you focus on what's important: helping students learn from their
-mistakes. Best of all, it lets you help them without putting much time into it!
+GradeFast is a Python program (with an HTML/JavaScript UI) that eliminates the repetitive parts of
+grading programming assignments and lets you focus on what's important: helping students learn from
+their mistakes. Best of all, it lets you help them without putting much time into it!
 
 ## Dependencies
 
@@ -17,14 +17,15 @@ Additionally, these packages are required:
  - [Colorama](https://pypi.python.org/pypi/colorama) to make it look pretty
  - [YAML](https://pypi.python.org/pypi/PyYAML) to... I don't know... parse the input files, or
    something silly like that
- - [Mistune](https://pypi.python.org/pypi/mistune/) to parse markdown
  - [Flask](https://pypi.python.org/pypi/Flask) because... what doesn't ship with a web server these
    days?
+ - [Mistune](https://pypi.python.org/pypi/mistune/) to parse Markdown in comments and feedback
+   (optional)
 
 ### JavaScript
 
-The frontend UI is browser-based. To compile the JavaScript files, you will need a working install
-of [Node.js](https://nodejs.org/) and [NPM](https://www.npmjs.com/).
+The GradeBook user interface is browser-based (HTML/JavaScript). To compile the JavaScript files,
+you will need a working install of [Node.js](https://nodejs.org/) and [NPM](https://www.npmjs.com/).
 
 To install the Node dependencies and compile the JavaScript files, run:
 
@@ -57,6 +58,13 @@ Want to delve deeper or use individual parts of GradeFast as part of your larger
 Check out the `runyaml.py` module to see how the other GradeFast modules and packages are used.
 Also, look at the [other pages on the GradeFast wiki](https://github.com/jhartz/gradefast/wiki) for
 lots more information.
+
+## Bugs
+
+Want to fix it yourself? (Please?) Fork the repository and submit a pull request on GitHub.
+(Be sure to follow the [code style](STYLE.md).)
+
+If that's too much work, feel free to file an issue on GitHub or email Jake Hartz.
 
 ## License
 

@@ -6,14 +6,14 @@ Licensed under the MIT License. For more, see the LICENSE file.
 
 Author: Jake Hartz <jake@hartz.io>
 """
-import sys
+import difflib
+import io
 import os
 import platform
 import re
 import subprocess
+import sys
 import zipfile
-import difflib
-import io
 
 try:
     import readline

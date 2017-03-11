@@ -10,9 +10,9 @@ Licensed under the MIT License. For more, see the LICENSE file.
 Author: Jake Hartz <jake@hartz.io>
 """
 
-import sys
 import os
 import runpy
+import sys
 
 path = os.path.dirname(sys.modules[__name__].__file__)
 path = os.path.join(path, "..")

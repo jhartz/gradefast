@@ -6,8 +6,8 @@ Licensed under the MIT License. For more, see the LICENSE file.
 
 Author: Jake Hartz <jake@hartz.io>
 """
-import sys
 import os
+import sys
 
 from .runyaml import run
 

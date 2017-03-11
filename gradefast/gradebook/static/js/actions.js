@@ -149,12 +149,6 @@ export const actions = {
     }
 };
 
-/// TODO: DEBUG
-window.actions = actions;
-///TODO: DEBUG
-
-
-
 
 function cloneGradeChildren(children, action) {
     const path = action.path || Immutable.List(),
