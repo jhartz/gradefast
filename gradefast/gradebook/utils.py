@@ -10,7 +10,8 @@ import json
 import traceback
 import uuid
 
-from typing import Any
+from collections import OrderedDict
+from typing import Any, Optional
 
 
 def print_error(*messages: Any, start="\n", sep: str = "\n", end="\n",
@@ -39,6 +40,30 @@ def print_error(*messages: Any, start="\n", sep: str = "\n", end="\n",
         else:
             print()
     print(end, end="")
+
+
+class GradeBookPublicError(Exception):
+    """
+    An error with a name and a message that are okay to send to the GradeBook client.
+    """
+    def __init__(self, message: Optional[str] = None, **more_details):
+        self._message = message
+
+        self._details = OrderedDict()
+        self._details["name"] = self._get_error_name()
+        if message is not None:
+            self._details["message"] = message
+        for key, value in more_details.items():
+            self._details[key] = str(value) or str(value.__class__)
+
+    def _get_error_name(self) -> str:
+        return self.__class__.__name__
+
+    def get_message(self) -> str:
+        return "%s: %s" % (self._get_error_name(), self._message)
+
+    def get_details(self) -> OrderedDict:
+        return self._details
 
 
 class GradeBookJSONEncoder(json.JSONEncoder):

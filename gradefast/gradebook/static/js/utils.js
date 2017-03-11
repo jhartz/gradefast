@@ -19,7 +19,7 @@ export function reportRequestError(path, status, details, ...objects) {
  * @param [objects] - Any errors or objects to log.
  */
 export function reportResponseError(path, status, details, ...objects) {
-    reportError(`Bad response from ${path} (status: ${status})`, details, objects);
+    reportError(`Error response from ${path} (HTTP status: ${status})`, details, objects);
 }
 
 function reportError(message, details, objects) {

@@ -1,32 +1,37 @@
 TODO
 ====
 
-Links for current redesign:
+GradeBook TODOs:
 
-- https://facebook.github.io/react/docs/forms.html
-- http://redux.js.org/docs/basics/UsageWithReact.html
-- http://teropa.info/blog/2015/09/10/full-stack-redux-tutorial.html#the-client-application
-- https://facebook.github.io/immutable-js/docs/
-- https://facebook.github.io/react/docs/pure-render-mixin.html
-
-Little TODOs:
-
+- Implement the submission list
+  - Include the "score / points" next to each name
+  - For completed submissions other than the "current" one in the grader, include a link to the
+    HTML log page (/gradefast/log/<id>?data_key=...) - make it an actual link so we can ctrl+click
+    it, but if you just click it normally, make it open in an iframe in a dialog in the gradebook
 - When we send which submission we're on to the gradebook, pass in the index too (so that when we
   go back or jump around it don't throw it off)
 - For sections, add a "scale" option that takes a ratio to scale the section by (or a string
   representing a fraction)
-- subprocess.CREATE_NEW_PROCESS_GROUP (if it's a background process). Then catch Ctrl-C manually
-  (in the "Waiting" stage) and do process.terminate(). Also test the current functionality on
-  linux; and this might be useful:
-  http://stackoverflow.com/questions/18255730/popen-new-process-group-on-linux
 - Like entering grades on mycourses, mark background in gradebook when a grade item is modified
 - For grade structures, add "collapsible" option to collapse the structure if it's either 0 or 100
   (and with no comments/point hints/section deductions, and all grade items are exactly full points)
 - Unicode issues (in comments, shows up weird in CSV file)
 - 3 states for grade structures: enabled, disabled, or collapsed, in which case any sub grades are
   not shown, and we just enter one big point value, one big comment.
-- Add "check point hint range" into YAML file (this should *really* be an option for each
-  individual grade item, maybe with a global default)
+- If a hint is worth 0, then don't include the point number in the feedback.
+- Change "default points" to "default score" in YAML config
+- In YAML config, "notes" should be allowed to be a list of MD-parsed strings (which we'll show as
+  a HTML list)
+
+Grader TODOs:
+
+- After the end of the last submission, instead of returning, ask the user, "Hey, are you really
+  all done here?" And if they say yes, then return (and send the EndOfSubmissions event, etc.).
+  If they say no, then cycle back around to the first submission.
+- subprocess.CREATE_NEW_PROCESS_GROUP (if it's a background process). Then catch Ctrl-C manually
+  (in the "Waiting" stage) and do process.terminate(). Also test the current functionality on
+  linux; and this might be useful:
+  http://stackoverflow.com/questions/18255730/popen-new-process-group-on-linux
 - Better signaling between gradebook and grader (can still be 1-way, since the gradebook shouldn't
   really have to communicate with the grader).
   Things we could do with this:
@@ -41,8 +46,6 @@ Little TODOs:
 - New YAML file command environmental variable: GRADEFAST_ROOT (the path to the GradeFast package /
   main script)
 - Option to "steal back" terminal/cmd window focus after running a command
-- For comments, instead of textareas, show the rendered Markdown, then, on click, switch it to a
-  textarea (until it loses focus)
 - For "folder"s in the command section of the YAML file, add "confirm" option that defaults to true,
   but if set to false, skips the "Does this folder satisfy your innate human needs?" prompt
 - When running a command, ability to NOT do diff, or to enter a different diff filename. (same w/
@@ -52,43 +55,26 @@ Little TODOs:
 - Better ability to select a folder (some sort of fancy CLI folder select dialog)
 - When specifying a folder, add ability to specify "required files" that must be in the folder (and
   option with it to look thru sub-folders to see if any match the requirement)
-- For point hints, if no value is specified, then it doesn't change the point total -- just shows a
-  message to the user.
 - Keep track of the timestamps of when we start/finish a submission, so at the end we have some
   interesting stats on how long it took us to grade.
-- If a hint is worth 0, then don't include the point number in the feedback.
-- Ability to add notes to hints (so, shows up with the name in our view, but not to the user)
-- Change "default points" to "default score" in YAML config
-- In YAML config, "notes" should be allowed to be a list of MD-parsed strings (which we'll show as
-  a HTML list)
-
-- TODO: TODOs IN THE FILES THEMSELVES!!!
 
 Big TODOs:
 
 - Save files (spec'd in YAML config)
-- In grade book, make a "note book" where we store commonly used notes, and we
-  can access it by right-clicking in any of the comment boxes and it brings it
-  up, and we can click on something to insert it at that point, or add a new
-  one. It would show at the top the ones that were created on the comment box
-  where we right-clicked, and then below it the ones created on other boxes.
-- Add "shortcut" command to open a list of files in a given editor (or maybe
-  just another option on a command to append this list to the end of the
-  parameters). Then we can have an order for the files, and any extra other
-  files in the dir can be appended to the end of the list.
-- In grade book, make a "down arrow" button next to the Name at the top of the
-  page to allow users to go back to previous submissions. The drop-down list
-  should include the score next to each name, and for submissions other than
-  the latest one, a link to the log HTML page (/gradefast/log/<id>)
-- Make separate shell script or something to parse the index.html from
-  Desire2Learn platforms to add "pre-data" into the YAML file somehow (so we
-  can take the comments they wrote when uploading, and also possibly whether
-  it was late, and put it in the YAML beforehand)
-    - Also in this script if we have multiple submissions by the same person,
-      run a checksum on them to make sure they're different and, if not,
-      delete the earlier one
-    - Actually, in general, delete the earlier one for any submissions that
-      have multiple submissions (unless one is on time and other is late)
-- Push the "dist/" folder to GitHub, so that people can use GradeFast without
-  needing npm. (But, with a big fat notice in the README that, if they modify
-  any of the JS files, they'll need to "npm run build" to see the effects)
+- In grade book, make a "note book" where we store commonly used notes, and we can access it by
+  right-clicking in any of the comment boxes and it brings it up, and we can click on something to
+  insert it at that point, or add a new one. It would show at the top the ones that were created on
+  the comment box where we right-clicked, and then below it the ones created on other boxes.
+- Add "shortcut" command to open a list of files in a given editor (or maybe just another option on
+  a command to append this list to the end of the parameters). Then we can have an order for the
+  files, and any extra other files in the dir can be appended to the end of the list.
+- Make separate shell script or something to parse the index.html from Desire2Learn platforms to
+  add "pre-data" into the YAML file somehow (so we can take the comments they wrote when uploading,
+  and also possibly whether it was late, and put it in the YAML beforehand)
+    - Also in this script if we have multiple submissions by the same person, run a checksum on
+      them to make sure they're different and, if not, delete the earlier one
+    - Actually, in general, delete the earlier one for any submissions that have multiple
+      submissions (unless one is on time and other is late)
+- Push the "dist/" folder to GitHub, so that people can use GradeFast without needing npm. (But,
+  with a big fat notice in the README that, if they modify any of the JS files, they'll need to
+  "npm run build" to see the effects)

@@ -17,10 +17,6 @@ var CONFIG = {
     INITIAL_LIST: {{ initial_list|safe }},
     INITIAL_SUBMISSION_ID: {{ initial_submission_id|safe }},
 
-    // The default value for whether to make sure that, when enabling or disabling hints (on grade
-    // scores), applying the hint doesn't make us go out of the grade item's range
-    CHECK_HINT_RANGE: {{ check_hint_range|safe }},
-
     // usually /gradefast/
     BASE: location.pathname.substring(0, location.pathname.lastIndexOf("gradebook")),
     STYLE_BASE: "/static/style/"

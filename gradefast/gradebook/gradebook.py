@@ -15,7 +15,7 @@ import threading
 import uuid
 
 from collections import OrderedDict
-from typing import List, Optional, Union
+from typing import Dict, List, Optional, Set, Union
 
 from . import events, grades, utils
 
@@ -32,11 +32,11 @@ class GradeBook:
     Represents a grade book with submissions and grade structures.
     """
 
-    class BadStructureException(Exception):
-        """Exception resulting from a bad grade structure"""
+    class BadStructureError(utils.GradeBookPublicError):
+        """Error resulting from a bad grade structure"""
         pass
 
-    def __init__(self, grade_structure: List[dict], grade_name: str=None):
+    def __init__(self, grade_structure: List[dict], grade_name: str = None):
         """
         Create a WSGI app representing a grade book.
 
@@ -51,36 +51,36 @@ class GradeBook:
         # Check validity of _grade_structure
         self._grade_structure = grade_structure
         if not grades.check_grade_structure(self._grade_structure):
-            raise GradeBook.BadStructureException()
+            raise GradeBook.BadStructureError()
 
-        self._grades_by_submission = {}
-        self._current_submission_id = None
-        self.is_done = False
+        self._grades_by_submission: Dict[int, grades.SubmissionGrade] = {}
+        self._current_submission_id: Optional[int] = None
+        self.is_done: bool = False
         self._event_lock = threading.Lock()
 
         # Each instance of the GradeBook client is given its own unique ID (a UUID).
         # They are stored in these sets.
-        self._client_ids = set()
-        self._authenticated_client_ids = set()
+        self._client_ids: Set[uuid.UUID] = set()
+        self._authenticated_client_ids: Set[uuid.UUID] = set()
 
         # When a client accesses the events stream, it has an "update queue" (a Queue that update
         # events are sent to).
-        self._client_update_queues = {}
+        self._client_update_queues: Dict[uuid.UUID, queue.Queue] = {}
 
         # Secret key used by the client and any other integrations for accessing downloadables
         # (CSV and JSON).
         # This is sent to the client through the client's events stream after authentication.
-        self._data_keys = set()
+        self._data_keys: Set[uuid.UUID] = set()
 
         # Secret key used by the client to access the events stream
         # (mapping an events key to a client ID).
         # This is included in the client's HTML page when it is loaded.
-        self._events_keys = {}
+        self._events_keys: Dict[uuid.UUID, uuid.UUID] = {}
 
         # Secret key used by the client for sending updates to the _update AJAX endpoint
         # (mapping a client ID to an update key).
         # This is sent to the client through the client's events stream after authentication.
-        self._client_update_keys = {}
+        self._client_update_keys: Dict[uuid.UUID, uuid.UUID] = {}
 
         # Set up MIME type for JS source map
         mimetypes.add_type("application/json", ".map")
@@ -100,18 +100,18 @@ class GradeBook:
             except ValueError:
                 flask.abort(400)
 
-        def json_response(**data):
-            return flask.Response(utils.to_json(data), mimetype="application/json")
+        def json_response(flask_response_args: Optional[dict] = None, **data) -> flask.Response:
+            if flask_response_args is None:
+                flask_response_args = {}
+            return flask.Response(utils.to_json(data),
+                                  mimetype="application/json",
+                                  **flask_response_args)
 
-        def json_bad_request(status: str, **data):
-            """
-            This function will ALWAYS raise an exception, thus it never actually returns, but you
-            can still prefix calls to it with "return" if it...
-                a) makes PyCharm happier,
-                b) makes your code look better, or
-                c) makes you feel better about your life.
-            """
-            flask.abort(400, response=json_response(status=status, **data))
+        def json_aight() -> flask.Response:
+            return json_response(status="Aight")
+
+        def json_bad_request(status: str, **data) -> flask.Response:
+            return json_response(flask_response_args={"status": 400}, status=status, **data)
 
         def _get_value_from_form(field: str, constructor):
             if field not in flask.request.form:
@@ -155,9 +155,7 @@ class GradeBook:
                 events_key=utils.to_json(events_key),
                 initial_list=utils.to_json([]),
                 initial_submission_id=utils.to_json(self._current_submission_id),
-                is_done=utils.to_json(self.is_done),
-                # TODO: implement (from YAML file)
-                check_hint_range=utils.to_json(False))
+                is_done=utils.to_json(self.is_done))
 
         # Grades CSV file
         @app.route("/gradefast/grades.csv")
@@ -190,8 +188,7 @@ class GradeBook:
         # Log page
         @app.route("/gradefast/log/<submission_id>")
         def _gradefast_log__(submission_id):
-            # TODO: This endpoint is INSECURE
-            # TODO: Integrate this into the normal JS client, and fetch the logs via AJAX instead
+            check_data_key()
             grade = self.get_grade(submission_id)
             if grade is None:
                 flask.abort(404)
@@ -222,7 +219,7 @@ class GradeBook:
             # (although note in the future that this will probably happen from another thread)
             self.client_is_authenticated(client_id)
 
-            return json_response(status="Aight")
+            return json_aight()
 
         # AJAX endpoint to update grades based on an action
         @app.route("/gradefast/_update", methods=["POST"])
@@ -242,32 +239,23 @@ class GradeBook:
                 submission_id = get_int_from_form("submission_id")
                 action = get_json_form_field("action")
 
-                # Parse the action into a ClientActionEvent (may raise BadSubmissionException)
+                # Parse the action into a ClientActionEvent (may raise BadSubmissionError)
                 action_event = events.ClientActionEvent(
                     submission_id, client_id, client_seq, action)
 
                 # Apply the action (this will send an update through the events stream).
-                # This may raise BadActionException, BadPathException, or BadValueException
+                # This may raise BadActionError, BadPathError, or BadValueError
                 self.apply_event(action_event)
 
                 # If nothing threw, return that we processed everything successfully
-                return json_response(status="Aight")
+                return json_aight()
 
-            except events.ActionEvent.BadSubmissionException:
-                return json_bad_request("Invalid submission")
-
-            except events.ClientActionEvent.BadActionException:
-                return json_bad_request("Invalid action")
-
-            except grades.BadPathException as ex:
-                return json_bad_request("Invalid path", message=ex.message)
-
-            except grades.BadValueException as ex:
-                return json_bad_request("Invalid value", message=ex.message)
+            except utils.GradeBookPublicError as err:
+                return json_bad_request("GradeBook Error", **err.get_details())
 
             except Exception as ex:
                 utils.print_error("GRADEBOOK ERROR:",
-                                  "Unknown exception (%s) in _update handler" % str(ex),
+                                  "Non-public exception (%s) in _update handler" % str(ex),
                                   print_traceback=True)
                 return json_bad_request(
                     "Look what you did... (seriously, look in the server error console)")

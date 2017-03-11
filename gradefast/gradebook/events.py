@@ -145,9 +145,9 @@ class ActionEvent(GradeBookEvent):
     in the GradeBook.
     """
 
-    class BadSubmissionException(Exception):
+    class BadSubmissionError(utils.GradeBookPublicError):
         """
-        Exception resulting from a bad submission ID in an ActionEvent.
+        Error resulting from a bad submission ID in an ActionEvent.
         """
         pass
 
@@ -165,7 +165,7 @@ class ActionEvent(GradeBookEvent):
 
         grade = gradebook_instance.get_grade(submission_id)
         if grade is None:
-            raise ActionEvent.BadSubmissionException()
+            raise ActionEvent.BadSubmissionError("Invalid submission_id: " + str(submission_id))
 
         # Apply this event on the grade
         more_data = self.apply_to_grade(grade)
@@ -197,9 +197,9 @@ class ClientActionEvent(ActionEvent):
     An ActionEvent representing an action from a GradeBook client.
     """
 
-    class BadActionException(Exception):
+    class BadActionError(utils.GradeBookPublicError):
         """
-        Exception resulting from a bad action type passed to a ClientActionEvent.
+        Error resulting from a bad action type passed to a ClientActionEvent.
         """
         pass
 
@@ -220,7 +220,7 @@ class ClientActionEvent(ActionEvent):
         action_type = action["type"] if "type" in action else None
 
         # We return this if we've finished successfully
-        # At the end of the method, if we still haven't returned, we raise an exception.
+        # At the end of the method, if we still haven't returned, we raise an error.
         done = {
             "originating_client_id": self.client_id,
             "originating_client_seq": self.client_seq
@@ -244,7 +244,7 @@ class ClientActionEvent(ActionEvent):
 
         # All of the other action types have a path
         if "path" not in action:
-            raise ClientActionEvent.BadActionException()
+            raise ClientActionEvent.BadActionError("Action missing a path", action=action)
         path = action["path"]
 
         if action_type == "ADD_HINT":
@@ -271,7 +271,7 @@ class ClientActionEvent(ActionEvent):
 
         # They also all have a value
         if "value" not in action:
-            raise ClientActionEvent.BadActionException()
+            raise ClientActionEvent.BadActionError("Action missing a value", action=action)
         value = action["value"]
 
         if action_type == "SET_ENABLED":
@@ -293,7 +293,7 @@ class ClientActionEvent(ActionEvent):
             return done
 
         # If we're still here, something went wrong...
-        raise ClientActionEvent.BadActionException()
+        raise ClientActionEvent.BadActionError("Action does not have a valid type", action=action)
 
 
 class SetGradeItemScore(ActionEvent):

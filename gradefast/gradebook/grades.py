@@ -85,7 +85,7 @@ def _make_number(val: WeakScore) -> Score:
     try:
         num_val = float(val)
     except:
-        raise BadValueException("Not a number: " + val)
+        raise BadValueError("Not a number: " + str(val))
 
     # Make it an int if we can
     if int(num_val) == num_val:
@@ -107,20 +107,18 @@ def _get_late_deduction(score: Score, percent_to_deduct: float, precision: int =
     return max(0, d)
 
 
-class BadPathException(Exception):
+class BadPathError(utils.GradeBookPublicError):
     """
-    Exception resulting from a bad path
+    Error resulting from a bad path.
     """
-    def __init__(self, message: Optional[str] = None):
-        self.message = message
+    pass
 
 
-class BadValueException(Exception):
+class BadValueError(utils.GradeBookPublicError):
     """
-    Exception resulting from a bad number or value
+    Error resulting from a bad number or value
     """
-    def __init__(self, message: Optional[str] = None):
-        self.message = message
+    pass
 
 
 def check_grade_structure(st: list, _path: List[int] = None) -> bool:
@@ -216,9 +214,16 @@ def check_grade_structure(st: list, _path: List[int] = None) -> bool:
             for hint in grade["hints"]:
                 if "name" not in hint:
                     error("Hint in", title, "missing name")
+                hint["name"] = hint["name"].strip()
                 if "value" not in hint:
-                    error("Hint \"%s\"" % hint["name"].trim(), "in grade item", title,
-                          "is missing a \"value\"")
+                    warn("Hint \"%s\"" % hint["name"], "in grade item", title,
+                         "is missing a \"value\"; assuming \"0\"")
+                    hint["value"] = 0
+                try:
+                    hint["value"] = _make_number(hint["value"])
+                except BadValueError as ex:
+                    error("Hint \"%s\"" % hint["name"], "in grade item", title,
+                          "has a bad \"value\" (%s)" % ex.get_message())
 
     return not found_error
 
@@ -240,7 +245,7 @@ class GradeItem:
         self._hints_set = {}
         self._note = None
         self._note_html = None
-        self._children: List[GradeItem] = None
+        self.children: List[GradeItem] = None
 
         if structure:
             self._name = structure["name"]
@@ -277,9 +282,9 @@ class GradeItem:
         """
         Enumerate over all enabled children (sections and scores) of this grade section.
         """
-        if self._children is None:
+        if self.children is None:
             raise TypeError("This subclass does not have children")
-        for item in self._children:
+        for item in self.children:
             if item._enabled:
                 yield item
 
@@ -495,7 +500,7 @@ class GradeSection(GradeItem):
         self._late_deduction = _make_number(structure["deduct percent if late"]) \
             if "deduct percent if late" in structure else 0
 
-        self._children = _create_tree_from_structure(structure["grades"])
+        self.children = _create_tree_from_structure(structure["grades"])
 
     def enumerate_all(self, include_disabled: bool = False) -> Iterable[GradeItem]:
         # If we're not enabled, stop
@@ -504,13 +509,13 @@ class GradeSection(GradeItem):
             yield self
 
             # Next, yield our children
-            for item in self._children:
+            for item in self.children:
                 yield from item.enumerate_all(include_disabled)
 
     def get_point_titles(self, include_disabled: bool = False) -> List[Tuple[str, Score]]:
         items = []
         if self._enabled or include_disabled:
-            for item in self._children:
+            for item in self.children:
                 items += [(self._name + ": " + name, points) for name, points in
                           item.get_point_titles(include_disabled)]
         return items
@@ -576,7 +581,7 @@ class GradeSection(GradeItem):
     def to_plain_data(self) -> dict:
         data = super().to_plain_data()
         data.update({
-            "children": [child.to_plain_data() for child in self._children]
+            "children": [child.to_plain_data() for child in self.children]
         })
         return data
 
@@ -589,15 +594,15 @@ class GradeRoot(GradeItem):
     def __init__(self, structure: List[dict]):
         super().__init__(None)
 
-        self._children = _create_tree_from_structure(structure)
+        self.children = _create_tree_from_structure(structure)
 
     def enumerate_all(self, include_disabled: bool = False) -> Iterable[GradeItem]:
-        for item in self._children:
+        for item in self.children:
             yield from item.enumerate_all()
 
     def get_point_titles(self, include_disabled: bool = False) -> List[Tuple[str, Score]]:
         items = []
-        for item in self._children:
+        for item in self.children:
             items += item.get_point_titles(include_disabled)
         return items
 
@@ -622,10 +627,10 @@ class GradeRoot(GradeItem):
         return points_earned, points_possible, individual_points
 
     def get_feedback(self, is_late: bool, depth: int = 0) -> str:
-        return "\n".join(item.get_feedback(is_late, depth + 1) for item in self._children)
+        return "\n".join(item.get_feedback(is_late, depth + 1) for item in self.children)
 
     def to_plain_data(self) -> List[POD]:
-        return [child.to_plain_data() for child in self._children]
+        return [child.to_plain_data() for child in self.children]
 
 
 def _create_tree_from_structure(structure: List[dict]) -> List[GradeItem]:
@@ -688,8 +693,8 @@ class SubmissionGrade:
             # Traverse all the GradeSections until we get to where we want
             for index in path_indexes:
                 item = item.children[index]
-        except (ValueError, IndexError, AttributeError):
-            raise BadPathException("Error parsing path")
+        except (ValueError, IndexError, AttributeError) as ex:
+            raise BadPathError("Error parsing path %s" % path, exception=ex)
 
         return item
 
@@ -716,7 +721,7 @@ class SubmissionGrade:
         :param value: The point value of the hint to add
         """
         if len(path) == 0:
-            raise BadPathException("Path is empty")
+            raise BadPathError("Path is empty")
 
         self.get_by_path(path).add_hint(name, value)
 
@@ -732,12 +737,12 @@ class SubmissionGrade:
         :param value: The new point value of the hint
         """
         if len(path) == 0:
-            raise BadPathException("Path is empty")
+            raise BadPathError("Path is empty")
 
         try:
             self.get_by_path(path).replace_hint(index, name, value)
-        except (ValueError, IndexError):
-            raise BadPathException("Invalid hint index %s at path %s" % (index, path))
+        except (ValueError, IndexError) as ex:
+            raise BadPathError("Invalid hint index %s at path %s" % (index, path), exception=ex)
 
     def get_score(self) -> Tuple[Score, Score, List[Tuple[str, Score]]]:
         """
