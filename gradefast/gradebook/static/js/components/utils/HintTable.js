@@ -194,7 +194,9 @@ const HintTable = React.createClass({
                                                   style={{width: "100%"}}
                                                   focusOnMount={this.state.forceShowTextarea}
                                   />
-                                : <a href="#" onClick={this.handleAddHintClick}>Add a new hint</a>
+                                : <a href="#poundsign" onClick={this.handleAddHintClick}>
+                                      Add a new hint
+                                  </a>
                             }
                         </td>
                         <td style={{width: "1px"}}>

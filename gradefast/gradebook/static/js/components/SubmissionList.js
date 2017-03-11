@@ -19,7 +19,8 @@ const SubmissionList = React.createClass({
                         }).map((submission) => {
                             return (
                                 <li key={submission.id}>
-                                    <a href="#" onClick={this.handleItemClick.bind(submission.id)}>
+                                    <a href="#poundsign"
+                                       onClick={this.handleItemClick.bind(submission.id)}>
                                         {submission.id}: <strong>{submission.name}</strong>
                                     </a>
                                 </li>

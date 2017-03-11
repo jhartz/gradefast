@@ -53,7 +53,7 @@ const Header = React.createClass({
                     </span>
                 </h2>
                 <h1>
-                    <a href="#" className="no-underline" onClick={this.titleClickHandler}>
+                    <a href="#poundsign" className="no-underline" onClick={this.titleClickHandler}>
                         {this.props.list_visible ? <small>&#x25B2;</small> : <small>&#x25BC;</small>}
                         &nbsp;&nbsp;
                         {this.props.children}
