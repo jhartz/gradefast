@@ -226,7 +226,7 @@ class GraderOS:
 
         return directory
 
-    def open_shell(self, path: str, env: dict):
+    def open_shell(self, path: str, environment: Dict[str, str]):
         """
         Open a shell or terminal window, initialized to the provided path. This method should
         return immediately after opening the shell; it should not wait for the shell window to be
@@ -235,7 +235,7 @@ class GraderOS:
         This may not be available on all platforms.
 
         :param path: The initial working directory.
-        :param env: Any environmental variables to pass to the shell.
+        :param environment: Any environmental variables to pass to the shell.
         """
         raise NotImplementedError("Not implemented for this OS")
 
@@ -401,17 +401,25 @@ class LocalOS(GraderOS):
         pass
 
 
+def _open_in_background(args, env=None):
+    subprocess.Popen(args, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                     stderr=subprocess.DEVNULL)
+
+
 class LocalWindowsOS(LocalOS):
     """
     Extension of LocalOS for Windows.
     """
 
-    def open_shell(self, path: str, env: dict):
-        if path.find("\"") != -1:
+    def open_shell(self, path: str, environment: Dict[str, str]):
+        # Replace forward slashes with backslashes
+        path = os.path.normpath(path)
+        if path.find('"') != -1:
             # Just get rid of parts with double-quotes
-            path = path[0:path.find("\"")]
+            path = path[0:path.find('"')]
+            # Make sure we don't have a dangling bit of folder name on the end
             path = path[0:path.rfind("\\")]
-        os.system("start cmd /K \"cd " + path + "\"")
+        _open_in_background(["start", "cmd", "/K", 'cd "{}"'.format(path)], env=environment)
 
     def open_directory(self, path: str):
         os.startfile(path)
@@ -422,16 +430,16 @@ class LocalMacOS(LocalOS):
     Extension of LocalOS for Mac OS X.
     """
 
-    def open_shell(self, path: str, env: dict):
-        subprocess.Popen([
+    def open_shell(self, path: str, environment: Dict[str, str]):
+        _open_in_background([
             "open",
             "-a",
             "Terminal",
             path
-        ], env=env)
+        ], env=environment)
 
     def open_directory(self, path: str):
-        subprocess.Popen(["open", path])
+        _open_in_background(["open", path])
 
 
 class LocalLinuxOS(LocalOS):
@@ -445,30 +453,30 @@ class LocalLinuxOS(LocalOS):
                                stdout=subprocess.DEVNULL,
                                stderr=subprocess.DEVNULL) == 0
 
-    def open_shell(self, path: str, env: dict):
+    def open_shell(self, path: str, environment: Dict[str, str]):
         if self._cmd_exists("exo-open"):
             # Use the system's default terminal emulator
-            subprocess.Popen([
+            _open_in_background([
                 "exo-open",
                 "--launch",
                 "TerminalEmulator",
                 "--working-directory",
                 path
-            ], env=env)
+            ], env=environment)
         elif self._cmd_exists("gnome-terminal"):
             # We have gnome-terminal
-            subprocess.Popen([
+            _open_in_background([
                 "gnome-terminal",
                 "--working-directory=" + path
-            ], env=env)
+            ], env=environment)
         elif self._cmd_exists("xfce4-terminal"):
             # We have xfce4-terminal
-            subprocess.Popen([
+            _open_in_background([
                 "xfce4-terminal",
                 "--default-working-directory=" + path
-            ], env=env)
+            ], env=environment)
         else:
             raise NotImplementedError("No terminal emulator found")
 
     def open_directory(self, path: str):
-        subprocess.Popen(["xdg-open", path])
+        _open_in_background(["xdg-open", path])
