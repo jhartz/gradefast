@@ -57,6 +57,7 @@ Grader TODOs:
   option with it to look thru sub-folders to see if any match the requirement)
 - Keep track of the timestamps of when we start/finish a submission, so at the end we have some
   interesting stats on how long it took us to grade.
+- Ability to filter which lines of output are shown based on a regex
 
 Big TODOs:
 

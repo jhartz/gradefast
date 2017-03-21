@@ -10,17 +10,20 @@ their mistakes. Best of all, it lets you help them without putting much time int
 
 ### Python
 
-GradeFast requires **Python *3.5*** or later! (We use type hints.)
+GradeFast requires **Python *3.6*** or later! (We use type hints.)
 
 Additionally, these packages are required:
 
- - [Colorama](https://pypi.python.org/pypi/colorama) to make it look pretty
  - [YAML](https://pypi.python.org/pypi/PyYAML) to... I don't know... parse the input files, or
    something silly like that
  - [Flask](https://pypi.python.org/pypi/Flask) because... what doesn't ship with a web server these
    days?
+
+Optional (but recommended) dependencies:
+
+ - [Colorama](https://pypi.python.org/pypi/colorama) to make the CLI look pretty
  - [Mistune](https://pypi.python.org/pypi/mistune/) to parse Markdown in comments and feedback
-   (optional)
+
 
 ### JavaScript
 
@@ -49,7 +52,7 @@ or, for more detailed usage:
 
 See the [GradeFast wiki](https://github.com/jhartz/gradefast/wiki).
 
-**tl,dr;** First, you must make a YAML-formatted configuration file the assignment that you want to
+**tl;dr:** First, you must make a YAML-formatted configuration file the assignment that you want to
 grade. This file includes the structure of the grades and the commands to run on each submission.
 For more info, see the [YAML Format page](https://github.com/jhartz/gradefast/wiki/YAML-Format) on
 the GradeFast wiki.

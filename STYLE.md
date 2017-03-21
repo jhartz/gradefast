@@ -12,10 +12,13 @@ In addition to PEP 8:
 - Always use double quotes for string literals, UNLESS:
     - The string contains a double quote, and it looks cleaner to use single quotes, OR
     - The string contains raw HTML
+
 - The line length cut-off is 100 characters (don't feel constrained to just 80).
+
 - Always use Python [type hints](https://www.python.org/dev/peps/pep-0484/) for function arguments
   and return types. Feel free to use the built-in
   [typing](https://docs.python.org/3/library/typing.html) library.
+
 - Always use docstrings for both classes and functions (unless the function is overriding another
   already-documented function from a superclass).
 
@@ -24,6 +27,7 @@ In addition to PEP 8:
     - *blank line*
     - `:param` descriptions of each parameter
     - `:return` description of the return value, if applicable
+
 - Imports at the top of each file should follow this general order:
     - `import` statements (ordered alphabetically by module name)
     - *blank line*
