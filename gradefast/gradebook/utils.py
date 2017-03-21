@@ -82,6 +82,15 @@ class GradeBookJSONEncoder(json.JSONEncoder):
     def default(self, o):
         if isinstance(o, uuid.UUID):
             return str(o)
+
+        try:
+            # If the object has a to_json method, use that
+            o = o.to_json()
+        except AttributeError:
+            # I guess it doesn't :(
+            # Hopefully it's already json-encodable
+            pass
+
         return super().default(o)
 
 

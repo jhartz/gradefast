@@ -8,6 +8,8 @@ Author: Jake Hartz <jake@hartz.io>
 
 from typing import Iterable, List, Optional, Tuple, Union
 
+from ..submissions import Submission
+
 from . import utils
 
 try:
@@ -245,7 +247,7 @@ class GradeItem:
         self._hints_set = {}
         self._note = None
         self._note_html = None
-        self.children: List[GradeItem] = None
+        self.children: List["GradeItem"] = None
 
         if structure:
             self._name = structure["name"]
@@ -403,12 +405,12 @@ class GradeScore(GradeItem):
         super().__init__(structure)
 
         self._points = _make_number(structure["points"])
-        self._score = None
+        self._base_score = None
         self._comments = None
         self._comments_html = None
 
-        self.set_score(structure["default points"] if "default points" in structure
-                       else structure["points"])
+        self.set_base_score(structure["default points"] if "default points" in structure
+                            else structure["points"])
 
         self.set_comments(structure["default comments"] if "default comments" in structure else "")
 
@@ -423,7 +425,7 @@ class GradeScore(GradeItem):
             return []
 
     def get_score(self, is_late: bool) -> Tuple[Score, Score, List[Tuple[str, Score]]]:
-        score = self._score
+        score = self._base_score
         for index, hint in enumerate(self._hints):
             if self._hints_set.get(index):
                 score += hint["value"]
@@ -471,19 +473,26 @@ class GradeScore(GradeItem):
         })
         return data
 
-    def set_score(self, score: WeakScore):
+    def set_base_score(self, score: WeakScore):
         """
-        Set the points (score) for this grade item.
+        Set the score for this grade item, excluding the effects of enabled hints.
+        """
+        self._base_score = _make_number(score)
 
-        :param score: The earned score
+    def set_effective_score(self, score: WeakScore):
         """
-        self._score = _make_number(score)
+        Set the score for this grade item, including any hints that are applied.
+        """
+        score = _make_number(score)
+        # To get the base score, we need to "undo" the effects of hints
+        for index, hint in enumerate(self._hints):
+            if self._hints_set.get(index):
+                score -= hint["value"]
+        self._base_score = score
 
     def set_comments(self, comments: str):
         """
         Set the comments for this grade item.
-
-        :param comments: The new comment
         """
         self._comments = comments
         self._comments_html = _markdown_to_html(comments)
@@ -665,14 +674,14 @@ class SubmissionGrade:
     Represents a submission's grade.
     """
 
-    def __init__(self, name: str, grade_structure: List[dict]):
+    def __init__(self, submission: Submission, grade_structure: List[dict]):
         """
-        :param name: The name of the owner of the submission being graded
+        :param submission: The the submission being graded
         :param grade_structure: A list of grade items (see GradeBook class)
         """
-        self.name = name
+        self.submission = submission
         self._grades = GradeRoot(grade_structure)
-        self._log = ""
+        self._log_html = ""
 
         self._is_late = False
         self._overall_comments = ""
@@ -766,7 +775,7 @@ class SubmissionGrade:
         """
         points_earned, points_total, _ = self.get_score()
         return {
-            "name": self.name,
+            "submission": self.submission,
             "is_late": self._is_late,
             "overall_comments": self._overall_comments,
             "overall_comments_html": self._overall_comments_html,
@@ -782,8 +791,8 @@ class SubmissionGrade:
         self._overall_comments = overall_comments
         self._overall_comments_html = _markdown_to_html(overall_comments)
 
-    def append_log(self, log_html: str):
-        self._log += log_html
+    def append_log_html(self, log_html: str):
+        self._log_html += log_html
 
     def get_log_html(self) -> str:
-        return self._log
+        return self._log_html

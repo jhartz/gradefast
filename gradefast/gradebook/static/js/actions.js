@@ -8,7 +8,7 @@ const SET_DATA_KEY = "SET_DATA_KEY";
 const LOADING_SUBMISSION = "LOADING_SUBMISSION";
 const INIT_SUBMISSION = "INIT_SUBMISSION";
 const TOGGLE_LIST_VISIBILITY = "TOGGLE_LIST_VISIBILITY";
-const SET_LIST = "SET_LIST";
+const SET_SUBMISSION_LIST = "SET_SUBMISSION_LIST";
 
 // These string values are also recognized by the GradeBook server
 // (see GradeBook::_parse_action in gradebook.py)
@@ -85,9 +85,9 @@ export const actions = {
         };
     },
 
-    setList(list) {
+    setSubmissionList(list) {
         return {
-            type: SET_LIST,
+            type: SET_SUBMISSION_LIST,
             list: Immutable.fromJS(list)
         }
     },
@@ -263,7 +263,6 @@ export function app(state, action) {
                 "submission_id": action.submission_id
             });
             break;
-
         case INIT_SUBMISSION:
             if (action.submission_id === state.get("submission_id")) {
                 state = state.merge({
@@ -280,10 +279,11 @@ export function app(state, action) {
                 });
             }
             break;
+
         case TOGGLE_LIST_VISIBILITY:
             state = state.set("list_visible", !state.get("list_visible"));
             break;
-        case SET_LIST:
+        case SET_SUBMISSION_LIST:
             state = state.set("list", action.list);
             break;
 

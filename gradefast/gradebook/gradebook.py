@@ -11,13 +11,15 @@ import logging
 import mimetypes
 import queue
 import sys
-import threading
 import uuid
 
 from collections import OrderedDict
 from typing import Dict, List, Optional, Set, Union
 
-from . import events, grades, utils
+from .. import events
+from ..submissions import Submission
+
+from . import clients, eventhandlers, grades, utils
 
 try:
     import flask
@@ -33,35 +35,49 @@ class GradeBook:
     """
 
     class BadStructureError(utils.GradeBookPublicError):
-        """Error resulting from a bad grade structure"""
+        """
+        Error resulting from a bad grade structure.
+        """
         pass
 
-    def __init__(self, grade_structure: List[dict], grade_name: str = None):
+    def __init__(self, project_name: str, project_grade_structure: List[dict],
+                 event_manager: events.EventManager):
         """
         Create a WSGI app representing a grade book.
 
         A grade structure is a list of grade items (grade scores and grade sections). For more, see
         the GradeFast wiki: https://github.com/jhartz/gradefast/wiki/Grade-Structure
 
-        :param grade_structure: A list of grade items
-        :param grade_name: A name for whatever we're grading
+        :param project_name: The name of the project that we are grading.
+        :param project_grade_structure: A list of grade items for the project that we are grading.
+        :param event_manager: An event manager to register our event handlers with, and to use to
+            dispatch events
         """
-        self._grade_name = grade_name or "grades"
+        self._project_name = project_name
 
-        # Check validity of _grade_structure
-        self._grade_structure = grade_structure
+        # Register our event handlers with the event manager
+        self._event_manager: events.EventManager = event_manager
+        for event_handler_class in eventhandlers.__all__:
+            event_manager.register_event_handler(getattr(eventhandlers, event_handler_class)(self))
+
+        # Check validity of the project's grade_structure
+        self._grade_structure = project_grade_structure
         if not grades.check_grade_structure(self._grade_structure):
             raise GradeBook.BadStructureError()
 
-        self._grades_by_submission: Dict[int, grades.SubmissionGrade] = {}
+        self._grades_by_submission_id: Dict[int, grades.SubmissionGrade] = {}
         self._current_submission_id: Optional[int] = None
+        self._submission_list: List[Submission] = []
         self.is_done: bool = False
-        self._event_lock = threading.Lock()
 
         # Each instance of the GradeBook client is given its own unique ID (a UUID).
         # They are stored in these sets.
         self._client_ids: Set[uuid.UUID] = set()
         self._authenticated_client_ids: Set[uuid.UUID] = set()
+
+        # When we send out an AuthRequestedEvent for a client, store the event ID here so we can
+        # handle the corresponding AuthGrantedEvent when it comes.
+        self._auth_event_id_to_client_id = {}
 
         # When a client accesses the events stream, it has an "update queue" (a Queue that update
         # events are sent to).
@@ -152,10 +168,7 @@ class GradeBook:
             return flask.render_template(
                 "gradebook.html",
                 client_id=utils.to_json(client_id),
-                events_key=utils.to_json(events_key),
-                initial_list=utils.to_json([]),
-                initial_submission_id=utils.to_json(self._current_submission_id),
-                is_done=utils.to_json(self.is_done))
+                events_key=utils.to_json(events_key))
 
         # Grades CSV file
         @app.route("/gradefast/grades.csv")
@@ -175,7 +188,7 @@ class GradeBook:
 
             resp = flask.Response(gen(), mimetype="text/csv")
             filename_param = 'filename="%s.csv"' % \
-                self._grade_name.replace("\\", "").replace('"', '\\"')
+                self._project_name.replace("\\", "").replace('"', '\\"')
             resp.headers["Content-disposition"] = "attachment; " + filename_param
             return resp
 
@@ -195,7 +208,7 @@ class GradeBook:
             else:
                 return flask.render_template(
                     "log.html",
-                    title="Log for %s" % grade.name,
+                    title="Log for %s" % grade.submission.name,
                     content_html=grade.get_log_html()
                 )
 
@@ -213,11 +226,11 @@ class GradeBook:
 
             device = flask.request.form.get("device", "unknown device")
 
-            # TODO: Either check for a password in the request (if one was specified in the YAML
-            # file), or prompt the user (with "device") to make sure it's okay.
-            # For now, just do this:
-            # (although note in the future that this will probably happen from another thread)
-            self.client_is_authenticated(client_id)
+            event = events.AuthRequestedEvent("GradeBook Client; device: " + device)
+            self._auth_event_id_to_client_id[event.event_id] = client_id
+            # TODO: Send out the AuthRequestedEvent, and wait for an AuthGrantedEvent to come back
+            # In the meantime...
+            self.auth_granted(event.event_id)
 
             return json_aight()
 
@@ -239,13 +252,8 @@ class GradeBook:
                 submission_id = get_int_from_form("submission_id")
                 action = get_json_form_field("action")
 
-                # Parse the action into a ClientActionEvent (may raise BadSubmissionError)
-                action_event = events.ClientActionEvent(
-                    submission_id, client_id, client_seq, action)
-
-                # Apply the action (this will send an update through the events stream).
-                # This may raise BadActionError, BadPathError, or BadValueError
-                self.apply_event(action_event)
+                # Parse the action and apply it (may raise a subclass of GradeBookPublicError)
+                self._parse_action(submission_id, client_id, client_seq, action)
 
                 # If nothing threw, return that we processed everything successfully
                 return json_aight()
@@ -275,7 +283,7 @@ class GradeBook:
                 update_queue = queue.Queue(999)
                 self._client_update_queues[client_id] = update_queue
                 # Some browsers need an initial kick to fire the "open" event on the EventSource
-                update_queue.put(events.ClientUpdate("hello", requires_authentication=False))
+                update_queue.put(clients.ClientUpdate("hello", requires_authentication=False))
                 try:
                     while True:
                         client_update = update_queue.get()
@@ -292,9 +300,6 @@ class GradeBook:
                         del self._client_update_queues[client_id]
             return flask.Response(gen(), mimetype="text/event-stream")
 
-    def get_current_submission_id(self):
-        return self._current_submission_id
-
     def get_grade(self, submission_id: Union[str, int]) -> Optional[grades.SubmissionGrade]:
         """
         Test whether a submission ID is valid and, if so, get the Grade corresponding to it.
@@ -310,40 +315,40 @@ class GradeBook:
         if submission_id is None:
             return None
 
-        if submission_id not in self._grades_by_submission:
+        if submission_id not in self._grades_by_submission_id:
             return None
-        return self._grades_by_submission[submission_id]
+        return self._grades_by_submission_id[submission_id]
 
-    def apply_event(self, event: events.GradeBookEvent):
+    def _send_client_update(self, client_update: clients.ClientUpdate, client_id: uuid.UUID = None):
         """
-        Apply a GradeBook event to this gradebook.
+        Send a ClientUpdate to either a specific GradeBook client or to all open, authenticated
+        GradeBook clients.
 
-        :param event: An instance of a subclass of events.GradeBookEvent
+        :param client_update: The update to send.
+        :param client_id: The ID of the client to send to. If this is None, then send to all
+            clients.
         """
-        assert isinstance(event, events.GradeBookEvent)
+        assert isinstance(client_update, clients.ClientUpdate)
 
-        # Make sure that only one event is being applied at once, and that nobody is trying to
-        # export the grades while we're applying changes.
-        with self._event_lock:
-            # Run the event on this GradeBook
-            client_update = event.apply(self)
+        if client_id is None:
+            client_ids = self._authenticated_client_ids
+        else:
+            client_ids = [client_id]
 
-            # If the event resulted in a client update, send that to all authenticated GradeBook
-            # clients
-            if client_update:
-                assert isinstance(client_update, events.ClientUpdate)
-                for client_id in self._authenticated_client_ids:
-                    if client_id in self._client_update_queues:
-                        try:
-                            self._client_update_queues[client_id].put_nowait(client_update)
-                        except queue.Full:
-                            utils.print_error("GRADEBOOK WARNING:",
-                                              "Client %s event queue is full" % client_id)
+        for client_id in client_ids:
+            if client_id in self._client_update_queues:
+                try:
+                    self._client_update_queues[client_id].put_nowait(client_update)
+                except queue.Full:
+                    utils.print_error("GRADEBOOK WARNING:",
+                                      "Client %s event queue is full" % client_id)
 
-    def client_is_authenticated(self, client_id: uuid.UUID):
+    def auth_granted(self, auth_event_id: int):
         """
-        Indicate that a client ID is now authenticated.
+        Indicate that a client ID is now authenticated, identified by the event ID of the original
+        AuthRequestEvent that was sent out.
         """
+        client_id = self._auth_event_id_to_client_id[auth_event_id]
         assert client_id not in self._authenticated_client_ids
         assert client_id not in self._client_update_keys
 
@@ -352,40 +357,78 @@ class GradeBook:
         self._data_keys.add(data_key)
         self._client_update_keys[client_id] = uuid.uuid4()
 
-        self._client_update_queues[client_id].put(events.ClientUpdate("auth", {
+        self._send_client_update(clients.ClientUpdate("auth", {
             "data_key": data_key,
-            "update_key": self._client_update_keys[client_id]
+            "update_key": self._client_update_keys[client_id],
+            "initial_submission_list": self._submission_list,
+            "initial_submission_id": self._current_submission_id,
+            "is_done": self.is_done
         }))
 
-    def start_submission(self, submission_id: int, name: str):
+    def set_submission_list(self, submission_list: List[Submission]):
+        """
+        Set a new submission list.
+        """
+        self._submission_list = submission_list
+
+        # Make new SubmissionGrade objects for any submissions that we haven't seen before
+        for submission in submission_list:
+            if submission.id not in self._grades_by_submission_id:
+                self._grades_by_submission_id[submission.id] = grades.SubmissionGrade(
+                    submission, self._grade_structure)
+
+        # Tell GradeBook clients about this new list
+        self._send_client_update(clients.ClientUpdate.create_update_event("NEW_SUBMISSION_LIST", {
+            "submissions": submission_list
+        }))
+
+    def set_current_submission(self, submission_id: int):
         """
         Set a submission ID to be the current submission ID.
 
-        This should only be called from a GradeBookEvent applied through the GradeBook apply_event
-        method to ensure thread safety.
-
         :param submission_id: The ID of the submission.
-        :param name: The name of the owner of the submission.
         """
-        # Make a new Grade object for this submission
-        if submission_id not in self._grades_by_submission:
-            self._grades_by_submission[submission_id] = grades.SubmissionGrade(
-                name, self._grade_structure)
+        assert submission_id in self._grades_by_submission_id
         self._current_submission_id = submission_id
 
-    def log_submission(self, log: str):
+        # Tell GradeBook clients about this change in the current submission
+        self._send_client_update(clients.ClientUpdate.create_update_event("SUBMISSION_STARTED", {
+            "submission_id": submission_id
+        }))
+
+    def log_submission(self, submission_id: int, log_html: str):
         """
-        Add log info for the current submission.
+        Add log info for a submission.
 
-        This should only be called from a GradeBookEvent applied through the GradeBook apply_event
-        method to ensure thread safety.
-
-        :param log: The HTML log info
+        :param submission_id: The submission ID corresponding to the log.
+        :param log_html: The HTML log info.
         """
-        if len(self._grades_by_submission):
-            self._grades_by_submission[self._current_submission_id].append_log(log)
+        self.get_grade(submission_id).append_log_html(log_html)
 
-    def get_grades(self) -> List[OrderedDict]:
+    def set_done(self, is_done: bool):
+        """
+        Set whether we are done grading.
+        """
+        self.is_done = is_done
+
+        # Tell GradeBook clients that we're done
+        self._send_client_update(clients.ClientUpdate.create_update_event("END_OF_SUBMISSIONS"))
+
+    def _parse_action(self, submission_id: int, client_id: int, client_seq: int, action: dict):
+        """
+        Parse and apply an action received from a GradeBook client.
+
+        :param submission_id: The ID of the submission that this action applies to.
+        :param client_id: The ID of the GradeBook client that submitted this action event.
+        :param client_seq: The sequence number from the GradeBook client that submitted this event.
+        :param action: The action, directly from the GradeBook client that submitted it.
+        """
+        client_action = clients.ClientAction(submission_id, client_id, client_seq, action)
+        data = client_action.apply_to_gradebook(self)
+        self._send_client_update(
+            clients.ClientUpdate.create_update_event("SUBMISSION_UPDATED", data))
+
+    def _get_grades_export(self) -> List[OrderedDict]:
         """
         Return a list of ordered dicts representing the scores and feedback for each submission.
         """
@@ -394,11 +437,11 @@ class GradeBook:
         # Make sure that no events are applied while we are generating the grade list, ensuring
         # that everything is consistent. (For simplicity, we also build up the entire list and then
         # return it, instead of trying using a generator with the event lock.)
-        with self._event_lock:
-            for grade in self._grades_by_submission.values():
+        with self._event_manager.block_event_dispatching():
+            for grade in self._grades_by_submission_id.values():
                 points_earned, points_possible, individual_points = grade.get_score()
                 grade_details = OrderedDict()
-                grade_details["name"] = grade.name
+                grade_details["name"] = grade.submission.name
                 grade_details["score"] = points_earned
                 grade_details["possible_score"] = points_possible
                 grade_details["percentage"] = 0 if points_possible == 0 else \
@@ -424,7 +467,7 @@ class GradeBook:
         csv_writer.writerow(row_titles)
 
         # Make the value rows
-        for grade in self.get_grades():
+        for grade in self._get_grades_export():
             csv_writer.writerow([
                 grade["name"],
                 grade["score"],
@@ -441,7 +484,7 @@ class GradeBook:
         """
         Return a string representing the grades as JSON.
         """
-        return utils.to_json(self.get_grades())
+        return utils.to_json(self._get_grades_export())
 
     def run(self, hostname: str, port: int, log_level: Union[str, int] = logging.WARNING,
             debug: bool = False):

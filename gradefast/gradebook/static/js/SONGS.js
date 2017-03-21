@@ -25,8 +25,9 @@
 
 // These songs are used for the song snippet in the gradebook footer
 
-// I welcome PR's for more songs here!
-// Pick one of your favorite songs, and choose a line or 2 from the lyrics.
+// I welcome PR's for more songs here! Pick one of your favorite songs, and choose a line or 2 from
+// the lyrics to use as a snippet.
+// (It would be nice if the PR also included an actual contribution to GradeFast :p)
 
 // Only rule is: no more than one song per artist. (Make sure to put the artist in a comment so
 // future people know that that artist is out.)

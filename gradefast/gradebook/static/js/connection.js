@@ -13,15 +13,17 @@ export function sendAuthRequest() {
     });
 }
 
-function authKeysReceived(new_data_key, new_update_key) {
+function authKeysReceived(new_data_key, new_update_key, initial_submission_list, initial_submission_id, is_done) {
     console.log("Received auth keys");
     update_key = new_update_key;
     store.dispatch(actions.setDataKey(new_data_key));
 
     // Now that we are authenticated, move on from the "Loading" screen
-    store.dispatch(actions.setList(CONFIG.INITIAL_LIST));
-    if (typeof CONFIG.INITIAL_SUBMISSION_ID === "number") {
-        store.dispatch(actions.goToSubmission(CONFIG.INITIAL_SUBMISSION_ID));
+    store.dispatch(actions.setSubmissionList(initial_submission_list));
+    if (is_done) {
+        // TODO: Show the user a summary or some shit
+    } else if (typeof initial_submission_id === "number") {
+        store.dispatch(actions.goToSubmission(initial_submission_id));
     } else {
         store.dispatch(actions.waitingForUserToGetTheirAssMoving());
     }
@@ -38,17 +40,17 @@ export function sendUpdate(submission_id, action = {}) {
 }
 
 const updateTypeHandlers = {
-    UPDATE_LIST(data) {
+    NEW_SUBMISSION_LIST(data) {
         // Update our list of submissions
-        store.dispatch(actions.setList(data.list));
+        store.dispatch(actions.setSubmissionList(data.submissions));
     },
 
-    SUBMISSION_START(data) {
+    SUBMISSION_STARTED(data) {
         // Tell the forces at large to go to this submission
         store.dispatch(actions.goToSubmission(data.submission_id));
     },
 
-    SUBMISSION_UPDATE(data) {
+    SUBMISSION_UPDATED(data) {
         // Should we ignore this update?
         // Only if it came from us, and is already outdated
         if (data.originating_client_id === CONFIG.CLIENT_ID) {
@@ -108,7 +110,12 @@ export function initEventSource(onReady) {
         if (!jsonData) return;
 
         if (jsonData.data_key && jsonData.update_key) {
-            authKeysReceived(jsonData.data_key, jsonData.update_key)
+            authKeysReceived(
+                jsonData.data_key,
+                jsonData.update_key,
+                jsonData.initial_submission_list,
+                jsonData.initial_submission_id,
+                jsonData.is_done);
         } else {
             reportResponseError(path, "event: auth", "Missing keys", jsonData)
         }
