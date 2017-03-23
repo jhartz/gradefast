@@ -146,61 +146,81 @@ class GraderOS:
         """
         raise NotImplementedError()
 
-    def list_dir(self, directory: Optional[str] = None) -> List[Tuple[str, str, bool]]:
+    def get_home_folder(self) -> str:
         """
-        Get the contents of a directory. If the directory cannot be found, raise a
-        FileNotFoundError with a detailed error message.
-
-        :param directory: The absolute path of the directory to list. If provided, this will be
-            based on a value returned from the choose_dir method. If not provided, it should
-            default to the "home directory", or equivalent.
-        :return: A list of tuples of the form (name, type, is_link). The type should be one of:
-            "file", "directory", or some other string for a special or inaccessible file
+        Get the absolute path to a "home folder", or equivalent.
         """
         raise NotImplementedError()
 
-    def choose_dir(self, base_directory: Optional[str] = None) -> str:
+    def list_folder(self, path: str) -> List[Tuple[str, str, bool]]:
         """
-        Interactively choose a directory. This should be overridden by subclasses if it is possible
-        to show the user a GUI file chooser window. Otherwise, the default implementation makes use
-        of the other GraderOS methods to prompt the user for a directory.
+        Get the contents of a folder. If the folder cannot be found, raise a FileNotFoundError with
+        a detailed error message.
 
-        :param base_directory: The absolute path of the directory to start in. If provided, this
-            will be based on a previous return value from the same choose_dir method.
-        :return: The absolute path to the chosen directory. This must start with a forward
-            slash ("/"), and it must use forward slashes (NOT backslashes, colons, etc.) to
-            separate parts of the path. (Sorry, Windows)
+        :param path: The absolute path of the folder to list. This will be based on values
+            returned from the get_home_folder, list_folder, and choose_folder methods.
+        :return: A list of tuples of the form (name, type, is_link). The type should be one of:
+            "file", "folder", or some other string for a special or inaccessible file. If the type
+            is unknown, use None.
         """
-        old_directory = None
-        directory = base_directory
+        raise NotImplementedError()
+
+    def choose_folder(self, base_folder: Optional[str] = None) -> Optional[str]:
+        """
+        Interactively choose a folder. This should be overridden by subclasses if it is possible
+        to show the user a GUI file chooser window. Otherwise, the default implementation makes use
+        of the other GraderOS methods and GraderIO methods to prompt the user for a directory.
+
+        :param base_folder: The absolute path of the folder to start in. If provided, this will be
+            based on a previous return value from the same choose_folder method. If not provided,
+            it will default to get_home_folder().
+        :return: The absolute path to the chosen folder. This must start with a forward slash ("/")
+            and it must use forward slashes (NOT backslashes, colons, etc.) to separate parts of
+            the path. (Sorry, Windows.) If the user downright refuses to choose something, then
+            None will be returned, in which case feel free to blow up.
+        """
+        if base_folder is not None:
+            try:
+                self.list_folder(base_folder)
+            except FileNotFoundError:
+                self._io.output(Msg().error("Base folder not found:").print(base_folder))
+                base_folder = None
+        if base_folder is None:
+            base_folder = self.get_home_folder()
+
+        old_folder = None
+        folder = base_folder
         while True:
             try:
-                dir_listing = self.list_dir(directory)
+                folder_listing = self.list_folder(folder)
             except FileNotFoundError:
-                self._io.output(Msg().error("Not found:").print(directory))
-                if old_directory is None:
-                    # We were passed a bad directory to begin with; no hope here
-                    break
-                directory = old_directory
-                continue
+                self._io.output(Msg().error("Directory not found:").print(folder))
+                if old_folder is None:
+                    # list_dir must have failed on the results from get_home_folder()
+                    # Let's just give up :(
+                    return None
+                else:
+                    # Go back to a known existing folder
+                    folder = old_folder
+                    continue
 
             files = []
-            directories = []
+            folders = []
             other = []
-            for name, type, is_link in dir_listing:
+            for name, type, is_link in folder_listing:
                 if type == "file":
                     files.append((name, is_link))
-                elif type == "directory":
-                    directories.append((name, is_link))
+                elif type == "folder":
+                    folders.append((name, is_link))
                 else:
                     other.append((name, type, is_link))
 
             listing = Msg(sep="")
-            listing.print("{}", posixpath.relpath(directory, base_directory)).status(": ")
+            listing.print("{}", posixpath.relpath(folder, base_folder)).status(": ")
             listing.print("..")
-            for name, is_link in sorted(directories, key=lambda f: f[0]):
+            for name, is_link in sorted(folders, key=lambda f: f[0]):
                 listing.status(", ")
-                listing.print("{}/", name)
+                listing.bright("{}/", name)
                 if is_link:
                     listing.print(" (link)")
             for name, is_link in sorted(files, key=lambda f: f[0]):
@@ -212,19 +232,22 @@ class GraderOS:
                 listing.status(", ")
                 listing.print("{}", name)
                 if is_link:
-                    listing.print(" (link to {})", type)
-                else:
+                    listing.print(" (link")
+                    if type is not None:
+                        listing.print(" to {}", type)
+                    listing.print(")")
+                elif type is not None:
                     listing.print(" ({})", type)
             self._io.output(listing)
 
-            choice = self._io.input("Choose a directory (or \"Enter\" if you're satisfied):",
-                                    [name for name, is_link in directories]).strip()
+            choice = self._io.input("Choose a folder (or \"Enter\" if you're satisfied with this "
+                                    "one):", [name for name, is_link in folders]).strip()
             if not choice:
                 break
-            old_directory = directory
-            directory = posixpath.normpath(directory + "/" + choice)
+            old_folder = folder
+            folder = posixpath.normpath(folder + "/" + choice)
 
-        return directory
+        return folder
 
     def open_shell(self, path: str, environment: Dict[str, str]):
         """
@@ -239,16 +262,16 @@ class GraderOS:
         """
         raise NotImplementedError("Not implemented for this OS")
 
-    def open_directory(self, path: str):
+    def open_folder(self, path: str):
         """
-        Open a GUI view of a directory (e.g. Windows Explorer, Finder, Nautilus, PCManFM, etc.)
-        at the provided directory path. This method should return immediately after opening the
-        folder window; it should not wait for the window to be closed.
+        Open a GUI view of a folder (e.g. Windows Explorer, Finder, Nautilus, Nemo, PCManFM, etc.)
+        at the provided folder path. This method should return immediately after opening the folder
+        window; it should not wait for the window to be closed.
 
         This may not be available on all platforms.
 
-        :param path: The absolute path to the directory to open, based on a value returned from
-            the choose_dir method.
+        :param path: The absolute path to the folder to open, based on a value returned from the
+            choose_folder method.
         """
         raise NotImplementedError("Not implemented for this OS")
 
@@ -397,8 +420,21 @@ class LocalOS(GraderOS):
         self._try_stdin_close(process)
         return LocalOS.LocalBackgroundCommand(process)
 
-    def list_dir(self, directory: Optional[str] = None) -> List[Tuple[str, str, bool]]:
-        pass
+    def get_home_folder(self) -> str:
+        return os.path.expanduser("~")
+
+    def list_folder(self, path: Optional[str] = None) -> List[Tuple[str, str, bool]]:
+        with os.scandir(path) as it:
+            results = []
+            for entry in it:
+                entry: os.DirEntry = entry
+                type = None
+                if entry.is_dir():
+                    type = "folder"
+                elif entry.is_file():
+                    type = "file"
+                results.append((entry.name, type, entry.is_symlink()))
+            return results
 
 
 def _open_in_background(args, env=None):
@@ -411,6 +447,45 @@ class LocalWindowsOS(LocalOS):
     Extension of LocalOS for Windows.
     """
 
+    def choose_folder(self, base_folder: Optional[str] = None) -> Optional[str]:
+        if base_folder is not None and not os.path.isdir(base_folder):
+            base_folder = None
+
+        # TODO: TEST THIS
+        # This is a "hacky af" PowerShell script to show a file selection window that allows folder
+        # selection while still showing files. Turns out this isn't built in to Windows (well,
+        # except for the horribly ugly "folder selection" dialog that's just a glorified treeview).
+        # This is based on:
+        # https://www.codeproject.com/articles/44914/select-file-or-folder-from-the-same-dialog
+        # There's a better solution at http://www.lyquidity.com/devblog/?p=136 (but it's written in
+        # C# and uses reflection, so it's beyond my porting-C#-to-PowerShell skillz)
+        script = """
+            Add-Type -AssemblyName System.Windows.Forms
+            $f = new-object Windows.Forms.OpenFileDialog
+            $f.Title = "GradeFast"
+            $f.InitialDirectory = pwd
+            $f.ShowHelp = $true
+            $f.Multiselect = $false
+            # This needs to be "false" to allow us to put "Folder Selection" in the box
+            $f.ValidateNames = $false
+            $f.CheckFileExists = $false
+            $f.CheckPathExists = $true
+            $f.FileName = "Folder Selection."
+            [void]$f.ShowDialog()
+            $f.FileName
+            """
+        process = subprocess.Popen(
+            ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", "-"], cwd=base_folder,
+            universal_newlines=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL)
+        directory: str = process.communicate(script)[0]
+        if process.returncode == 0:
+            if directory.endswith("Folder Selection.") or not os.path.exists(directory):
+                directory = os.path.dirname(directory)
+            if os.path.isdir(directory):
+                return "/" + directory.replace("\\", "/")
+        return None
+
     def open_shell(self, path: str, environment: Dict[str, str]):
         # Replace forward slashes with backslashes
         path = os.path.normpath(path)
@@ -421,7 +496,7 @@ class LocalWindowsOS(LocalOS):
             path = path[0:path.rfind("\\")]
         _open_in_background(["start", "cmd", "/K", 'cd "{}"'.format(path)], env=environment)
 
-    def open_directory(self, path: str):
+    def open_folder(self, path: str):
         os.startfile(path)
 
 
@@ -429,6 +504,26 @@ class LocalMacOS(LocalOS):
     """
     Extension of LocalOS for Mac OS X.
     """
+
+    def choose_folder(self, base_folder: Optional[str] = None) -> Optional[str]:
+        if base_folder is not None and not os.path.isdir(base_folder):
+            base_folder = None
+
+        # TODO: Test This
+        args = ["osascript", "-"]
+        if base_folder is None:
+            stdin = "return POSIX path of (choose folder)"
+        else:
+            args += [base_folder]
+            stdin = "return POSIX path of " + \
+                    "(choose folder default location POSIX path of item 1 of argv)"
+        process = subprocess.Popen(args, universal_newlines=True, stdin=subprocess.PIPE,
+                                   stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        directory: str = process.communicate(stdin)[0]
+        if process.returncode == 0:
+            return directory
+        else:
+            return None
 
     def open_shell(self, path: str, environment: Dict[str, str]):
         _open_in_background([
@@ -438,7 +533,7 @@ class LocalMacOS(LocalOS):
             path
         ], env=environment)
 
-    def open_directory(self, path: str):
+    def open_folder(self, path: str):
         _open_in_background(["open", path])
 
 
@@ -449,8 +544,7 @@ class LocalLinuxOS(LocalOS):
 
     @staticmethod
     def _cmd_exists(cmd: str) -> bool:
-        return subprocess.call(["which", cmd],
-                               stdout=subprocess.DEVNULL,
+        return subprocess.call(["which", cmd], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                                stderr=subprocess.DEVNULL) == 0
 
     def open_shell(self, path: str, environment: Dict[str, str]):
@@ -478,5 +572,5 @@ class LocalLinuxOS(LocalOS):
         else:
             raise NotImplementedError("No terminal emulator found")
 
-    def open_directory(self, path: str):
+    def open_folder(self, path: str):
         _open_in_background(["xdg-open", path])
