@@ -54,20 +54,19 @@ See the [GradeFast wiki](https://github.com/jhartz/gradefast/wiki).
 
 **tl;dr:** First, you must make a YAML-formatted configuration file the assignment that you want to
 grade. This file includes the structure of the grades and the commands to run on each submission.
-For more info, see the [YAML Format page](https://github.com/jhartz/gradefast/wiki/YAML-Format) on
-the GradeFast wiki.
+For more info, see the
+[YAML Configuration Format](https://github.com/jhartz/gradefast/wiki/YAML-Configuration-Format)
+page on the GradeFast wiki.
 
-Want to delve deeper or use individual parts of GradeFast as part of your larger, superior project?
-Check out the `runyaml.py` module to see how the other GradeFast modules and packages are used.
-Also, look at the [other pages on the GradeFast wiki](https://github.com/jhartz/gradefast/wiki) for
-lots more information.
+## Contributing to GradeFast
 
-## Bugs
+Want to delve deeper and contribute to GradeFast, or use individual parts of GradeFast as part of
+your larger, superior project? Check out the
+[Developer Documentation](https://github.com/jhartz/gradefast/wiki/Developer-Documentation) on the
+wiki for more information on the GradeFast internals.
 
-Want to fix it yourself? (Please?) Fork the repository and submit a pull request on GitHub.
-(Be sure to follow the [code style](STYLE.md).)
-
-If that's too much work, feel free to file an issue on GitHub or email Jake Hartz.
+If you find a bug or want to add a (reasonable) feature, fork the repository and submit a pull
+request on GitHub. Be sure to follow the [code style](STYLE.md).
 
 ## License
 
@@ -75,4 +74,5 @@ Licensed under the MIT License. For more, see the `LICENSE` file.
 
 ## Contact
 
-Questions? Concerns? Feedback? Contact Jake Hartz.
+Questions? Bugs? Concerns? Feedback? Contact Jake Hartz. (I trust that you can find my email
+address somewhere.)
