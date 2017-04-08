@@ -21,6 +21,10 @@ from gradefast.grader import Grader
 from gradefast.models import Path, Settings
 
 
+class LazyUserError(Exception):
+    pass
+
+
 def run_gradefast(injector: Injector, submission_paths: List[Path]):
     # Create and start the GradeBook WSGI server in a new thread
     threading.Thread(
@@ -51,7 +55,8 @@ def run_gradefast(injector: Injector, submission_paths: List[Path]):
         # Finally... let's start grading!
         for path in submission_paths:
             grader.add_submissions(path)
-        grader.prompt_for_submissions()
+        if not grader.prompt_for_submissions():
+            raise LazyUserError("User is too lazy to find any submissions")
         grader.run_commands()
 
         # Well, the user thinks they're done

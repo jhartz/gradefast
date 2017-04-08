@@ -46,6 +46,8 @@ class Grader:
         """
         Nag the user into choosing at least one folder of submissions. The user is prompted
         (repeatedly) to choose the folder.
+
+        :return: True if there's some submissions to go on; False if they got nuthin'.
         """
         if len(self._submissions):
             # Go each on them
@@ -56,14 +58,19 @@ class Grader:
             # They don't have anything yet; they're in for quite a treat
             self.channel.input("Press Enter to choose a folder containing the submissions...")
             while True:
-                self.add_submissions(None)
+                if not self.add_submissions(None):
+                    # They've actually hit "cancel"; I guess we can give up
+                    break
+
                 if not len(self._submissions):
                     self.channel.error("No submissions found")
                     continue
 
                 self.channel.print()
-                if self.channel.prompt("Add another folder?", ["y", "n"]) == "n":
+                if self.channel.prompt("Add another folder?", ["y", "N"], "n") == "n":
                     break
+
+        return len(self._submissions) > 0
 
     def add_submissions(self, base_folder: Optional[Path] = None):
         """
@@ -78,6 +85,9 @@ class Grader:
 
         :param base_folder: The path to a base folder to use when prompting the user to choose a
             folder. If it does not exist, then it falls back to the Host::choose_dir default.
+
+        :return: True if the user actually tried to pick something (even if we couldn't find any
+            submissions in the folder they picked); False if they cancelled.
         """
         check_file_extensions = self.settings.check_file_extensions
         if check_file_extensions is None:
@@ -87,7 +97,7 @@ class Grader:
         path = self.host.choose_folder(base_folder)
         if not path:
             self.channel.error("No folder provided")
-            return
+            return False
 
         # Step 2: Find matching submissions
         regex = re.compile(self.settings.submission_regex)
@@ -96,11 +106,13 @@ class Grader:
             submission_match = None
             folder_path = None
 
+            valid_submission = False
             if type == "folder":
                 submission_match = regex.fullmatch(name)
                 if submission_match:
                     self.channel.print("Found folder: {}", name)
                     folder_path = path.append(name)
+                    valid_submission = True
             elif type == "file" and name.find(".") > 0:
                 name, ext = name.rsplit(".", maxsplit=1)
                 submission_match = regex.fullmatch(name)
@@ -111,12 +123,14 @@ class Grader:
                         self.channel.print("Found zipfile: {}.zip", name, end="; ")
                         self.host.unzip(file_path, folder_path)
                         self.channel.print("extracted to {}/", name)
+                        valid_submission = True
                     elif ext in check_file_extensions:
                         self.channel.print("Found file: {}.{}", name, ext, end="; ")
                         self.host.move_to_folder(file_path, folder_path)
                         self.channel.print("moved into {}/", name)
+                        valid_submission = True
 
-            if submission_match:
+            if valid_submission:
                 submission_id = len(self._submissions) + 1
                 submission_name = name
                 for group in submission_match.groups():
@@ -126,8 +140,11 @@ class Grader:
                 self._submissions.append(Submission(
                     submission_id, submission_name, name, folder_path))
 
+        # Step 3: Tell the world
         if len(self._submissions):
             self.event_manager.dispatch_event(events.NewSubmissionListEvent(self._submissions))
+
+        return True
 
     def run_commands(self):
         """
