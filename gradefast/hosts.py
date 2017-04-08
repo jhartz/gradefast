@@ -685,7 +685,6 @@ class LocalMacHost(LocalHost):
         if start_path and not os.path.isdir(self.gradefast_path_to_local_path(start_path)):
             start_path = None
 
-        # TODO: Test This
         args = ["osascript", "-"]
         if start_path is None:
             stdin = "return POSIX path of (choose folder)"
@@ -695,8 +694,8 @@ class LocalMacHost(LocalHost):
                     "(choose folder default location POSIX path of item 1 of argv)"
         process = subprocess.Popen(args, universal_newlines=True, stdin=subprocess.PIPE,
                                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-        local_path_str: str = process.communicate(stdin)[0]
-        if process.returncode == 0:
+        local_path_str: str = process.communicate(stdin)[0].strip()
+        if process.returncode == 0 and local_path_str:
             return self.local_path_to_gradefast_path(LocalPath(local_path_str))
         else:
             return None
