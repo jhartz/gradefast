@@ -63,25 +63,29 @@ def _parse_commands(command_list: list) -> List[Command]:
     """
     commands = []
     for command_dict in command_list:
-        if "name" not in command_dict:
-            raise YAMLStructureError("Command missing \"name\"")
+        display_name = command_dict.get("name")
+        if display_name:
+            display_name = 'Command "%s"' % display_name
+        else:
+            display_name = "Command"
+
         if "command" not in command_dict and "commands" not in command_dict:
-            raise YAMLStructureError("Command \"%s\" missing \"command\" or \"commands\"" %
-                                     command_dict["name"])
+            raise YAMLStructureError("%s missing \"command\" or \"commands\"" % display_name)
         if "command" in command_dict and "commands" in command_dict:
-            raise YAMLStructureError("Command \"%s\" has both \"command\" and \"commands\"" %
-                                     command_dict["name"])
+            raise YAMLStructureError("%s has both \"command\" and \"commands\"" % display_name)
 
         if "commands" in command_dict:
             # It's a command set
             commands.append(CommandSet(
-                command_dict["name"],
+                command_dict.get("name"),
                 _parse_commands(command_dict["commands"]),
                 command_dict.get("folder"),
                 command_dict.get("environment")
             ))
         else:
             # It's a command item
+            if "name" not in command_dict:
+                raise YAMLStructureError("Command item missing \"name\"")
             commands.append(CommandItem(
                 command_dict["name"],
                 command_dict["command"],
