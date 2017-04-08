@@ -17,8 +17,8 @@ try:
 except ImportError:
     yaml = None
     print("")
-    print("*** Couldn't find YAML package!")
-    print("    Please install 'PyYAML' and try again.")
+    print("==> Couldn't find YAML package!")
+    print("==> Please install 'PyYAML' and try again.")
     print("")
     sys.exit(1)
 
