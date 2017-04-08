@@ -8,9 +8,8 @@ Author: Jake Hartz <jake@hartz.io>
 
 from typing import Iterable, List, Optional, Tuple, Union
 
-from ..submissions import Submission
-
-from . import utils
+from gradefast.gradebook import utils
+from gradefast.models import Submission
 
 try:
     import mistune
@@ -783,6 +782,19 @@ class SubmissionGrade:
             "max_score": points_total,
             "grades": self._grades.to_plain_data()
         }
+
+    def to_simple_data(self) -> POD:
+        """
+        Get simple grade metadata as plain old data.
+        """
+        data = self.submission.to_json()
+        points_earned, points_total, _ = self.get_score()
+        data.update({
+            "is_late": self._is_late,
+            "current_score": points_earned,
+            "max_score": points_total
+        })
+        return data
 
     def set_late(self, is_late: bool):
         self._is_late = is_late

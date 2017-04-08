@@ -29,11 +29,12 @@ In addition to PEP 8:
     - `:return` description of the return value, if applicable
 
 - Imports at the top of each file should follow this general order:
-    - `import` statements (ordered alphabetically by module name)
+    - `import` statements (ordered alphabetically)
+    - `from ... import ...` statements (ordered alphabetically)
     - *blank line*
-    - `from ... import ...` statements (ordered alphabetically by module name)
+    - Imports from the "external" folder (e.g. pyprovide)
     - *blank line*
-    - Local imports
+    - GradeFast imports (ordered alphabetically) - always absolute, starting with `gradefast.`
     - *blank line*
     - Any imports wrapped in a `try`/`except`
 

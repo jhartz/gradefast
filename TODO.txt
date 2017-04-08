@@ -3,6 +3,8 @@ TODO
 
 GradeBook TODOs:
 
+- In the gradebook (particularly gradebook.grades and the UI), find something better to call the
+  path to the grade item than "path" (it's confusing with the Path model for filesystem paths).
 - Implement the submission list
   - Include the "score / points" next to each name
   - For completed submissions other than the "current" one in the grader, include a link to the
@@ -58,6 +60,8 @@ Grader TODOs:
 - Keep track of the timestamps of when we start/finish a submission, so at the end we have some
   interesting stats on how long it took us to grade.
 - Ability to filter which lines of output are shown based on a regex
+- Option for a command: to not do our wonky roundabout thing for stdin (i.e. just let it go thru
+  automatically). Make sure to note that this means it won't be in the log.
 
 Big TODOs:
 

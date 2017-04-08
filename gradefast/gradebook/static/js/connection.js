@@ -110,6 +110,7 @@ export function initEventSource(onReady) {
         if (!jsonData) return;
 
         if (jsonData.data_key && jsonData.update_key) {
+            //console.log("AUTH EVENT:", jsonData);
             authKeysReceived(
                 jsonData.data_key,
                 jsonData.update_key,
@@ -126,6 +127,7 @@ export function initEventSource(onReady) {
         if (!jsonData) return;
 
         if (jsonData.update_type && updateTypeHandlers.hasOwnProperty(jsonData.update_type)) {
+            //console.log("UPDATE EVENT:", jsonData);
             updateTypeHandlers[jsonData.update_type](jsonData.update_data);
         } else {
             reportResponseError(path, "event: update", "Invalid update_type: " + jsonData.update_type, jsonData);

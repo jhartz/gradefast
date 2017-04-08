@@ -95,5 +95,10 @@ export const SONGS = [
             "Saving' all your food stamps, and burning' down the trailer park.\n" +
             "Yo. ... Cut it.",
         link: "https://www.youtube.com/watch?v=6xHh8bSX-zc"
+    },
+    {
+        // In This Moment
+        snippet: "I heard I don't belong in this scene; Sex Metal Barbie, Homicidal Queen",
+        link: "https://www.youtube.com/watch?v=vzFUESHaDJk"
     }
 ];

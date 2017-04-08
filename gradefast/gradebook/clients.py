@@ -1,5 +1,5 @@
 """
-Module that contains classes for interacting between the GradeBook server and GradeBook clients.
+Classes for interacting between the GradeBook server and GradeBook clients.
 
 Licensed under the MIT License. For more, see the LICENSE file.
 
@@ -8,7 +8,7 @@ Author: Jake Hartz <jake@hartz.io>
 
 from typing import Any
 
-from . import grades, utils
+from gradefast.gradebook import grades, utils
 
 
 class ClientUpdate:

@@ -5,21 +5,23 @@ Licensed under the MIT License. For more, see the LICENSE file.
 
 Author: Jake Hartz <jake@hartz.io>
 """
+
 import csv
 import io
 import logging
 import mimetypes
 import queue
 import sys
+import threading
 import uuid
-
 from collections import OrderedDict
 from typing import Dict, List, Optional, Set, Union
 
-from .. import events
-from ..submissions import Submission
+from pyprovide import inject
 
-from . import clients, eventhandlers, grades, utils
+from gradefast import events
+from gradefast.gradebook import clients, eventhandlers, grades, utils
+from gradefast.models import Settings, Submission
 
 try:
     import flask
@@ -40,28 +42,23 @@ class GradeBook:
         """
         pass
 
-    def __init__(self, project_name: str, project_grade_structure: List[dict],
-                 event_manager: events.EventManager):
+    @inject()
+    def __init__(self, event_manager: events.EventManager, settings: Settings):
         """
         Create a WSGI app representing a grade book.
 
         A grade structure is a list of grade items (grade scores and grade sections). For more, see
         the GradeFast wiki: https://github.com/jhartz/gradefast/wiki/Grade-Structure
-
-        :param project_name: The name of the project that we are grading.
-        :param project_grade_structure: A list of grade items for the project that we are grading.
-        :param event_manager: An event manager to register our event handlers with, and to use to
-            dispatch events
         """
-        self._project_name = project_name
+        self.settings: Settings = settings
 
         # Register our event handlers with the event manager
-        self._event_manager: events.EventManager = event_manager
-        for event_handler_class in eventhandlers.__all__:
-            event_manager.register_event_handler(getattr(eventhandlers, event_handler_class)(self))
+        self.event_lock = threading.Lock()
+        self.event_manager: events.EventManager = event_manager
+        event_manager.register_all_event_handlers_with_args(eventhandlers, gradebook_instance=self)
 
         # Check validity of the project's grade_structure
-        self._grade_structure = project_grade_structure
+        self._grade_structure = settings.grade_structure
         if not grades.check_grade_structure(self._grade_structure):
             raise GradeBook.BadStructureError()
 
@@ -117,11 +114,10 @@ class GradeBook:
                 flask.abort(400)
 
         def json_response(flask_response_args: Optional[dict] = None, **data) -> flask.Response:
-            if flask_response_args is None:
-                flask_response_args = {}
+            kwargs: dict = flask_response_args or {}
             return flask.Response(utils.to_json(data),
                                   mimetype="application/json",
-                                  **flask_response_args)
+                                  **kwargs)
 
         def json_aight() -> flask.Response:
             return json_response(status="Aight")
@@ -188,7 +184,7 @@ class GradeBook:
 
             resp = flask.Response(gen(), mimetype="text/csv")
             filename_param = 'filename="%s.csv"' % \
-                self._project_name.replace("\\", "").replace('"', '\\"')
+                self.settings.project_name.replace("\\", "").replace('"', '\\"')
             resp.headers["Content-disposition"] = "attachment; " + filename_param
             return resp
 
@@ -228,9 +224,7 @@ class GradeBook:
 
             event = events.AuthRequestedEvent("GradeBook Client; device: " + device)
             self._auth_event_id_to_client_id[event.event_id] = client_id
-            # TODO: Send out the AuthRequestedEvent, and wait for an AuthGrantedEvent to come back
-            # In the meantime...
-            self.auth_granted(event.event_id)
+            self.event_manager.dispatch_event(event)
 
             return json_aight()
 
@@ -319,6 +313,13 @@ class GradeBook:
             return None
         return self._grades_by_submission_id[submission_id]
 
+    def get_submission_list(self):
+        """
+        Get the current list of submissions, with each submission represented by its "simple data"
+        format.
+        """
+        return list(map(lambda s: self.get_grade(s.id).to_simple_data(), self._submission_list))
+
     def _send_client_update(self, client_update: clients.ClientUpdate, client_id: uuid.UUID = None):
         """
         Send a ClientUpdate to either a specific GradeBook client or to all open, authenticated
@@ -357,13 +358,14 @@ class GradeBook:
         self._data_keys.add(data_key)
         self._client_update_keys[client_id] = uuid.uuid4()
 
+        # Send the client its auth keys
         self._send_client_update(clients.ClientUpdate("auth", {
             "data_key": data_key,
             "update_key": self._client_update_keys[client_id],
-            "initial_submission_list": self._submission_list,
+            "initial_submission_list": self.get_submission_list(),
             "initial_submission_id": self._current_submission_id,
             "is_done": self.is_done
-        }))
+        }), client_id)
 
     def set_submission_list(self, submission_list: List[Submission]):
         """
@@ -379,7 +381,7 @@ class GradeBook:
 
         # Tell GradeBook clients about this new list
         self._send_client_update(clients.ClientUpdate.create_update_event("NEW_SUBMISSION_LIST", {
-            "submissions": submission_list
+            "submissions": self.get_submission_list()
         }))
 
     def set_current_submission(self, submission_id: int):
@@ -428,6 +430,11 @@ class GradeBook:
         self._send_client_update(
             clients.ClientUpdate.create_update_event("SUBMISSION_UPDATED", data))
 
+        # Also update the submission list (to get the new scores, etc.)
+        self._send_client_update(clients.ClientUpdate.create_update_event("NEW_SUBMISSION_LIST", {
+            "submissions": self.get_submission_list()
+        }))
+
     def _get_grades_export(self) -> List[OrderedDict]:
         """
         Return a list of ordered dicts representing the scores and feedback for each submission.
@@ -437,7 +444,7 @@ class GradeBook:
         # Make sure that no events are applied while we are generating the grade list, ensuring
         # that everything is consistent. (For simplicity, we also build up the entire list and then
         # return it, instead of trying using a generator with the event lock.)
-        with self._event_manager.block_event_dispatching():
+        with self.event_lock:
             for grade in self._grades_by_submission_id.values():
                 points_earned, points_possible, individual_points = grade.get_score()
                 grade_details = OrderedDict()
@@ -486,13 +493,10 @@ class GradeBook:
         """
         return utils.to_json(self._get_grades_export())
 
-    def run(self, hostname: str, port: int, log_level: Union[str, int] = logging.WARNING,
-            debug: bool = False):
+    def run(self, log_level: Union[str, int] = logging.WARNING, debug: bool = False):
         """
         Start the Flask server (using Werkzeug internally).
 
-        :param hostname: The hostname to run on
-        :param port: The port to run on
         :param log_level: The level at which to set the Werkzeug logger
         :param debug: Whether to start the server in debug mode (prints tracebacks with "HTTP 500"
             errors)
@@ -509,7 +513,7 @@ class GradeBook:
             kwargs["debug"] = True
             kwargs["use_reloader"] = False
 
-        self._app.run(hostname, port, **kwargs)
+        self._app.run(self.settings.host, self.settings.port, **kwargs)
 
     def get_wsgi_app(self):
         """

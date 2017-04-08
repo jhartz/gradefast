@@ -24,6 +24,10 @@ Optional (but recommended) dependencies:
  - [Colorama](https://pypi.python.org/pypi/colorama) to make the CLI look pretty
  - [Mistune](https://pypi.python.org/pypi/mistune/) to parse Markdown in comments and feedback
 
+Additionally, some Python dependencies are included in the repository as git submodules. To get
+these, after cloning, run:
+
+    git submodule update --init
 
 ### JavaScript
 

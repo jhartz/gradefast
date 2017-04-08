@@ -13,3 +13,6 @@ pip-delete-this-directory.txt
 
 # NPM (Node.js)
 node_modules/
+
+# vim
+.*.swp

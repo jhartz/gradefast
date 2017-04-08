@@ -115,6 +115,19 @@ h6 {
     font-size: 11pt;
 }
 
+a, .link {
+    color: inherit;
+    text-decoration: underline;
+}
+
+a:hover, .link:hover {
+    text-decoration: none;
+}
+
+a.no-underline {
+    text-decoration: none;
+}
+
 summary {
     cursor: default;
 }
@@ -131,17 +144,24 @@ ul {
     padding-left: 15px;
 }
 
-a, .link {
-    color: inherit;
+ul.submission-list {
+    padding-left: 40px;
+    list-style-type: lower-greek;
+}
+
+ul.submission-list li {
+    margin-top: 10px;
+    font-size: 130%;
+    color: #B3B3B3;
+}
+
+ul.submission-list a {
+    color: #000000;
+    text-decoration: none;
+}
+
+ul.submission-list a:hover {
     text-decoration: underline;
-}
-
-a:hover, .link:hover {
-    text-decoration: none;
-}
-
-a.no-underline {
-    text-decoration: none;
 }
 
 input.big-checkbox {

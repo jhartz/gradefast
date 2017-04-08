@@ -19,7 +19,7 @@ export function reportRequestError(path, status, details, ...objects) {
  * @param [objects] - Any errors or objects to log.
  */
 export function reportResponseError(path, status, details, ...objects) {
-    reportError(`Error response from ${path} (HTTP status: ${status})`, details, objects);
+    reportError(`Error response from ${path} (status: ${status})`, details, objects);
 }
 
 function reportError(message, details, objects) {
@@ -53,7 +53,12 @@ export function parseJson(str, errorPath, errorStatus, ...errorObjects) {
 export function post(path, data) {
     const fd = new FormData();
     Object.keys(data).forEach((key) => {
-        fd.append(key, typeof data[key] === "string" ? data[key] : JSON.stringify(data[key]));
+        try {
+            fd.append(key, typeof data[key] === "string" ? data[key] : JSON.stringify(data[key]));
+        } catch (err) {
+            console.error("Error stringifying data for " + key, data[key]);
+            throw err;
+        }
     });
 
     const xhr = new XMLHttpRequest();

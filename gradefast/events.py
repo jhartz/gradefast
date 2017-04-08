@@ -1,6 +1,5 @@
 """
-This module contains the base classes for the events system that enables communication between the
-GradeBook and the Grader.
+Base classes for the events system that enables communication between the GradeBook and the Grader.
 
 This is different from the GradeBook's "client updates" system that it uses to communicate with
 GradeBook clients.
@@ -11,11 +10,13 @@ Author: Jake Hartz <jake@hartz.io>
 """
 
 import contextlib
+import queue
 import threading
-
 from typing import List
 
-from .submissions import Submission
+from pyprovide import Injector, inject
+
+from gradefast.models import Submission
 
 
 class Event:
@@ -63,43 +64,111 @@ class EventHandler:
         raise NotImplementedError()
 
 
+class EventNameHandler(EventHandler):
+    """
+    An abstract subclass of EventHandler for handling events with a specific name. This simplifies
+    event handler implementations that only handle a single event.
+    """
+
+    _accepted_event_name = None
+
+    def __init_subclass__(cls, event: str):
+        cls._accepted_event_name = event
+
+    def accept(self, event: Event) -> bool:
+        return event.get_name() == self._accepted_event_name
+
+    def handle(self, event: Event):
+        raise NotImplementedError()
+
+
 class EventManager:
     """
-    Keeps a registry of event handlers and handles dispatching events to event handlers.
+    Keeps a registry of event handlers and handles dispatching events to event handlers. This
+    facilitates communication between the Grader and the GradeBook.
+
+    When an event is dispatched, it is put into a queue and is handled later by a different thread.
+    Additionally, multiple event handlers may be running in different threads at the same time.
     """
 
-    class BadEventError(Exception):
-        pass
-
-    def __init__(self):
+    @inject(injector=Injector.CURRENT_INJECTOR)
+    def __init__(self, injector: Injector):
+        self.injector = injector
         self._handlers: List[EventHandler] = []
-        self._lock = threading.Lock()
+        self._event_queue = queue.Queue()
+        threading.Thread(target=self._event_thread_target, daemon=True).start()
 
-    def register_event_handler(self, event_handler: EventHandler):
+    def _event_thread_target(self):
+        while True:
+            event = self._event_queue.get()
+            for handler in self._handlers:
+                threading.Thread(
+                    target=self._event_handler_thread_target,
+                    args=(event, handler),
+                    daemon=True
+                ).start()
+
+    @staticmethod
+    def _event_handler_thread_target(event: Event, handler: EventHandler):
+        if handler.accept(event):
+            handler.handle(event)
+
+    def register_event_handlers(self, *event_handlers: EventHandler):
         """
-        Register a new event handler that will be called for any future event dispatches.
+        Register one or more new event handler instances that will be called for any future event
+        dispatches.
         """
-        with self._lock:
-            self._handlers.append(event_handler)
+        self._handlers += event_handlers
+
+    def register_event_handler_classes(self, *event_handler_classes):
+        """
+        Register one or more new event handler classes that will be called for any future event
+        dispatches.
+
+        Instances of these classes are created using the same injector that was used when creating
+        the EventManager (so the classes' constructors should be decorated with "@inject()").
+        """
+        self._handlers += [self.injector.get_instance(cls) for cls in event_handler_classes]
+
+    def register_all_event_handlers(self, module):
+        """
+        Register all the event handler classes exposed in a module.
+
+        This method relies on "register_event_handler_classes" to actually create the class
+        instances, so see that method's documentation for further details.
+        """
+        self.register_event_handler_classes(*list(self._get_classes_in_module(module)))
+
+    def register_all_event_handlers_with_args(self, module, *args, **kwargs):
+        """
+        Register all the event handler classes exposed in a module, using the provided args and
+        kwargs as arguments to the event handler classes' constructors.
+        """
+        self.register_event_handlers(*list(cls(*args, **kwargs)
+                                           for cls in self._get_classes_in_module(module)))
+
+    @staticmethod
+    def _get_classes_in_module(module):
+        """
+        Get all the event handler classes in a module.
+        """
+        assert hasattr(module, "__all__")
+        for name in module.__all__:
+            cls = getattr(module, name)
+            try:
+                if issubclass(cls, EventHandler):
+                    yield cls
+            except TypeError:
+                pass
 
     def dispatch_event(self, event: Event):
         """
-        Dispatch an event to all event handlers that accept it.
+        Dispatch an event to all event handlers that accept it. This method only enqueues the
+        event; the event handling occurs in a different thread, and this method will likely return
+        before the event is handled.
         """
         assert isinstance(event, Event)
-        # Make sure that only one event is being applied at once
-        with self._lock:
-            for handler in self._handlers:
-                if handler.accept(event):
-                    handler.handle(event)
-
-    @contextlib.contextmanager
-    def block_event_dispatching(self):
-        """
-        Returns a context manager that can be used to block event dispatching.
-        """
-        with self._lock:
-            yield
+        self._event_queue.put(event)
 
 
 #############################################################################

@@ -27,7 +27,11 @@ const GradeBook = React.createClass({
 
         if (this.props.loading) {
             // Loading message
-            sectionContent = <h2>Loading...</h2>;
+            if (this.props.submission_id !== null) {
+                sectionContent = <h2>Loading submission...</h2>;
+            } else {
+                sectionContent = <h2>Waiting...</h2>;
+            }
 
         } else if (this.props.list_visible) {
             // List of submissions

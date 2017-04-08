@@ -9,7 +9,6 @@ Author: Jake Hartz <jake@hartz.io>
 import json
 import traceback
 import uuid
-
 from collections import OrderedDict
 from typing import Any, Optional
 
@@ -44,7 +43,8 @@ def print_error(*messages: Any, start="\n", sep: str = "\n", end="\n",
 
 class GradeBookPublicError(Exception):
     """
-    An error with a name and a message that are okay to send to the GradeBook client.
+    An error with a name and a message that are okay to send to the GradeBook client (or, if on a
+    public endpoint, anyone who can access our HTTP server).
     """
     def __init__(self, message: Optional[str] = None, **more_details):
         self._message = message
@@ -71,21 +71,13 @@ class GradeBookJSONEncoder(json.JSONEncoder):
     A custom JSONEncoder that encodes UUIDs as a string containing the hex version of the UUID.
     """
 
-    _instance: "GradeBookJSONEncoder" = None
-
-    @staticmethod
-    def get_instance() -> "GradeBookJSONEncoder":
-        if GradeBookJSONEncoder._instance is None:
-            GradeBookJSONEncoder._instance = GradeBookJSONEncoder()
-        return GradeBookJSONEncoder._instance
-
     def default(self, o):
         if isinstance(o, uuid.UUID):
             return str(o)
 
         try:
             # If the object has a to_json method, use that
-            o = o.to_json()
+            return o.to_json()
         except AttributeError:
             # I guess it doesn't :(
             # Hopefully it's already json-encodable
@@ -94,11 +86,17 @@ class GradeBookJSONEncoder(json.JSONEncoder):
         return super().default(o)
 
 
+_json_encoder_instance: GradeBookJSONEncoder = None
+
+
 def to_json(o: Any) -> str:
     """
     Convert an object to a JSON string. For usage, see json.dumps(...).
     """
-    return GradeBookJSONEncoder.get_instance().encode(o)
+    global _json_encoder_instance
+    if _json_encoder_instance is None:
+        _json_encoder_instance = GradeBookJSONEncoder()
+    return _json_encoder_instance.encode(o)
 
 
 def from_json(*args, **kwargs):

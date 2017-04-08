@@ -1,0 +1,6 @@
+[submodule "external/pyprovide"]
+	path = external/pyprovide
+	url = git@github.com:jhartz/pyprovide.git
+[submodule "external/iochannels"]
+	path = external/iochannels
+	url = git@github.com:jhartz/iochannels.git

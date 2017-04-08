@@ -1,20 +1,22 @@
-#!/usr/bin/env python3
 """
 GradeFast is a Python and JavaScript program to grade lots of programming labs or similar projects.
-
-To use a YAML file as input, use the run function. The YAML file details the structure of the
-grading and the commands to run. For more, see README.md.
 
 Licensed under the MIT License. For more, see the LICENSE file.
 
 Author: Jake Hartz <jake@hartz.io>
 """
 
-from .grader import Grader
-from .gradebook import *
-from .runyaml import run
-
 __author__ = "Jake Hartz"
 __copyright__ = "Copyright (C) 2017 Jake Hartz"
 __license__ = "MIT"
 __version__ = "0.9"
+
+import os
+import sys
+
+_EXTERNAL_MODULES = ("iochannels", "pyprovide")
+
+# Insert the folder containing each external module into the module search path
+_GRADEFAST_REPO_ROOT = os.path.dirname(os.path.dirname(__file__))
+for _m in _EXTERNAL_MODULES:
+    sys.path.insert(1, os.path.join(_GRADEFAST_REPO_ROOT, "external", _m))
