@@ -40,12 +40,12 @@ const GradeBook = React.createClass({
 
         } else if (this.props.submission_id !== null) {
             // An actual submission! It's almost like this is what we're actually here for
-            pageTitle = this.props.submission_id + ": " + this.props.submission_name + " - GradeFast";
+            pageTitle = this.props.submission_id + ": " + this.props.submission.get("name") + " - GradeFast";
             showScore = true;
 
             headerContent = (
-                <span>
-                    {this.props.submission_id}: <em>{this.props.submission_name || "no-name"}</em>
+                <span title={this.props.submission.get("full_name") + " (" + this.props.submission.get("path") + ")"}>
+                    {this.props.submission_id}: <em>{this.props.submission.get("name") || <strong>[[ NO NAME ]]</strong>}</em>
                 </span>
             );
             sectionContent = <GradeList path={Immutable.List()} grades={this.props.grades} />;
@@ -115,7 +115,7 @@ function mapStateToProps(state) {
         list: state.get("list"),
 
         submission_id: state.get("submission_id"),
-        submission_name: state.get("submission_name"),
+        submission: state.get("submission"),
         overall_comments: state.get("submission_overall_comments"),
         overall_comments_html: state.get("submission_overall_comments_html"),
         grades: state.get("submission_grades")

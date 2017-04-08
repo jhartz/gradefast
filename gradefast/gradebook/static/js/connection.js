@@ -70,7 +70,7 @@ const updateTypeHandlers = {
 
         store.dispatch(actions.initSubmission(
             data.submission_id,
-            data.name,
+            data.submission,
             data.is_late,
             data.overall_comments,
             data.overall_comments_html,

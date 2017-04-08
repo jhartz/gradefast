@@ -69,12 +69,12 @@ export const actions = {
         };
     },
 
-    initSubmission(submission_id, name, is_late, overall_comments, overall_comments_html,
+    initSubmission(submission_id, submission, is_late, overall_comments, overall_comments_html,
                    current_score, max_score, grades) {
         return {
             type: INIT_SUBMISSION,
 
-            submission_id, name, is_late, overall_comments, overall_comments_html,
+            submission_id, submission: Immutable.fromJS(submission), is_late, overall_comments, overall_comments_html,
             current_score, max_score, grades: Immutable.fromJS(grades)
         }
     },
@@ -191,7 +191,7 @@ function gradeReducer(state, action) {
         state = state.set("children", cloneGradeChildren(state.get("children"), action));
     }
 
-    if (action.path.size == 0) {
+    if (action.path.size === 0) {
         // We've reached the place where we apply this operation
         switch (action.type) {
             case GRADE_SET_ENABLED:
@@ -231,7 +231,7 @@ const initialState = Immutable.Map({
     "list": Immutable.List(),
 
     "submission_id": null,
-    "submission_name": "",
+    "submission": null,  // akin to the Submission model in models.py
     "submission_is_late": false,
     "submission_overall_comments": "",
     "submission_overall_comments_html": "",
@@ -269,7 +269,7 @@ export function app(state, action) {
                     "loading": false,
                     "list_visible": false,
 
-                    "submission_name": action.name,
+                    "submission": action.submission,
                     "submission_is_late": action.is_late,
                     "submission_overall_comments": action.overall_comments,
                     "submission_overall_comments_html": action.overall_comments_html,

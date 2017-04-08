@@ -16,10 +16,13 @@ const SubmissionList = ({submissions}) => {
                             store.dispatch(actions.goToSubmission(submission.get("id")));
                         };
                         return (
-                            <li key={submission.get("id")}>
+                            <li key={submission.get("id")}
+                                title={submission.get("full_name") + " (" + submission.get("path") + ")"}>
+
                                 <a href="#poundsign" onClick={handleClick}>
                                     ({submission.get("id")}) <strong>{submission.get("name")}</strong>
                                 </a>
+
                                 <label>
                                     &nbsp;&nbsp;
                                     {submission.get("current_score")} / {submission.get("max_score")}
