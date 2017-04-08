@@ -62,6 +62,10 @@ Grader TODOs:
 - Ability to filter which lines of output are shown based on a regex
 - Option for a command: to not do our wonky roundabout thing for stdin (i.e. just let it go thru
   automatically). Make sure to note that this means it won't be in the log.
+- Add a diff config option for whether to show the raw output as it comes in (since we need to wait
+  for the process to end before we do the diff). Pros: you get to see that the command is running,
+  and provide input if needed. Cons: double output. (Should probably still be enabled by default,
+  though).
 
 Big TODOs:
 
