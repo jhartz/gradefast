@@ -6,7 +6,6 @@ Licensed under the MIT License. For more, see the LICENSE file.
 Author: Jake Hartz <jake@hartz.io>
 """
 
-import os
 import threading
 import time
 import traceback
@@ -28,6 +27,7 @@ class LazyUserError(Exception):
 def run_gradefast(injector: Injector, submission_paths: List[Path]):
     # Create and start the GradeBook WSGI server in a new thread
     threading.Thread(
+        name="GradeBookTh",
         target=lambda: injector.get_instance(GradeBook).run(debug=True),
         daemon=True
     ).start()
@@ -83,6 +83,3 @@ def run_gradefast(injector: Injector, submission_paths: List[Path]):
         except (InterruptedError, KeyboardInterrupt):
             # Pretend that they pressed "Enter"
             channel.print()
-
-        # Make sure that all of our doors are shut for the winter
-        os._exit(0)

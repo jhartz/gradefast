@@ -7,6 +7,7 @@ Author: Jake Hartz <jake@hartz.io>
 """
 
 import difflib
+import logging
 import os
 import random
 import re
@@ -21,6 +22,8 @@ from gradefast.grader import eventhandlers
 from gradefast.grader.banners import BANNERS
 from gradefast.hosts import BackgroundCommand, CommandRunError, CommandStartError, Host
 from gradefast.models import Command, CommandItem, CommandSet, Path, Settings, Submission
+
+_logger = logging.getLogger("grader")
 
 
 class Grader:
@@ -365,6 +368,7 @@ class CommandRunner:
         """
         Run the commands on the submission.
         """
+        _logger.info("Running commands for: %s", self._submission)
         try:
             self._do_command_set(self.settings.commands,
                                  self._check_folder(self._submission.path),
@@ -392,12 +396,14 @@ class CommandRunner:
             this submission.
         """
         if not self.host.folder_exists(path):
+            _logger.warning("_do_command_set: Folder not found: %s", path)
             self.channel.print()
             self.channel.error("Folder not found: {}", path)
             self.channel.error("Skipping {} commands: {}",
                                len(commands),
                                [command.name for command in commands])
             return False
+        _logger.debug("_do_command_set: in %s", path)
 
         for command in commands:
             if hasattr(command, "commands"):
@@ -460,6 +466,8 @@ class CommandRunner:
         :param environment: A base dictionary of environment variables for the command.
         :return: True to move on to the next command, False to skip the rest of this submission.
         """
+        _logger.debug("_do_command: %s", command)
+
         self.channel.print()
         status_title = ("-" * 3) + " " + self._submission.name
         if len(status_title) < 56:

@@ -53,6 +53,9 @@ class CommandItem:
         command_item.version += self.version
         return command_item
 
+    def __str__(self):
+        return "%s: %s" % (self.get_name(), repr(self.command))
+
 
 class CommandSet:
     __slots__ = ("name", "commands", "folder", "environment")
@@ -268,6 +271,8 @@ class Settings(NamedTuple):
     # Host (hosts.py) settings
     base_env: Optional[Dict[str, str]]
     prefer_cli_file_chooser: bool
+
+    # LocalHost (hosts.py) settings
     # These "command" settings aren't necessarily local paths or GradeFast paths (hell, they could
     # just be the string "sh" or something).
     # We'll trust the user to tailor these to whatever Host subclass is in play.
@@ -295,6 +300,8 @@ class SettingsDefaults:
     # Host (hosts.py) settings
     base_env = None
     prefer_cli_file_chooser = False
+
+    # LocalHost (hosts.py) settings
     shell_command = None
     terminal_command = None
 

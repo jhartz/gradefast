@@ -7,6 +7,7 @@ Author: Jake Hartz <jake@hartz.io>
 """
 
 import argparse
+import logging
 import os
 import sys
 from typing import Dict, List, Optional
@@ -23,6 +24,111 @@ DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8051
 
 
+class Formatter(argparse.HelpFormatter):
+    """
+    We're all consenting adults... https://mail.python.org/pipermail/tutor/2003-October/025932.html
+    """
+
+    def _split_lines(self, text, width):
+        # Preserve newlines (as opposed to the default, which collapses them)
+        lines = []
+        for line in text.splitlines():
+            lines += super()._split_lines(line, width)
+        lines.append("")
+        return lines
+
+
+def get_parser():
+    parser = argparse.ArgumentParser(
+        "GradeFast",
+        formatter_class=Formatter,
+        epilog="The search path for the \"shell\" or \"terminal\" commands will include the "
+               "folder containing the YAML Configuration File."
+    )
+    parser.add_argument(
+        "--host",
+        help="The hostname to run the gradebook HTTP server on.\nDefault: %s" % DEFAULT_HOST,
+        default=DEFAULT_HOST
+    )
+    parser.add_argument(
+        "--port",
+        help="The port to run the gradebook HTTP server on.\nDefault: %s" % DEFAULT_PORT,
+        default=DEFAULT_PORT
+    )
+    parser.add_argument(
+        "--shell", metavar="CMD",
+        help="A program used to parse and run the commands in the \"commands\" section of the "
+             "YAML file.\n"
+             "The command to run will be passed as an argument.\n"
+             "Default: the operating system's default shell"
+    )
+    parser.add_argument(
+        "--terminal", metavar="CMD",
+        help="A program used to open a terminal or command prompt window.\n"
+             "The path to the directory to start in will be passed as an argument (and will also "
+             "be the working directory of the process).\n"
+             "Default: the operating system's default terminal"
+    )
+    parser.add_argument(
+        "--no-color", action="store_true",
+        help="Don't use any color on the command line"
+    )
+    parser.add_argument(
+        "--file-chooser", choices=("native", "cli"),
+        help="Which file chooser to use when selecting folders. \"native\" attempts to use your "
+             "OS's file chooser, while \"cli\" is a command-line-based file chooser.\n"
+             "Default: \"native\" (if available)",
+        default="native"
+    )
+    parser.add_argument(
+        "-f", "-s", "--submissions", metavar="PATH", action="append",
+        help="A folder in which to look for submissions (optional; can be specified multiple "
+             "times).\n"
+             "When GradeFast starts, you will be able to choose more folders if you want."
+    )
+    parser.add_argument(
+        "--save-file", metavar="PATH",
+        help="A file in which to save the current GradeFast state, allowing GradeFast to recover "
+             "if it crashes. This file is checked on startup; if it already exists, then "
+             "GradeFast reads it to resume from where it left off.\n"
+             "Default: [yaml filename].save.data (in the same directory as the YAML file)"
+    )
+    parser.add_argument(
+        "--log-file", metavar="PATH",
+        help="A file to save all output to. This is usually better than using \"tee\" since it "
+             "includes user input (stdin) as well. If a log file already exists at this path, it "
+             "is appended to.\n"
+             "Default: [yaml filename].log (in the same directory as the YAML file)"
+    )
+    parser.add_argument(
+        "--debug-file", metavar="PATH",
+        help="A file to log debug output to.\nDefault: (none)"
+    )
+    parser.add_argument(
+        "yaml_file", metavar="yaml-file",
+        help="The GradeFast YAML Configuration File that contains the structure of the grading "
+             "and the commands to run (see the GradeFast wiki)"
+    )
+
+    return parser
+
+
+def init_logging(log_file: str):
+    logging.basicConfig(
+        filename=log_file,
+        level=logging.DEBUG,
+        format="%(asctime)s  %(threadName)-11s %(levelname)-5s [%(name)s]  %(message)s"
+    )
+
+
+def disable_logging():
+    logging.basicConfig(level=logging.CRITICAL)
+
+
+def shutdown_logging():
+    logging.shutdown()
+
+
 def _absolute_path_if_exists(item: str, base: LocalPath) -> Optional[str]:
     # Search order: working directory, YAML file directory
     if not item:
@@ -35,7 +141,7 @@ def _absolute_path_if_exists(item: str, base: LocalPath) -> Optional[str]:
     return item
 
 
-def handle_args(args):
+def build_settings(args):
     yaml_file_path = os.path.abspath(args.yaml_file)
     if not os.path.isfile(yaml_file_path):
         print("YAML file not found: %s" % yaml_file_path)
@@ -85,8 +191,21 @@ def handle_args(args):
     settings_builder.shell_command = _absolute_path_if_exists(args.shell, yaml_directory)
     settings_builder.terminal_command = _absolute_path_if_exists(args.terminal, yaml_directory)
 
+    return settings_builder.build()
+
+
+def main():
+    args = get_parser().parse_args()
+    if args.debug_file:
+        init_logging(args.debug_file)
+    else:
+        disable_logging()
+    logging.info("STARTING GRADEFAST")
+
+    settings = build_settings(args)
+
     # A PyProvide injector for all our needs
-    injector = Injector(GradeFastLocalModule(settings_builder.build()))
+    injector = Injector(GradeFastLocalModule(settings))
 
     # Get and validate the initial list of submission folders
     local_host: LocalHost = injector.get_instance(LocalHost)
@@ -107,87 +226,11 @@ def handle_args(args):
     # Zhu Li, do the thing!
     run_gradefast(injector, submission_paths)
 
-
-class Formatter(argparse.HelpFormatter):
-    """
-    We're all consenting adults... https://mail.python.org/pipermail/tutor/2003-October/025932.html
-    """
-
-    def _split_lines(self, text, width):
-        # Preserve newlines (as opposed to the default, which collapses them)
-        lines = []
-        for line in text.splitlines():
-            lines += super()._split_lines(line, width)
-        lines.append("")
-        return lines
+    # Make sure that all of our doors are shut for the winter
+    logging.info("SHUTTING DOWN GRADEFAST")
+    shutdown_logging()
+    os._exit(0)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        "GradeFast",
-        formatter_class=Formatter,
-        epilog="The search path for the \"shell\" or \"terminal\" commands will include the "
-               "folder containing the YAML Configuration File."
-    )
-    parser.add_argument(
-        "--host",
-        help="The hostname to run the gradebook HTTP server on.\nDefault: %s" % DEFAULT_HOST,
-        default=DEFAULT_HOST
-    )
-    parser.add_argument(
-        "--port",
-        help="The port to run the gradebook HTTP server on.\nDefault: %s" % DEFAULT_PORT,
-        default=DEFAULT_PORT
-    )
-    parser.add_argument(
-        "--shell", metavar="CMD",
-        help="A program used to parse and run the commands in the \"commands\" section of the "
-             "YAML file.\n"
-             "The command to run will be passed as an argument.\n"
-             "Default: the operating system's default shell"
-    )
-    parser.add_argument(
-        "--terminal", metavar="CMD",
-        help="A program used to open a terminal or command prompt window.\n"
-             "The path to the directory to start in will be passed as an argument (and will also "
-             "be the working directory of the process).\n"
-             "Default: the operating system's default terminal"
-    )
-    parser.add_argument(
-        "--no-color", action="store_true",
-        help="Don't use any color on the command line"
-    )
-    parser.add_argument(
-        "--file-chooser", choices=("native", "cli"),
-        help="Which file chooser to use when selecting folders. \"native\" attempts to use your "
-             "OS's file chooser, while \"cli\" is a command-line-based file chooser.\n"
-             "Default: \"native\" (if available)",
-        default="native"
-    )
-    parser.add_argument(
-        "-f", "--submissions", metavar="PATH", action="append",
-        help="A folder in which to look for submissions (optional; can be specified multiple "
-             "times).\n"
-             "When GradeFast starts, you will be able to choose more folders if you want."
-    )
-    parser.add_argument(
-        "--save-file", metavar="PATH",
-        help="A file in which to save the current GradeFast state, allowing GradeFast to recover "
-             "if it crashes. This file is checked on startup; if it already exists, then "
-             "GradeFast reads it to resume from where it left off.\n"
-             "Default: [yaml filename].save.data (in the same directory as the YAML file)"
-    )
-    parser.add_argument(
-        "--log-file", metavar="PATH",
-        help="A file to save all output to. This is usually better than using \"tee\" since it "
-             "includes user input (stdin) as well. If a log file already exists at this path, it "
-             "is appended to.\n"
-             "Default: [yaml filename].log (in the same directory as the YAML file)"
-    )
-    parser.add_argument(
-        "yaml_file", metavar="yaml-file",
-        help="The GradeFast YAML Configuration File that contains the structure of the grading "
-             "and the commands to run (see the GradeFast wiki)"
-    )
-
-    handle_args(parser.parse_args())
+    main()

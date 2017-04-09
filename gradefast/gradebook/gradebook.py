@@ -30,6 +30,8 @@ except ImportError:
     utils.print_error("Couldn't find Flask package!", "Please install 'flask' and try again.")
     sys.exit(1)
 
+_logger = logging.getLogger("gradebook")
+
 
 class GradeBook:
     """
@@ -99,6 +101,7 @@ class GradeBook:
         mimetypes.add_type("application/json", ".map")
 
         # Start Flask app
+        _logger.info("Starting Flask app")
         app = flask.Flask(__name__)
         self._app = app
 
@@ -170,6 +173,7 @@ class GradeBook:
         @app.route("/gradefast/grades.csv")
         def _gradefast_grades_csv():
             check_data_key()
+            _logger.debug("Generating CSV export")
             csv_stream = self._get_csv()
 
             def gen():
@@ -192,6 +196,7 @@ class GradeBook:
         @app.route("/gradefast/grades.json")
         def _gradefast_grades_json():
             check_data_key()
+            _logger.debug("Generating JSON export")
             return flask.Response(self._get_json(), mimetype="application/json")
 
         # Log page
@@ -223,6 +228,8 @@ class GradeBook:
             device = flask.request.form.get("device", "unknown device")
 
             event = events.AuthRequestedEvent("GradeBook Client; device: " + device)
+            _logger.debug("Client %s requesting auth (event %s); device: %s",
+                          client_id, event.event_id, device)
             self._auth_event_id_to_client_id[event.event_id] = client_id
             self.event_manager.dispatch_event(event)
 
@@ -256,6 +263,7 @@ class GradeBook:
                 return json_bad_request("GradeBook Error", **err.get_details())
 
             except Exception as ex:
+                _logger.error("Non-public exception in _update handler: %s", ex)
                 utils.print_error("GRADEBOOK ERROR:",
                                   "Non-public exception (%s) in _update handler" % str(ex),
                                   print_traceback=True)
@@ -272,6 +280,7 @@ class GradeBook:
             if events_key not in self._events_keys:
                 return flask.abort(401)
             client_id = self._events_keys[events_key]
+            _logger.debug("Client %s connected to _events", client_id)
 
             def gen():
                 update_queue = queue.Queue(999)
@@ -341,6 +350,7 @@ class GradeBook:
                 try:
                     self._client_update_queues[client_id].put_nowait(client_update)
                 except queue.Full:
+                    _logger.warning("Client %s event queue is full", client_id)
                     utils.print_error("GRADEBOOK WARNING:",
                                       "Client %s event queue is full" % client_id)
 
@@ -352,6 +362,7 @@ class GradeBook:
         client_id = self._auth_event_id_to_client_id[auth_event_id]
         assert client_id not in self._authenticated_client_ids
         assert client_id not in self._client_update_keys
+        _logger.debug("Authentication granted to client %s (event %s)", client_id, auth_event_id)
 
         self._authenticated_client_ids.add(client_id)
         data_key = uuid.uuid4()

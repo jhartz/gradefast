@@ -8,6 +8,7 @@ Author: Jake Hartz <jake@hartz.io>
 
 import errno
 import io
+import logging
 import os
 import shutil
 import subprocess
@@ -370,7 +371,11 @@ class LocalHost(Host):
     on the guarantees stated in the Path class.
     """
 
+    logger = logging.getLogger("hosts.LocalHost")
+
     class LocalBackgroundCommand(BackgroundCommand):
+        logger = logging.getLogger("hosts.LocalBackgroundCommand")
+
         def __init__(self, process: subprocess.Popen, command_str: str, path: Path):
             super().__init__()
             self._process: subprocess.Popen = process
@@ -383,6 +388,7 @@ class LocalHost(Host):
             return "{} (in {})".format(self._command_str, self._path)
 
         def _we_are_done(self):
+            self.logger.debug("Background command DONE: %s", self.get_description())
             self._done = True
             output: str = self._process.communicate()[0]
             self._add_output(output)
@@ -394,9 +400,11 @@ class LocalHost(Host):
             with self._lock:
                 if self._done:
                     return
+                self.logger.debug("Waiting for background command: %s", self.get_description())
                 try:
                     self._process.communicate()
                 except (InterruptedError, KeyboardInterrupt):
+                    self.logger.debug("Background command interrupted: %s", self.get_description())
                     self._set_error("Command interrupted")
                 self._we_are_done()
 
@@ -404,7 +412,9 @@ class LocalHost(Host):
             with self._lock:
                 if self._done:
                     return
+                self.logger.debug("Killing background command: %s", self.get_description())
                 self._process.kill()
+                self.logger.debug("Background command killed: %s", self.get_description())
                 self._set_error("Command killed")
                 self._we_are_done()
 
@@ -417,9 +427,11 @@ class LocalHost(Host):
             # Let the platform default shell parse the command
             kwargs["shell"] = True
 
+        local_path_str = self.gradefast_path_to_local_path(path).path
+        self.logger.debug("Starting process %s (cwd: %s)", repr(command), local_path_str)
         try:
-            return subprocess.Popen(command, cwd=self.gradefast_path_to_local_path(path).path,
-                                    env=environment, universal_newlines=True, stdin=subprocess.PIPE,
+            return subprocess.Popen(command, cwd=local_path_str, env=environment,
+                                    universal_newlines=True, stdin=subprocess.PIPE,
                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, **kwargs)
         except (NotADirectoryError, FileNotFoundError) as ex:
             raise CommandStartError("File or directory not found: " + str(ex))
@@ -428,9 +440,12 @@ class LocalHost(Host):
     def _try_stdin_write(process: subprocess.Popen, stdin: str = None):
         if stdin is not None:
             try:
+                LocalHost.logger.debug("Writing to stdin of process %s\n%s",
+                                       repr(process.args), stdin)
                 process.stdin.write(stdin)
             except BrokenPipeError:
-                pass
+                LocalHost.logger.warning("BrokenPipeError when writing to stdin of process %s",
+                                         repr(process.args))
             except OSError as e:
                 if e.errno == errno.EINVAL and process.poll() is not None:
                     # On Windows, stdin.write() fails with EINVAL if the process already exited
@@ -442,9 +457,11 @@ class LocalHost(Host):
     @staticmethod
     def _try_stdin_close(process: subprocess.Popen):
         try:
+            LocalHost.logger.debug("Closing stdin of process %s", repr(process.args))
             process.stdin.close()
         except BrokenPipeError:
-            pass
+            LocalHost.logger.warning("BrokenPipeError when closing stdin of process %s",
+                                     repr(process.args))
         except OSError as e:
             if e.errno == errno.EINVAL and process.poll() is not None:
                 pass
@@ -452,30 +469,38 @@ class LocalHost(Host):
                 raise
 
     def _stdout_reader_thread(self, process: subprocess.Popen, buffer: io.StringIO,
-                              print_output: bool):
+                              print_output: bool, print_status_when_done: threading.Event):
+        self.logger.debug("Started thread to read from stdout of process %s", repr(process.args))
         while True:
             data = None
             try:
                 data = process.stdout.read(1)
             except BrokenPipeError:
-                pass
+                self.logger.warning("BrokenPipeError when reading stdout of process %s",
+                                    repr(process.args))
             if not data:
+                self.logger.debug("No more data from stdout of process %s", repr(process.args))
                 break
             buffer.write(data)
             if print_output:
                 self.channel._output_nosync(Msg(end="").print(data))
         if print_output:
-            self.channel._output_nosync(
-                Msg(sep="", end="").print("\n").status("Press Enter to continue..."))
+            self.channel._output_nosync(Msg(sep="", end="").print("\n"))
+        if print_status_when_done.is_set():
+            self.channel._output_nosync(Msg(end="").status("Press Enter to continue..."))
 
     def run_command(self, command: str, path: Path, environment: Dict[str, str],
                     stdin: Optional[str] = None, print_output: bool = True) -> str:
+        self.logger.info("Running command %s", repr(command))
         process = self._start_process(command, path, environment, bufsize=0)
 
         # Start a thread to handle the command's output
         output = io.StringIO()
+        print_status_when_done = threading.Event()
+        if print_output:
+            print_status_when_done.set()
         t = threading.Thread(target=self._stdout_reader_thread,
-                             args=(process, output, print_output))
+                             args=(process, output, print_output, print_status_when_done))
         t.daemon = True
         t.start()
 
@@ -489,20 +514,25 @@ class LocalHost(Host):
             try:
                 if print_output:
                     # Until the process is done, read our stdin and write it to the process's stdin
+                    self.logger.debug("Waiting for process and forwarding input")
                     while process.poll() is None:
                         stdin = input_func()
                         self._try_stdin_write(process, stdin)
+                    print_status_when_done.clear()
                     self._try_stdin_close(process)
                 else:
                     # Wait for the process to complete, without sending it more standard input
+                    self.logger.debug("Waiting for process without forwarding input")
                     self._try_stdin_close(process)
                     if process.poll() is None:
                         process.wait()
             except (InterruptedError, KeyboardInterrupt):
+                print_status_when_done.clear()
                 if process.poll() is None:
                     # Stop the process gracefully (with a "SIGTERM")
                     process.terminate()
                     # We won't leave until the process is actually dead
+                    self.logger.debug("Waiting for process to die")
                     while process.poll() is None:
                         try:
                             process.wait()
@@ -510,7 +540,7 @@ class LocalHost(Host):
                             if process.poll() is None:
                                 # We tried being peaceful; this time, go for the "SIGKILL"
                                 process.kill()
-            self._try_stdin_close(process)
+                self._try_stdin_close(process)
             t.join()
 
         if process.returncode != 0:
@@ -520,6 +550,7 @@ class LocalHost(Host):
 
     def start_background_command(self, command: str, path: Path, environment: Dict[str, str],
                                  stdin: Optional[str] = None) -> BackgroundCommand:
+        self.logger.info("Starting background command %s", repr(command))
         process = self._start_process(command, path, environment, bufsize=0)
         self._try_stdin_write(process, stdin)
         self._try_stdin_close(process)
@@ -645,12 +676,15 @@ class LocalWindowsHost(LocalHost):
             [void]$f.ShowDialog()
             $f.FileName
             """
+        self.logger.debug("Starting powershell process to choose folder")
         process = subprocess.Popen(
             ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", "-"],
             cwd=self.gradefast_path_to_local_path(start_path).path,
             universal_newlines=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL)
         local_path_str: str = process.communicate(script)[0]
+        self.logger.debug("powershell return code: %d; output: %s",
+                          process.returncode, local_path_str)
         if process.returncode == 0:
             if local_path_str.endswith("Folder Selection.") or not os.path.exists(local_path_str):
                 local_path_str = os.path.dirname(local_path_str)
@@ -669,11 +703,14 @@ class LocalWindowsHost(LocalHost):
             local_path_str = local_path_str[0:local_path_str.find('"')]
             # Make sure we don't have a dangling bit of folder name on the end
             local_path_str = local_path_str[0:local_path_str.rfind("\\")]
+        self.logger.debug("Using \"start\" to open cmd at %s", local_path_str)
         _open_in_background(["start", "cmd", "/K", 'cd "{}"'.format(local_path_str)],
                             env=environment)
 
     def open_folder(self, path: Path):
-        os.startfile(self.gradefast_path_to_local_path(path).path)
+        local_path_str = self.gradefast_path_to_local_path(path).path
+        self.logger.debug("Using startfile to open folder at %s", local_path_str)
+        os.startfile(local_path_str)
 
 
 class LocalMacHost(LocalHost):
@@ -692,9 +729,12 @@ class LocalMacHost(LocalHost):
             args += [self.gradefast_path_to_local_path(start_path).path]
             stdin = "return POSIX path of " + \
                     "(choose folder default location POSIX path of item 1 of argv)"
+        self.logger.debug("Starting osascript process to choose folder")
         process = subprocess.Popen(args, universal_newlines=True, stdin=subprocess.PIPE,
                                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         local_path_str: str = process.communicate(stdin)[0].strip()
+        self.logger.debug("osascript return code: %d; output: %s",
+                          process.returncode, local_path_str)
         if process.returncode == 0 and local_path_str:
             return self.local_path_to_gradefast_path(LocalPath(local_path_str))
         else:
@@ -705,15 +745,14 @@ class LocalMacHost(LocalHost):
             super().open_shell(path, environment)
             return
 
-        _open_in_background([
-            "open",
-            "-a",
-            "Terminal",
-            self.gradefast_path_to_local_path(path).path
-        ], env=environment)
+        local_path_str = self.gradefast_path_to_local_path(path).path
+        self.logger.debug("Using \"open\" to open Terminal.app at %s", local_path_str)
+        _open_in_background(["open", "-a", "Terminal", local_path_str], env=environment)
 
     def open_folder(self, path: Path):
-        _open_in_background(["open", self.gradefast_path_to_local_path(path).path])
+        local_path_str = self.gradefast_path_to_local_path(path).path
+        self.logger.debug("Using \"open\" to open folder at %s", local_path_str)
+        _open_in_background(["open", local_path_str])
 
 
 class LocalLinuxHost(LocalHost):
@@ -726,29 +765,35 @@ class LocalLinuxHost(LocalHost):
             super().open_shell(path, environment)
             return
 
+        local_path_str = self.gradefast_path_to_local_path(path).path
         if shutil.which("exo-open"):
             # Use the system's default terminal emulator
+            self.logger.debug("Using exo-open to open shell at %s", local_path_str)
             _open_in_background([
                 "exo-open",
                 "--launch",
                 "TerminalEmulator",
                 "--working-directory",
-                self.gradefast_path_to_local_path(path).path
+                local_path_str
             ], env=environment)
         elif shutil.which("gnome-terminal"):
             # We have gnome-terminal
+            self.logger.debug("Using gnome-terminal to open shell at %s", local_path_str)
             _open_in_background([
                 "gnome-terminal",
-                "--working-directory=" + self.gradefast_path_to_local_path(path).path
+                "--working-directory=" + local_path_str
             ], env=environment)
         elif shutil.which("xfce4-terminal"):
             # We have xfce4-terminal
+            self.logger.debug("Using xfce4-terminal to open shell at %s", local_path_str)
             _open_in_background([
                 "xfce4-terminal",
-                "--default-working-directory=" + self.gradefast_path_to_local_path(path).path
+                "--default-working-directory=" + local_path_str
             ], env=environment)
         else:
             raise NotImplementedError("No terminal emulator found")
 
     def open_folder(self, path: Path):
-        _open_in_background(["xdg-open", self.gradefast_path_to_local_path(path).path])
+        local_path_str = self.gradefast_path_to_local_path(path).path
+        self.logger.debug("Using xdg-open to open folder at %s", local_path_str)
+        _open_in_background(["xdg-open", local_path_str])

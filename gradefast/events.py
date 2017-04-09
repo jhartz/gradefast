@@ -9,7 +9,8 @@ Licensed under the MIT License. For more, see the LICENSE file.
 Author: Jake Hartz <jake@hartz.io>
 """
 
-import contextlib
+import itertools
+import logging
 import queue
 import threading
 from typing import List
@@ -17,6 +18,8 @@ from typing import List
 from pyprovide import Injector, inject
 
 from gradefast.models import Submission
+
+_logger = logging.getLogger("events")
 
 
 class Event:
@@ -59,7 +62,8 @@ class EventHandler:
 
     def handle(self, event: Event):
         """
-        Take some action in response to an event.
+        Take some action in response to an event. This method will almost always be called in a
+        fresh thread (different from the one that called "accept").
         """
         raise NotImplementedError()
 
@@ -96,28 +100,31 @@ class EventManager:
         self.injector = injector
         self._handlers: List[EventHandler] = []
         self._event_queue = queue.Queue()
-        threading.Thread(target=self._event_thread_target, daemon=True).start()
+        threading.Thread(
+            name="EventManTh",
+            target=self._event_thread_target,
+            daemon=True
+        ).start()
 
     def _event_thread_target(self):
+        count = itertools.count()
         while True:
             event = self._event_queue.get()
             for handler in self._handlers:
-                threading.Thread(
-                    target=self._event_handler_thread_target,
-                    args=(event, handler),
-                    daemon=True
-                ).start()
-
-    @staticmethod
-    def _event_handler_thread_target(event: Event, handler: EventHandler):
-        if handler.accept(event):
-            handler.handle(event)
+                if handler.accept(event):
+                    threading.Thread(
+                        name="EventTh-%02d" % next(count),
+                        target=handler.handle,
+                        args=(event,),
+                        daemon=True
+                    ).start()
 
     def register_event_handlers(self, *event_handlers: EventHandler):
         """
         Register one or more new event handler instances that will be called for any future event
         dispatches.
         """
+        _logger.info("Registering event handlers: %s", event_handlers)
         self._handlers += event_handlers
 
     def register_event_handler_classes(self, *event_handler_classes):
@@ -128,6 +135,7 @@ class EventManager:
         Instances of these classes are created using the same injector that was used when creating
         the EventManager (so the classes' constructors should be decorated with "@inject()").
         """
+        _logger.info("Registering event handler classes: %s", event_handler_classes)
         self._handlers += [self.injector.get_instance(cls) for cls in event_handler_classes]
 
     def register_all_event_handlers(self, module):
