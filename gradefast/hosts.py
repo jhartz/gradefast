@@ -442,7 +442,7 @@ class LocalHost(Host):
             try:
                 LocalHost.logger.debug("Writing to stdin of process %s\n%s",
                                        repr(process.args), stdin)
-                process.stdin.write(stdin)
+                process.stdin.write(stdin + "\n")
             except BrokenPipeError:
                 LocalHost.logger.warning("BrokenPipeError when writing to stdin of process %s",
                                          repr(process.args))
