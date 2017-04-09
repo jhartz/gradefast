@@ -6,18 +6,28 @@ Licensed under the MIT License. For more, see the LICENSE file.
 Author: Jake Hartz <jake@hartz.io>
 """
 
+# NOTE: In order for this version check to be executed, the interpreter must be able to parse this
+# file. Therefore, avoid using new syntax (like variable type annotations). Stick to anything that
+# would've been valid Python 3.0 (showing the error message for Python 2 is sort of a lost cause).
+
+import sys
+if sys.version_info < (3, 6):
+    print("==> GradeFast requires Python 3.6 or later.")
+    print("==> You have version:")
+    print("    " + str(sys.version).replace("\n", "\n    "))
+    sys.exit(1)
+
 import argparse
 import logging
 import os
-import sys
-from typing import Dict, List, Optional
+from typing import Optional
 
 from pyprovide import Injector
 
 from gradefast import yamlsettings
 from gradefast.config.local import GradeFastLocalModule
 from gradefast.hosts import LocalHost
-from gradefast.models import LocalPath, Path, SettingsBuilder
+from gradefast.models import LocalPath
 from gradefast.run import run_gradefast
 
 DEFAULT_HOST = "127.0.0.1"
@@ -148,7 +158,7 @@ def build_settings(args):
         sys.exit(1)
 
     yaml_file_name = os.path.splitext(os.path.basename(yaml_file_path))[0]
-    yaml_directory: LocalPath = LocalPath(os.path.dirname(yaml_file_path))
+    yaml_directory = LocalPath(os.path.dirname(yaml_file_path))
 
     if args.save_file:
         save_file = LocalPath(os.path.abspath(args.save_file))
@@ -160,7 +170,7 @@ def build_settings(args):
     else:
         log_file = LocalPath(os.path.join(yaml_directory, yaml_file_name + ".log"))
 
-    base_env: Dict[str, str] = dict(os.environ)
+    base_env = dict(os.environ)
     base_env.update({
         "SUPPORT_DIRECTORY": yaml_directory.path,
         "HELPER_DIRECTORY": yaml_directory.path,
@@ -169,7 +179,7 @@ def build_settings(args):
 
     with open(yaml_file_path, encoding="utf-8") as yaml_file:
         try:
-            settings_builder: SettingsBuilder = yamlsettings.parse_yaml(yaml_file)
+            settings_builder = yamlsettings.parse_yaml(yaml_file)
         except yamlsettings.YAMLStructureError as e:
             print("Error parsing YAML file:", e)
             sys.exit(1)
@@ -208,8 +218,8 @@ def main():
     injector = Injector(GradeFastLocalModule(settings))
 
     # Get and validate the initial list of submission folders
-    local_host: LocalHost = injector.get_instance(LocalHost)
-    submission_paths: List[Path] = []
+    local_host = injector.get_instance(LocalHost)
+    submission_paths = []
     if args.submissions:
         found_bad = False
         for folder in args.submissions:
