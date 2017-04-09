@@ -100,8 +100,8 @@ class GradeBook:
         # Set up MIME type for JS source map
         mimetypes.add_type("application/json", ".map")
 
-        # Start Flask app
-        _logger.info("Starting Flask app")
+        # Set up Flask app
+        _logger.info("Initializing Flask app")
         app = flask.Flask(__name__)
         self._app = app
 
@@ -504,17 +504,13 @@ class GradeBook:
         """
         return utils.to_json(self._get_grades_export())
 
-    def run(self, log_level: Union[str, int] = logging.WARNING, debug: bool = False):
+    def run(self, debug: bool = False):
         """
         Start the Flask server (using Werkzeug internally).
 
-        :param log_level: The level at which to set the Werkzeug logger
-        :param debug: Whether to start the server in debug mode (prints tracebacks with "HTTP 500"
-            errors)
+        :param debug: Whether to start the server in debug mode (includes tracebacks with HTTP 500
+            error pages)
         """
-        # Set logging level
-        server_log = logging.getLogger("werkzeug")
-        server_log.setLevel(log_level)
         # Start the server
         kwargs = {
             "threaded": True,
@@ -524,10 +520,5 @@ class GradeBook:
             kwargs["debug"] = True
             kwargs["use_reloader"] = False
 
+        _logger.info("Running Flask app")
         self._app.run(self.settings.host, self.settings.port, **kwargs)
-
-    def get_wsgi_app(self):
-        """
-        Get a function representing the server as a WSGI app.
-        """
-        return self._app.wsgi_app

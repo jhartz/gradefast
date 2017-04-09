@@ -124,7 +124,7 @@ class EventManager:
         Register one or more new event handler instances that will be called for any future event
         dispatches.
         """
-        _logger.info("Registering event handlers: %s", event_handlers)
+        _logger.info("Registering event handlers %s", event_handlers)
         self._handlers += event_handlers
 
     def register_event_handler_classes(self, *event_handler_classes):
@@ -135,7 +135,7 @@ class EventManager:
         Instances of these classes are created using the same injector that was used when creating
         the EventManager (so the classes' constructors should be decorated with "@inject()").
         """
-        _logger.info("Registering event handler classes: %s", event_handler_classes)
+        _logger.info("Registering event handler classes %s", event_handler_classes)
         self._handlers += [self.injector.get_instance(cls) for cls in event_handler_classes]
 
     def register_all_event_handlers(self, module):

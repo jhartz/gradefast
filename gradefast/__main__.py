@@ -119,6 +119,9 @@ def init_logging(log_file: str):
         level=logging.DEBUG,
         format="%(asctime)s  %(threadName)-11s %(levelname)-5s [%(name)s]  %(message)s"
     )
+    # All web requests thru werkzeug are logged at the "INFO" level
+    server_log = logging.getLogger("werkzeug")
+    server_log.setLevel(logging.WARNING)
 
 
 def disable_logging():
