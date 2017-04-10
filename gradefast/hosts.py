@@ -284,7 +284,7 @@ class Host:
             self.print_folder(path, start_path)
             choice = self.channel.input(
                 "Choose a folder (or \"Enter\" to stop):",
-                [name for name, type, _ in folder_listing if type == "folder"]).strip()
+                [name for name, type, _ in folder_listing if type == "folder"])
             if not choice:
                 choice = self.channel.prompt("Satisfied? (\"c\" to cancel)", ["Y", "n", "c"], "y")
                 if choice == "y":
@@ -517,15 +517,17 @@ class LocalHost(Host):
                     self.logger.debug("Waiting for process and forwarding input")
                     while process.poll() is None:
                         stdin = input_func()
+                        if stdin is None:
+                            break
                         self._try_stdin_write(process, stdin)
                     print_status_when_done.clear()
-                    self._try_stdin_close(process)
                 else:
                     # Wait for the process to complete, without sending it more standard input
                     self.logger.debug("Waiting for process without forwarding input")
-                    self._try_stdin_close(process)
-                    if process.poll() is None:
-                        process.wait()
+
+                self._try_stdin_close(process)
+                if process.poll() is None:
+                    process.wait()
             except (InterruptedError, KeyboardInterrupt):
                 print_status_when_done.clear()
                 if process.poll() is None:

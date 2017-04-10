@@ -200,19 +200,20 @@ class Grader:
                 self.channel.print("n   Jump to submission n")
                 self.channel.print("+n  Jump forward n submissions")
                 self.channel.print("-n  Jump back n submissions")
-                new_id = self.channel.input("Go:").strip()
+                new_id = self.channel.input("Go:")
 
-                try:
-                    if new_id[0] == "+":
-                        submission_id += int(new_id[1:])
-                    elif new_id[0] == "-":
-                        submission_id -= int(new_id[1:])
-                    else:
-                        submission_id = int(new_id)
-                except (ValueError, IndexError):
-                    self.channel.error("Invalid index!")
+                if new_id:
+                    try:
+                        if new_id[0] == "+":
+                            submission_id += int(new_id[1:])
+                        elif new_id[0] == "-":
+                            submission_id -= int(new_id[1:])
+                        else:
+                            submission_id = int(new_id)
+                    except (ValueError, IndexError):
+                        self.channel.error("Invalid index!")
 
-                submission_id = min(max(submission_id, 1), total)
+                    submission_id = min(max(submission_id, 1), total)
             elif what_to_do == "l":
                 # List all the submissions
                 for submission in self._submissions:
@@ -317,7 +318,7 @@ class CommandRunner:
             for name in matches:
                 self.channel.print("   ", name)
             choice = self.channel.input("Make a choice:", matches)
-            if choice in matches:
+            if choice and choice in matches:
                 folder = choice
         if folder is None:
             return None
@@ -358,7 +359,6 @@ class CommandRunner:
         self.channel.print("Existing command: {}", command.command)
         new_command = self.channel.input("Enter new command (TAB to input old): ",
                                          [command.command])
-        new_command = new_command.strip()
         if not new_command:
             self.channel.print("No change :(")
             return command
