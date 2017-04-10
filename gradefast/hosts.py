@@ -444,8 +444,8 @@ class LocalHost(Host):
                                        repr(process.args), stdin)
                 process.stdin.write(stdin + "\n")
             except BrokenPipeError:
-                LocalHost.logger.warning("BrokenPipeError when writing to stdin of process %s",
-                                         repr(process.args))
+                LocalHost.logger.debug("BrokenPipeError when writing to stdin of process %s",
+                                       repr(process.args))
             except OSError as e:
                 if e.errno == errno.EINVAL and process.poll() is not None:
                     # On Windows, stdin.write() fails with EINVAL if the process already exited
@@ -460,8 +460,8 @@ class LocalHost(Host):
             LocalHost.logger.debug("Closing stdin of process %s", repr(process.args))
             process.stdin.close()
         except BrokenPipeError:
-            LocalHost.logger.warning("BrokenPipeError when closing stdin of process %s",
-                                     repr(process.args))
+            LocalHost.logger.debug("BrokenPipeError when closing stdin of process %s",
+                                   repr(process.args))
         except OSError as e:
             if e.errno == errno.EINVAL and process.poll() is not None:
                 pass
@@ -476,8 +476,8 @@ class LocalHost(Host):
             try:
                 data = process.stdout.read(1)
             except BrokenPipeError:
-                self.logger.warning("BrokenPipeError when reading stdout of process %s",
-                                    repr(process.args))
+                self.logger.debug("BrokenPipeError when reading stdout of process %s",
+                                  repr(process.args))
             if not data:
                 self.logger.debug("No more data from stdout of process %s", repr(process.args))
                 break
