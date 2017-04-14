@@ -153,7 +153,9 @@ def _absolute_path_if_exists(item: str, base: LocalPath) -> Optional[str]:
 
 def build_settings(args):
     yaml_file_path = os.path.abspath(args.yaml_file)
+    logging.info("YAML file: %s", yaml_file_path)
     if not os.path.isfile(yaml_file_path):
+        logging.info("(not found)")
         print("YAML file not found: %s" % yaml_file_path)
         sys.exit(1)
 
@@ -164,11 +166,13 @@ def build_settings(args):
         save_file = LocalPath(os.path.abspath(args.save_file))
     else:
         save_file = LocalPath(os.path.join(yaml_directory, yaml_file_name + ".save.data"))
+    logging.info("Save file: %s", save_file)
 
     if args.log_file:
         log_file = LocalPath(os.path.abspath(args.log_file))
     else:
         log_file = LocalPath(os.path.join(yaml_directory, yaml_file_name + ".log"))
+    logging.info("Log file: %s", log_file)
 
     base_env = dict(os.environ)
     base_env.update({
