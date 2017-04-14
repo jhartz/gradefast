@@ -225,29 +225,26 @@ class Host:
         listings: List[Msg] = [Msg(end="").accent("../")]
 
         for name, is_link in sorted(folders, key=lambda f: f[0]):
-            listing = Msg(end="")
-            listing.accent("{}/", name)
+            listing = Msg(end="").accent("{}/", name)
             if is_link:
                 listing.bright("(link)")
             listings.append(listing)
 
         for name, is_link in sorted(files, key=lambda f: f[0]):
-            listing = Msg(end="")
-            listing.print("{}", name)
+            listing = Msg(end="").print("{}", name)
             if is_link:
                 listing.bright("(link)")
             listings.append(listing)
 
         for name, type, is_link in sorted(other, key=lambda f: f[0]):
-            listings.append(listing)
-            listing.print("{}", name)
+            listing = Msg(end="", sep="").error("{}", name)
             if is_link:
-                listing.bright("(link")
-                if type is not None:
-                    listing.print(" to {}", type)
-                listing.print(")")
-            elif type is not None:
-                listing.print("({})", type)
+                listing.bright(" (link")
+                if type:
+                    listing.print(" to ").bright("{}", type)
+                listing.bright(")")
+            elif type:
+                listing.bright(" ({})", type)
             listings.append(listing)
 
         self.channel.output_list(listings)
