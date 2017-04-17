@@ -468,19 +468,20 @@ class CommandRunner:
         """
         _logger.debug("_do_command: %s", command)
 
-        self.channel.print()
+        msg = Msg(sep="\n").print()
         status_title = ("-" * 3) + " " + self._submission.name
         if len(status_title) < 56:
             status_title += " "
             status_title += "-" * (56 - len(status_title))
-        self.channel.status(status_title)
+        msg.status(status_title)
 
-        self.channel.status("::: {}", command.name)
+        msg.status("::: {}", command.name)
         if command.is_background:
-            self.channel.status("    (background command)")
+            msg.status("    (background command)")
         for line in command.command.split("\n"):
-            self.channel.bright("    {}", line)
-        self.channel.print("")
+            if line:
+                msg.bright("    {}", line)
+        self.channel.output(msg.print())
 
         # Set up the command environment dictionary
         # (This is used for running the command, and if we open a shell)
@@ -510,13 +511,15 @@ class CommandRunner:
                 return False
             elif choice == "?":
                 # Show help
-                self.channel.print("  o:  Open a shell in the current folder")
-                self.channel.print("  f:  Open the current folder")
-                self.channel.print("  m:  Modify the command (just for this submission)")
-                self.channel.print("  s:  Skip this command")
-                self.channel.print("  ss: Skip the rest of this submission")
-                self.channel.print("  ?:  Show this help message")
-                self.channel.print("  Enter: Run the command")
+                msg = Msg(sep="\n")
+                msg.print("  o:  Open a shell in the current folder")
+                msg.print("  f:  Open the current folder")
+                msg.print("  m:  Modify the command (just for this submission)")
+                msg.print("  s:  Skip this command")
+                msg.print("  ss: Skip the rest of this submission")
+                msg.print("  ?:  Show this help message")
+                msg.print("  Enter: Run the command")
+                self.channel.output(msg)
             else:
                 # Run the command
                 self.channel.print("")
