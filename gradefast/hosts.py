@@ -14,7 +14,7 @@ import shutil
 import subprocess
 import threading
 import zipfile
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 from iochannels import Channel, Msg
 from pyprovide import inject
@@ -221,7 +221,6 @@ class Host:
             else:
                 other.append((name, type, is_link))
 
-        self.channel.status("{}", path.relative_str(base_path))
         listings: List[Msg] = [Msg(end="").accent("../")]
 
         for name, is_link in sorted(folders, key=lambda f: f[0]):
@@ -247,6 +246,7 @@ class Host:
                 listing.bright(" ({})", type)
             listings.append(listing)
 
+        self.channel.status("{}", path.relative_str(base_path))
         self.channel.output_list(listings)
 
     def _choose_folder_cli(self, start_path: Optional[Path] = None) -> Optional[Path]:
@@ -465,49 +465,53 @@ class LocalHost(Host):
             else:
                 raise
 
-    def _stdout_reader_thread(self, process: subprocess.Popen, buffer: io.StringIO,
-                              print_output: bool, print_status_when_done: threading.Event):
-        self.logger.debug("Started thread to read from stdout of process %s", repr(process.args))
+    @staticmethod
+    def _stdout_reader_thread(process: subprocess.Popen, buffer: io.StringIO,
+                              output_func: Optional[Callable[[Msg], None]],
+                              print_status_when_done: threading.Event):
+        LocalHost.logger.debug("Started thread to read from stdout of process %s",
+                               repr(process.args))
         while True:
             data = None
             try:
                 data = process.stdout.read(1)
             except BrokenPipeError:
-                self.logger.debug("BrokenPipeError when reading stdout of process %s",
-                                  repr(process.args))
+                LocalHost.logger.debug("BrokenPipeError when reading stdout of process %s",
+                                       repr(process.args))
             if not data:
-                self.logger.debug("No more data from stdout of process %s", repr(process.args))
+                LocalHost.logger.debug("No more data from stdout of process %s",
+                                       repr(process.args))
                 break
             buffer.write(data)
-            if print_output:
-                self.channel._output_nosync(Msg(end="").print(data))
-        if print_output:
-            self.channel._output_nosync(Msg(sep="", end="").print("\n"))
-        if print_status_when_done.is_set():
-            self.channel._output_nosync(Msg(end="").status("Press Enter to continue..."))
+            if output_func:
+                output_func(Msg(end="").print(data))
+        if output_func:
+            output_func(Msg().print())
+            if print_status_when_done.is_set():
+                output_func(Msg(end="").status("Press Enter to continue..."))
 
     def run_command(self, command: str, path: Path, environment: Dict[str, str],
                     stdin: Optional[str] = None, print_output: bool = True) -> str:
         self.logger.info("Running command %s", repr(command))
-        process = self._start_process(command, path, environment, bufsize=0)
 
-        # Start a thread to handle the command's output
-        output = io.StringIO()
-        print_status_when_done = threading.Event()
-        if print_output:
-            print_status_when_done.set()
-        t = threading.Thread(target=self._stdout_reader_thread,
-                             args=(process, output, print_output, print_status_when_done))
-        t.daemon = True
-        t.start()
+        with self.channel.blocking_io() as (output_func, input_func, prompt_func):
+            process = self._start_process(command, path, environment, bufsize=0)
 
-        # If we have predetermined input, write it to stdin
-        if stdin is not None:
-            self._try_stdin_write(process, stdin)
+            # Start a thread to handle the command's output
+            output = io.StringIO()
+            print_status_when_done = threading.Event()
+            if print_output:
+                print_status_when_done.set()
+            t = threading.Thread(target=LocalHost._stdout_reader_thread,
+                                 args=(process, output, output_func if print_output else None,
+                                       print_status_when_done))
+            t.daemon = True
+            t.start()
 
-        # While running the process, we use Channel::blocking_input to block all synchronous I/O
-        # (and to get input to send to the process, if necessary)
-        with self.channel.blocking_input() as input_func:
+            # If we have predetermined input, write it to stdin
+            if stdin is not None:
+                LocalHost._try_stdin_write(process, stdin)
+
             try:
                 if print_output:
                     # Until the process is done, read our stdin and write it to the process's stdin
@@ -516,13 +520,13 @@ class LocalHost(Host):
                         stdin = input_func()
                         if stdin is None:
                             break
-                        self._try_stdin_write(process, stdin)
+                        LocalHost._try_stdin_write(process, stdin)
                     print_status_when_done.clear()
                 else:
                     # Wait for the process to complete, without sending it more standard input
                     self.logger.debug("Waiting for process without forwarding input")
 
-                self._try_stdin_close(process)
+                LocalHost._try_stdin_close(process)
                 if process.poll() is None:
                     process.wait()
             except (InterruptedError, KeyboardInterrupt):
@@ -539,7 +543,7 @@ class LocalHost(Host):
                             if process.poll() is None:
                                 # We tried being peaceful; this time, go for the "SIGKILL"
                                 process.kill()
-                self._try_stdin_close(process)
+                LocalHost._try_stdin_close(process)
             t.join()
 
         if process.returncode != 0:
@@ -551,8 +555,8 @@ class LocalHost(Host):
                                  stdin: Optional[str] = None) -> BackgroundCommand:
         self.logger.info("Starting background command %s", repr(command))
         process = self._start_process(command, path, environment, bufsize=0)
-        self._try_stdin_write(process, stdin)
-        self._try_stdin_close(process)
+        LocalHost._try_stdin_write(process, stdin)
+        LocalHost._try_stdin_close(process)
         return LocalHost.LocalBackgroundCommand(process, command, path)
 
     def gradefast_path_to_local_path(self, path: Path) -> LocalPath:
