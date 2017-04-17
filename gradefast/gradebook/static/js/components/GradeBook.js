@@ -51,7 +51,7 @@ const GradeBook = React.createClass({
             sectionContent = <GradeList path={Immutable.List()} grades={this.props.grades} />;
             footerContent = (
                 <CommentsTextarea onChange={this.handleOverallCommentsChange}
-                                  placeholder="Overall Comments (Markdown-parsed)"
+                                  placeholder={"Overall Comments " + CONFIG.MARKDOWN_MSG}
                                   value={this.props.overall_comments}
                                   valueHTML={this.props.overall_comments_html}
                                   minRows={3}

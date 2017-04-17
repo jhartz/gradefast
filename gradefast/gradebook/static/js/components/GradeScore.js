@@ -66,7 +66,7 @@ const GradeScore = React.createClass({
                         }
                         {!this.props.grade.get("enabled") ? undefined :
                             <CommentsTextarea onChange={this.handleCommentsChange}
-                                              placeholder="Comments (Markdown-parsed)"
+                                              placeholder={"Comments " + CONFIG.MARKDOWN_MSG}
                                               value={this.props.grade.get("comments")}
                                               valueHTML={this.props.grade.get("comments_html")}
                                               minRows={2}

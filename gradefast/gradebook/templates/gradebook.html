@@ -13,6 +13,7 @@
 var CONFIG = {
     CLIENT_ID: {{ client_id|safe }},
     EVENTS_KEY: {{ events_key|safe }},
+    MARKDOWN_MSG: {{ markdown_msg|safe }} || "",
 
     // usually /gradefast/
     BASE: location.pathname.substring(0, location.pathname.lastIndexOf("gradebook")),

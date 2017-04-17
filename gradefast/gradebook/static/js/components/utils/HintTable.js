@@ -126,7 +126,7 @@ const HintTable = React.createClass({
                             </td>
                             <td>
                                 <SizingTextarea onChange={this.handleTextareaChange}
-                                                placeholder="Hint Name (Markdown-parsed)"
+                                                placeholder={"Hint Name " + CONFIG.MARKDOWN_MSG}
                                                 value={this.state.textareaValue}
                                                 style={{width: "100%"}}
                                 />
@@ -189,7 +189,7 @@ const HintTable = React.createClass({
                         <td>
                             {(this.state.textareaValue || this.state.forceShowTextarea)
                                 ? <SizingTextarea onChange={this.handleTextareaChange}
-                                                  placeholder="Add a new hint (Markdown-parsed)"
+                                                  placeholder={"Add a new hint " + CONFIG.MARKDOWN_MSG}
                                                   value={this.state.textareaValue}
                                                   style={{width: "100%"}}
                                                   focusOnMount={this.state.forceShowTextarea}

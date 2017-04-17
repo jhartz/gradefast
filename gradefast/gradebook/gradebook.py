@@ -167,7 +167,8 @@ class GradeBook:
             return flask.render_template(
                 "gradebook.html",
                 client_id=utils.to_json(client_id),
-                events_key=utils.to_json(events_key))
+                events_key=utils.to_json(events_key),
+                markdown_msg=utils.to_json("(Markdown-parsed)" if grades.has_markdown else None))
 
         # Grades CSV file
         @app.route("/gradefast/grades.csv")

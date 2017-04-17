@@ -14,10 +14,12 @@ from gradefast.models import Submission
 try:
     import mistune
     _markdown = mistune.Markdown(renderer=mistune.Renderer(hard_wrap=True))
+    has_markdown = True
 except ImportError:
     utils.print_error("Couldn't find mistune package!",
                       "Comments and hints will not be Markdown-parsed.")
     mistune = None
+    has_markdown = False
 
 Path = Union[int, str]
 Score = Union[int, float]
@@ -56,7 +58,7 @@ FEEDBACK_HTML_TEMPLATES = {
 
 
 def _markdown_to_html(text: str, inline_only: bool = False) -> str:
-    if mistune is None:
+    if not has_markdown:
         html = text.replace("&", "&amp;")   \
                    .replace("\"", "&quot;") \
                    .replace("<", "&lt;")    \
@@ -70,8 +72,10 @@ def _markdown_to_html(text: str, inline_only: bool = False) -> str:
             html = html.replace('<p>', '<p style="margin: 3px 0">')
 
         # Stylize code tags (even though MyCourses cuts out the background anyway...)
-        html = html.replace('<code>', '<code style="background-color: rgba(0, 0, 0, 0.04); ' +
-                                      'padding: 1px 3px; border-radius: 5px;">')
+        html = html.replace(
+            '<code>',
+            '<code style="background-color: rgba(0, 0, 0, 0.04); padding: 1px 3px; '
+            'border: 1px solid rgba(0, 0, 0, 0.2); border-radius: 5px;">')
 
     return html
 
