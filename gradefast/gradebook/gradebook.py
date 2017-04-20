@@ -227,8 +227,7 @@ class GradeBook:
                 return json_bad_request("Client already authenticated")
 
             device = flask.request.form.get("device", "unknown device")
-
-            event = events.AuthRequestedEvent("GradeBook Client; device: " + device)
+            event = events.AuthRequestedEvent("device: " + device)
             _logger.debug("Client %s requesting auth (event %s); device: %s",
                           client_id, event.event_id, device)
             self._auth_event_id_to_client_id[event.event_id] = client_id
