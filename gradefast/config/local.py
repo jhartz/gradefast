@@ -36,10 +36,10 @@ class GradeFastLocalModule(Module):
     def provide_cli_channel(self, settings: Settings, submission_log: iochannels.MemoryLog) -> \
             iochannels.Channel:
         if settings.use_color:
-            return iochannels.ColorCLIChannel(submission_log,
+            return iochannels.ColorCLIChannel(submission_log, use_readline=settings.use_readline,
                                               application_name_for_error="GradeFast")
         else:
-            return iochannels.CLIChannel(submission_log)
+            return iochannels.CLIChannel(submission_log, use_readline=settings.use_readline)
 
     @provider()
     def provide_host(self, local_host: hosts.LocalHost) -> hosts.Host:

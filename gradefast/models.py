@@ -266,6 +266,7 @@ class Settings(NamedTuple):
     diff_file_path: Optional[LocalPath]
 
     # {Color,}CLIChannel (iochannels.py) settings
+    use_readline: bool
     use_color: bool
 
     # Host (hosts.py) settings
@@ -295,6 +296,7 @@ class SettingsDefaults:
     diff_file_path = None
 
     # {Color,}CLIChannel (iochannels.py) settings
+    use_readline = True
     use_color = True
 
     # Host (hosts.py) settings

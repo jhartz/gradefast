@@ -51,6 +51,8 @@ class Formatter(argparse.HelpFormatter):
 def get_parser():
     parser = argparse.ArgumentParser(
         "GradeFast",
+        usage="python3 -m gradefast [-h|--help] [options] yaml-file",
+        description="For GradeFast usage documentation, see: https://github.com/jhartz/gradefast",
         formatter_class=Formatter,
         epilog="The search path for the \"shell\" or \"terminal\" commands will include the "
                "folder containing the YAML Configuration File."
@@ -80,8 +82,13 @@ def get_parser():
              "Default: the operating system's default terminal"
     )
     parser.add_argument(
+        "--no-readline", action="store_true",
+        help="Don't try to use \"readline\" for command line autocompletion. This can help on "
+             "some platforms (*cough* OS X) that have buggy readline support."
+    )
+    parser.add_argument(
         "--no-color", action="store_true",
-        help="Don't use any color on the command line"
+        help="Don't use any color on the command line."
     )
     parser.add_argument(
         "--file-chooser", choices=("native", "cli"),
@@ -89,12 +96,6 @@ def get_parser():
              "OS's file chooser, while \"cli\" is a command-line-based file chooser.\n"
              "Default: \"native\" (if available)",
         default="native"
-    )
-    parser.add_argument(
-        "-f", "-s", "--submissions", metavar="PATH", action="append",
-        help="A folder in which to look for submissions (optional; can be specified multiple "
-             "times).\n"
-             "When GradeFast starts, you will be able to choose more folders if you want."
     )
     parser.add_argument(
         "--save-file", metavar="PATH",
@@ -115,9 +116,15 @@ def get_parser():
         help="A file to log debug output to.\nDefault: (none)"
     )
     parser.add_argument(
+        "-f", "-s", "--submissions", metavar="PATH", action="append",
+        help="A folder in which to look for submissions (optional; can be specified multiple "
+             "times).\n"
+             "When GradeFast starts, you will be able to choose more folders if you want."
+    )
+    parser.add_argument(
         "yaml_file", metavar="yaml-file",
         help="The GradeFast YAML Configuration File that contains the structure of the grading "
-             "and the commands to run (see the GradeFast wiki)"
+             "and the commands to run (see the GradeFast wiki at the link above)"
     )
 
     return parser
@@ -199,6 +206,7 @@ def build_settings(args):
     # "check_zipfiles" filled from YAML file
     # "check_file_extensions" filled from YAML file
     settings_builder.diff_file_path = yaml_directory
+    settings_builder.use_readline = not args.no_readline
     settings_builder.use_color = not args.no_color
     settings_builder.base_env = base_env
     settings_builder.prefer_cli_file_chooser = args.file_chooser == "cli"
