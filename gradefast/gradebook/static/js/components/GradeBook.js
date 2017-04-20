@@ -36,7 +36,8 @@ const GradeBook = React.createClass({
         } else if (this.props.list_visible) {
             // List of submissions
             headerContent = <span>Submissions</span>;
-            sectionContent = <SubmissionList submissions={this.props.list}/>;
+            sectionContent = <SubmissionList submissions={this.props.list}
+                                             data_key={this.props.data_key}/>;
 
         } else if (this.props.submission_id !== null) {
             // An actual submission! It's almost like this is what we're actually here for
@@ -110,6 +111,7 @@ const GradeBook = React.createClass({
 function mapStateToProps(state) {
     return {
         loading: state.get("loading"),
+        data_key: state.get("data_key"),
 
         list_visible: state.get("list_visible"),
         list: state.get("list"),

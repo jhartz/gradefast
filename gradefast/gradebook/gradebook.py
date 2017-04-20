@@ -418,6 +418,11 @@ class GradeBook:
         """
         self.get_grade(submission_id).append_log_html(log_html)
 
+        # Tell GradeBook clients about the list again, so they know that we have a log now
+        self._send_client_update(clients.ClientUpdate.create_update_event("NEW_SUBMISSION_LIST", {
+            "submissions": self.get_submission_list()
+        }))
+
     def set_done(self, is_done: bool):
         """
         Set whether we are done grading.

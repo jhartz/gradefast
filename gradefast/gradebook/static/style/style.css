@@ -144,26 +144,6 @@ ul {
     padding-left: 15px;
 }
 
-ul.submission-list {
-    padding-left: 40px;
-    list-style-type: lower-greek;
-}
-
-ul.submission-list li {
-    margin-top: 10px;
-    font-size: 130%;
-    color: #B3B3B3;
-}
-
-ul.submission-list a {
-    color: #000000;
-    text-decoration: none;
-}
-
-ul.submission-list a:hover {
-    text-decoration: underline;
-}
-
 input.big-checkbox {
     zoom: 1.5;
 }
@@ -247,4 +227,27 @@ table.row-grade-table {
 table.row-grade-table > tbody > tr > td {
     width: 50%;
     padding: 3px;
+}
+
+table.submission-list {
+    margin: 30px auto;
+}
+
+table.submission-list td {
+    padding-left: 30px;
+}
+
+table.submission-list td {
+    margin-top: 10px;
+    font-size: 130%;
+    color: #565656;
+}
+
+table.submission-list a {
+    color: #000000;
+    text-decoration: none;
+}
+
+table.submission-list a:hover {
+    text-decoration: underline;
 }

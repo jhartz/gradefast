@@ -5,11 +5,6 @@ GradeBook TODOs:
 
 - In the gradebook (particularly gradebook.grades and the UI), find something better to call the
   path to the grade item than "path" (it's confusing with the Path model for filesystem paths).
-- Implement the submission list
-  - Include the "score / points" next to each name
-  - For completed submissions other than the "current" one in the grader, include a link to the
-    HTML log page (/gradefast/log/<id>?data_key=...) - make it an actual link so we can ctrl+click
-    it, but if you just click it normally, make it open in an iframe in a dialog in the gradebook
 - When we send which submission we're on to the gradebook, pass in the index too (so that when we
   go back or jump around it don't throw it off)
 - For sections, add a "scale" option that takes a ratio to scale the section by (or a string

@@ -796,7 +796,8 @@ class SubmissionGrade:
         data.update({
             "is_late": self._is_late,
             "current_score": points_earned,
-            "max_score": points_total
+            "max_score": points_total,
+            "has_log": len(self._log_html) > 0
         })
         return data
 
