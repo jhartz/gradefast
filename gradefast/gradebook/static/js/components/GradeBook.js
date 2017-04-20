@@ -86,7 +86,7 @@ const GradeBook = React.createClass({
     getInspiration() {
         return (
             <section>
-                <h2>Start a submission, dammit!</h2>
+                <h2>Start grading a submission!</h2>
                 <p className="centered">
                     <a href="https://www.youtube.com/watch?v=oY47hdblMto"
                        title="The Clock Was Tickin'"

@@ -8,7 +8,7 @@ Author: Jake Hartz <jake@hartz.io>
 
 import logging
 
-from iochannels import Channel, Msg
+from iochannels import Channel, Msg, DEFAULT_BAD_CHOICE_MSG
 from pyprovide import inject
 
 from gradefast import events
@@ -47,7 +47,8 @@ class AuthRequestedEventHandler(events.EventNameHandler, event="AuthRequestedEve
                     l += " " * (max_line_len - len(l))
                 output_func(Msg(sep="").add(Msg.PartType.PROMPT_QUESTION, prefix).print("{}", l))
 
-            choice = prompt_func(prefix + "Allow?", ["Y", "n"], "y")
+            choice = prompt_func(prefix + "Allow?", ["Y", "n"], "y",
+                                 bad_choice_msg=prefix + DEFAULT_BAD_CHOICE_MSG)
             output_func(separator)
             output_func(Msg().print())
 
