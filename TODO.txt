@@ -5,8 +5,6 @@ GradeBook TODOs:
 
 - In the gradebook (particularly gradebook.grades and the UI), find something better to call the
   path to the grade item than "path" (it's confusing with the Path model for filesystem paths).
-- When we send which submission we're on to the gradebook, pass in the index too (so that when we
-  go back or jump around it don't throw it off)
 - For sections, add a "scale" option that takes a ratio to scale the section by (or a string
   representing a fraction)
 - Like entering grades on mycourses, mark background in gradebook when a grade item is modified
@@ -14,42 +12,22 @@ GradeBook TODOs:
   (and with no comments/point hints/section deductions, and all grade items are exactly full points)
 - Unicode issues (in comments, shows up weird in CSV file)
 - 3 states for grade structures: enabled, disabled, or collapsed, in which case any sub grades are
-  not shown, and we just enter one big point value, one big comment.
+  not shown, and we just enter one big point value, one big comment. This probably means
+  implementing a custom checkbox, or doing something hacky like: https://jsfiddle.net/urtwh9t7/2/
 - If a hint is worth 0, then don't include the point number in the feedback.
 - Change "default points" to "default score" in YAML config
 - In YAML config, "notes" should be allowed to be a list of MD-parsed strings (which we'll show as
   a HTML list)
+- Push the "dist/" folder to GitHub, so that people can use GradeFast without needing npm. (But,
+  with a big fat notice in the README that, if they modify any of the JS files, they'll need to
+  "npm run build" to see the effects)
 
 Grader TODOs:
 
-- After the end of the last submission, instead of returning, ask the user, "Hey, are you really
-  all done here?" And if they say yes, then return (and send the EndOfSubmissions event, etc.).
+- Implement output log (from command line param)
+- After the end of the last submission, instead of looping around, ask the user, "Hey, are you all
+  done here?" And if they say yes, then return (and send the EndOfSubmissions event, etc.).
   If they say no, then cycle back around to the first submission.
-- subprocess.CREATE_NEW_PROCESS_GROUP (if it's a background process). Then catch Ctrl-C manually
-  (in the "Waiting" stage) and do process.terminate(). Also test the current functionality on
-  linux; and this might be useful:
-  http://stackoverflow.com/questions/18255730/popen-new-process-group-on-linux
-- Better signaling between gradebook and grader (can still be 1-way, since the gradebook shouldn't
-  really have to communicate with the grader).
-  Things we could do with this:
-  - Make a section in the YAML commands to take the output of a command (or
-    the last line of output) and use that as the grade for a certain grading
-    item (identified by name... if there's more than 1, then they both get it)
-- Make "pre-run" and "post-cleanup" sections in the YAML file with commands to run before starting
-  any grading, and after all the grading is complete. (Store that the pre-run was run so that it'll
-  store in the savefile)
-- Option to "steal back" terminal/cmd window focus after running a command
-- For "folder"s in the command section of the YAML file, add "confirm" option that defaults to true,
-  but if set to false, skips the "Does this folder satisfy your innate human needs?" prompt
-- When running a command, ability to NOT do diff, or to enter a different diff filename. (same w/
-  input)
-- Add ability to specify a max running time for a process (useful for background commands), and
-  then some sort of action if it's cut off (like above idea of using program output as comment text)
-- When specifying a folder, add ability to specify "required files" that must be in the folder (and
-  option with it to look thru sub-folders to see if any match the requirement)
-- Keep track of the timestamps of when we start/finish a submission, so at the end we have some
-  interesting stats on how long it took us to grade.
-- Ability to filter which lines of output are shown based on a regex
 - Option for a command: to not do our wonky roundabout thing for stdin (i.e. just let it go thru
   automatically). Make sure to note that this means it won't be in the log.
     NOTE: Just have one option that will stop us from masking over ALL 3 pipes (stdin, stdout,
@@ -58,14 +36,39 @@ Grader TODOs:
   for the process to end before we do the diff). Pros: you get to see that the command is running,
   and provide input if needed. Cons: double output. (Should probably still be enabled by default,
   though).
+- subprocess.CREATE_NEW_PROCESS_GROUP, and make sure we catch Ctrl-C properly and do
+  process.terminate() (for the current foreground process, and for background processes when we're
+  in the "waiting" stage). Also test the current functionality on Linux; and this might be useful:
+  http://stackoverflow.com/questions/18255730/popen-new-process-group-on-linux
+- Make a section in the YAML commands to take the output of a command (or the last line of output)
+  and use that as the grade for a certain grading item (identified by name) -- OR to use the
+  output as the comment for a grade item
+- Make "pre-run" and "post-cleanup" sections in the YAML file with commands to run before starting
+  any grading, and after all the grading is complete. (Store that the pre-run was run so that it'll
+  store in the savefile)
+- Option to "steal back" terminal/cmd window focus after running a command
+- For "folder"s in the command section of the YAML file, add "confirm" option that defaults to true,
+  but if set to false, skips the "Does this folder satisfy your innate human needs?" prompt
+- When running a command, ask the user if they want to skip doing the diff, or to enter a different
+  diff filename. (same w/ being able to skip stdin)
+- Add ability to specify a max running time for a process (useful for background commands), and
+  then some sort of action if it's cut off (like above idea of using program output as comment text)
+- When specifying a folder, add ability to specify "required files" that must be in the folder (and
+  option with it to look thru sub-folders to see if any match the requirement)
+- Keep track of the timestamps of when we start/finish a submission, so at the end we have some
+  interesting stats on how long it took us to grade.
+- Ability to filter which lines of output are shown based on a regex (w/ "context", i.e. x lines
+  before/after)
 
 Big TODOs:
 
-- Save files (spec'd in YAML config)
+- SAVE FILES
 - In grade book, make a "note book" where we store commonly used notes, and we can access it by
   right-clicking in any of the comment boxes and it brings it up, and we can click on something to
   insert it at that point, or add a new one. It would show at the top the ones that were created on
   the comment box where we right-clicked, and then below it the ones created on other boxes.
+    - More useful alternative: right-clicking just shows snippets of previous content of that box
+    - Although they really should've been using hints :p
 - Add "shortcut" command to open a list of files in a given editor (or maybe just another option on
   a command to append this list to the end of the parameters). Then we can have an order for the
   files, and any extra other files in the dir can be appended to the end of the list.
@@ -76,6 +79,3 @@ Big TODOs:
       them to make sure they're different and, if not, delete the earlier one
     - Actually, in general, delete the earlier one for any submissions that have multiple
       submissions (unless one is on time and other is late)
-- Push the "dist/" folder to GitHub, so that people can use GradeFast without needing npm. (But,
-  with a big fat notice in the README that, if they modify any of the JS files, they'll need to
-  "npm run build" to see the effects)
