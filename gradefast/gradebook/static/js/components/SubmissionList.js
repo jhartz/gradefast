@@ -21,12 +21,12 @@ const SubmissionList = ({submissions, data_key}) => {
                             const logBase = CONFIG.BASE + "log/" + encodeURIComponent(submission.get("id"));
                             const logParams = "data_key=" + encodeURIComponent(data_key);
                             end_tds.push(
-                                <td>
+                                <td key={"CONDUCTOR"}>
                                     <a href={`${logBase}.html?${logParams}`} target="_blank">log</a>
                                 </td>
                             );
                             end_tds.push(
-                                <td>
+                                <td key={"CABOOSE"}>
                                     <a href={`${logBase}.txt?${logParams}`} target="_blank">text log</a>
                                 </td>
                             );

@@ -36,8 +36,12 @@ const GradeBook = React.createClass({
         } else if (this.props.list_visible) {
             // List of submissions
             headerContent = <span>Submissions</span>;
-            sectionContent = <SubmissionList submissions={this.props.list}
-                                             data_key={this.props.data_key}/>;
+            if (this.props.list.size) {
+                sectionContent = <SubmissionList submissions={this.props.list}
+                                                 data_key={this.props.data_key}/>;
+            } else {
+                sectionContent = this.getInspiration();
+            }
 
         } else if (this.props.submission_id !== null) {
             // An actual submission! It's almost like this is what we're actually here for
