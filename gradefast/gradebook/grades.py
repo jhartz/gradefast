@@ -8,6 +8,8 @@ Author: Jake Hartz <jake@hartz.io>
 
 from typing import Iterable, List, Optional, Tuple, Union
 
+from iochannels import MemoryLog
+
 from gradefast.gradebook import utils
 from gradefast.models import Submission
 
@@ -21,7 +23,7 @@ except ImportError:
     mistune = None
     has_markdown = False
 
-Path = Union[int, str]
+Path = List[Union[int, str]]
 Score = Union[int, float]
 # Will usually be passed to "make_number" to convert to a Score
 WeakScore = Union[Score, str]
@@ -684,7 +686,8 @@ class SubmissionGrade:
         """
         self.submission = submission
         self._grades = GradeRoot(grade_structure)
-        self._log_html = ""
+        self._html_logs: List[MemoryLog] = []
+        self._text_logs: List[MemoryLog] = []
 
         self._is_late = False
         self._overall_comments = ""
@@ -797,7 +800,7 @@ class SubmissionGrade:
             "is_late": self._is_late,
             "current_score": points_earned,
             "max_score": points_total,
-            "has_log": len(self._log_html) > 0
+            "has_log": len(self._html_logs) > 0 or len(self._text_logs) > 0
         })
         return data
 
@@ -808,8 +811,12 @@ class SubmissionGrade:
         self._overall_comments = overall_comments
         self._overall_comments_html = _markdown_to_html(overall_comments)
 
-    def append_log_html(self, log_html: str):
-        self._log_html += log_html
+    def append_logs(self, html_log: MemoryLog, text_log: MemoryLog):
+        self._html_logs.append(html_log)
+        self._text_logs.append(text_log)
 
-    def get_log_html(self) -> str:
-        return self._log_html
+    def get_html_logs(self) -> List[MemoryLog]:
+        return self._html_logs
+
+    def get_text_logs(self) -> List[MemoryLog]:
+        return self._text_logs

@@ -13,10 +13,12 @@ import mimetypes
 import queue
 import sys
 import threading
+import time
 import uuid
 from collections import OrderedDict
 from typing import Dict, List, Optional, Set, Union
 
+from iochannels import MemoryLog
 from pyprovide import inject
 
 from gradefast import events
@@ -200,19 +202,49 @@ class GradeBook:
             _logger.debug("Generating JSON export")
             return flask.Response(self._get_json(), mimetype="application/json")
 
-        # Log page
-        @app.route("/gradefast/log/<submission_id>")
-        def _gradefast_log__(submission_id):
+        # Log page (HTML)
+        @app.route("/gradefast/log/<submission_id>.html")
+        def _gradefast_log_html(submission_id):
             check_data_key()
             grade = self.get_grade(submission_id)
             if grade is None:
                 flask.abort(404)
             else:
+                content_html = "\n\n\n<hr>\n\n\n\n".join(
+                    "%s\n\n%s\n\n%s\n\n" % (
+                        "Started: " + time.asctime(time.localtime(log.open_timestamp)),
+                        log.get_content(),
+                        "Finished: " + time.asctime(time.localtime(log.close_timestamp))
+                        if log.close_timestamp else "..."
+                    )
+                    for log in grade.get_html_logs()
+                )
                 return flask.render_template(
                     "log.html",
                     title="Log for %s" % grade.submission.name,
-                    content_html=grade.get_log_html()
+                    content_html=content_html
                 )
+
+        # Log page (plain text)
+        @app.route("/gradefast/log/<submission_id>.txt")
+        def _gradefast_log_txt(submission_id):
+            check_data_key()
+            grade = self.get_grade(submission_id)
+            if grade is None:
+                flask.abort(404)
+            else:
+                def gen():
+                    yield "Log for %s\n" % grade.submission.name
+                    for log in grade.get_text_logs():
+                        yield "\n" + "=" * 79 + "\n"
+                        yield time.asctime(time.localtime(log.open_timestamp))
+                        if log.close_timestamp:
+                            yield " - "
+                            yield time.asctime(time.localtime(log.close_timestamp))
+                        yield "\n\n"
+                        yield log.get_content()
+                        yield "\n"
+                return flask.Response(gen(), mimetype="text/plain")
 
         # AJAX endpoint to request update and data keys
         # (can only be called once per client ID)
@@ -395,32 +427,23 @@ class GradeBook:
             "submissions": self.get_submission_list()
         }))
 
-    def set_current_submission(self, submission_id: int):
+    def set_current_submission(self, submission_id: int, html_log: MemoryLog, text_log: MemoryLog):
         """
-        Set a submission ID to be the current submission ID.
+        Set a submission ID to be the current submission ID, and add new html/text logs for it.
 
         :param submission_id: The ID of the submission.
+        :param html_log: A new HTMLMemoryLog that will be written to as the submission is graded.
+        :param text_log: A new MemoryLog that will be written to as the submission is graded.
         """
         assert submission_id in self._grades_by_submission_id
         self._current_submission_id = submission_id
+        self.get_grade(submission_id).append_logs(html_log, text_log)
 
         # Tell GradeBook clients about this change in the current submission
+        # (include the list of submissions so the clients have an updated idea of who has a log)
         self._send_client_update(clients.ClientUpdate.create_update_event("SUBMISSION_STARTED", {
+            "submissions": self.get_submission_list(),
             "submission_id": submission_id
-        }))
-
-    def log_submission(self, submission_id: int, log_html: str):
-        """
-        Add log info for a submission.
-
-        :param submission_id: The submission ID corresponding to the log.
-        :param log_html: The HTML log info.
-        """
-        self.get_grade(submission_id).append_log_html(log_html)
-
-        # Tell GradeBook clients about the list again, so they know that we have a log now
-        self._send_client_update(clients.ClientUpdate.create_update_event("NEW_SUBMISSION_LIST", {
-            "submissions": self.get_submission_list()
         }))
 
     def set_done(self, is_done: bool):

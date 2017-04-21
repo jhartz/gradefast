@@ -15,8 +15,23 @@ const SubmissionList = ({submissions, data_key}) => {
                             event.preventDefault();
                             store.dispatch(actions.goToSubmission(submission.get("id")));
                         };
-                        const logHref = CONFIG.BASE + "log/" + encodeURIComponent(submission.get("id")) +
-                            "?data_key=" + encodeURIComponent(data_key);
+
+                        const end_tds = [];
+                        if (submission.get("has_log")) {
+                            const logBase = CONFIG.BASE + "log/" + encodeURIComponent(submission.get("id"));
+                            const logParams = "data_key=" + encodeURIComponent(data_key);
+                            end_tds.push(
+                                <td>
+                                    <a href={`${logBase}.html?${logParams}`} target="_blank">log</a>
+                                </td>
+                            );
+                            end_tds.push(
+                                <td>
+                                    <a href={`${logBase}.txt?${logParams}`} target="_blank">text log</a>
+                                </td>
+                            );
+                        }
+
                         return (
                             <tr key={submission.get("id")}
                                 title={submission.get("full_name") + " (" + submission.get("path") + ")"}>
@@ -30,15 +45,16 @@ const SubmissionList = ({submissions, data_key}) => {
                                 </td>
                                 <td>
                                     <label>
-                                        {submission.get("current_score")} / {submission.get("max_score")}
+                                        {submission.get("current_score")}
+                                    </label>
+                                </td>
+                                <td style={{paddingLeft: "0"}}>
+                                    <label>
+                                        / {submission.get("max_score")}
                                         {submission.get("is_late") ? <em>&nbsp;&nbsp;(late)</em> : undefined}
                                     </label>
                                 </td>
-                                {submission.get("has_log")
-                                    ? <td>
-                                        <a href={logHref} target="_blank">log</a>
-                                      </td>
-                                    : undefined}
+                                {end_tds}
                             </tr>
                         );
                     })

@@ -15,6 +15,7 @@ import queue
 import threading
 from typing import List
 
+from iochannels import MemoryLog
 from pyprovide import Injector, inject
 
 from gradefast.models import Submission
@@ -200,19 +201,11 @@ class SubmissionStartedEvent(Event):
     """
     An event representing that a new submission is being graded.
     """
-    def __init__(self, submission_id: int):
+    def __init__(self, submission_id: int, html_log: MemoryLog, text_log: MemoryLog):
         super().__init__()
         self.submission_id = submission_id
-
-
-class SubmissionFinishedEvent(Event):
-    """
-    An event representing that a submission is done being graded.
-    """
-    def __init__(self, submission_id: int, log_html: str):
-        super().__init__()
-        self.submission_id = submission_id
-        self.log_html = log_html
+        self.html_log = html_log
+        self.text_log = text_log
 
 
 class EndOfSubmissionsEvent(Event):

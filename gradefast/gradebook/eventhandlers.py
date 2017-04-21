@@ -15,7 +15,6 @@ from gradefast import events
 __all__ = [
     "NewSubmissionListHandler",
     "SubmissionStartedHandler",
-    "SubmissionFinishedHandler",
     "EndOfSubmissionsHandler",
     "AuthGrantedEventHandler"
 ]
@@ -55,12 +54,8 @@ class NewSubmissionListHandler(GradeBookEventHandler, event="NewSubmissionListEv
 
 class SubmissionStartedHandler(GradeBookEventHandler, event="SubmissionStartedEvent"):
     def _handle_sync(self, event: events.SubmissionStartedEvent):
-        self.gradebook_instance.set_current_submission(event.submission_id)
-
-
-class SubmissionFinishedHandler(GradeBookEventHandler, event="SubmissionFinishedEvent"):
-    def _handle_sync(self, event: events.SubmissionFinishedEvent):
-        self.gradebook_instance.log_submission(event.submission_id, event.log_html)
+        self.gradebook_instance.set_current_submission(
+            event.submission_id, event.html_log, event.text_log)
 
 
 class EndOfSubmissionsHandler(GradeBookEventHandler, event="EndOfSubmissionsEvent"):

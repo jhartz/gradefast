@@ -7,6 +7,7 @@ Author: Jake Hartz <jake@hartz.io>
 """
 
 import platform
+import time
 
 import iochannels
 from pyprovide import InjectableClass, Module, class_provider, provider
@@ -28,18 +29,34 @@ class GradeFastLocalModule(Module):
     def provide_settings(self) -> Settings:
         return self._settings
 
-    @provider("Submission Log")
-    def provide_submission_log(self) -> iochannels.MemoryLog:
-        return iochannels.HTMLMemoryLog()
+    @provider("Output Log")
+    def provide_output_log(self, settings: Settings) -> iochannels.Log:
+        if not settings.log_file:
+            return iochannels.NullLog()
 
-    @provider(submission_log="Submission Log")
-    def provide_cli_channel(self, settings: Settings, submission_log: iochannels.MemoryLog) -> \
+        file = open(settings.log_file, "a")
+        if settings.log_as_html:
+            file.write("<h1>\n")
+        else:
+            file.write("=" * 79 + "\n")
+        file.write("GradeFast Log -- ")
+        file.write(time.asctime())
+        file.write("\n")
+        if settings.log_as_html:
+            file.write("</h1>\n")
+            return iochannels.HTMLFileLog(file)
+        else:
+            file.write("=" * 79 + "\n")
+            return iochannels.FileLog(file)
+
+    @provider(output_log="Output Log")
+    def provide_cli_channel(self, settings: Settings, output_log: iochannels.Log) -> \
             iochannels.Channel:
         if settings.use_color:
-            return iochannels.ColorCLIChannel(submission_log, use_readline=settings.use_readline,
+            return iochannels.ColorCLIChannel(output_log, use_readline=settings.use_readline,
                                               application_name_for_error="GradeFast")
         else:
-            return iochannels.CLIChannel(submission_log, use_readline=settings.use_readline)
+            return iochannels.CLIChannel(output_log, use_readline=settings.use_readline)
 
     @provider()
     def provide_host(self, local_host: hosts.LocalHost) -> hosts.Host:

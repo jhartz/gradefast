@@ -46,6 +46,8 @@ const updateTypeHandlers = {
     },
 
     SUBMISSION_STARTED(data) {
+        // Update our list of submissions
+        store.dispatch(actions.setSubmissionList(data.submissions));
         // Tell the forces at large to go to this submission
         store.dispatch(actions.goToSubmission(data.submission_id));
     },

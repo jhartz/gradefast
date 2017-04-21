@@ -24,10 +24,6 @@ GradeBook TODOs:
 
 Grader TODOs:
 
-- Implement output log (from command line param)
-- After the end of the last submission, instead of looping around, ask the user, "Hey, are you all
-  done here?" And if they say yes, then return (and send the EndOfSubmissions event, etc.).
-  If they say no, then cycle back around to the first submission.
 - Option for a command: to not do our wonky roundabout thing for stdin (i.e. just let it go thru
   automatically). Make sure to note that this means it won't be in the log.
     NOTE: Just have one option that will stop us from masking over ALL 3 pipes (stdin, stdout,

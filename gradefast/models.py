@@ -252,6 +252,7 @@ class Settings(NamedTuple):
     project_name: str
     save_file: Optional[LocalPath]
     log_file: Optional[LocalPath]
+    log_as_html: Optional[bool]
 
     # GradeBook settings
     grade_structure: List[dict]
@@ -288,6 +289,7 @@ class SettingsDefaults:
 
     save_file = None
     log_file = None
+    log_as_html = False
 
     # Grader settings
     submission_regex = None

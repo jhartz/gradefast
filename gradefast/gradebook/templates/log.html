@@ -5,15 +5,28 @@
 <title>{{ title }}</title>
 <style>
 body {
-    background-color: black;
+    margin: 0;
+    padding: 10px;
+
+    background-color: #121221;
     color: white;
-}
-pre {
     font-family: "Lucida Console", "Courier New", Courier, monospace;
+}
+
+pre {
+    margin: 0;
+    padding: 10px;
+    background-color: #010112;
+    border: 1px solid black;
+    border-radius: 9px;
+}
+
+hr {
+    margin: 20px 0;
 }
 </style>
 </head>
 <body>
-<pre>{{ content_html|safe }}</pre>
+{{ content_html|safe }}
 </body>
 </html>

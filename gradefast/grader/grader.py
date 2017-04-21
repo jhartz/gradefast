@@ -14,7 +14,7 @@ import re
 from collections import defaultdict
 from typing import Dict, List, Optional, Tuple, Union
 
-from iochannels import Channel, MemoryLog, Msg
+from iochannels import Channel, HTMLMemoryLog, MemoryLog, Msg
 from pyprovide import Injector, inject
 
 from gradefast import events
@@ -31,12 +31,11 @@ class Grader:
     Control the grading process and run commands on submissions.
     """
 
-    @inject(injector=Injector.CURRENT_INJECTOR, submission_log="Submission Log")
-    def __init__(self, injector: Injector, channel: Channel, submission_log: MemoryLog, host: Host,
+    @inject(injector=Injector.CURRENT_INJECTOR)
+    def __init__(self, injector: Injector, channel: Channel, host: Host,
                  event_manager: events.EventManager, settings: Settings):
         self.injector = injector
         self.channel: Channel = channel
-        self._submission_log: MemoryLog = submission_log
         self.host: Host = host
         self.event_manager: events.EventManager = event_manager
         self.settings: Settings = settings
@@ -222,23 +221,41 @@ class Grader:
                 # Add another folder of submissions
                 self.add_submissions(None)
             else:
-                # Run next_submission
-                self._submission_log.start_logging()
-                self.event_manager.dispatch_event(events.SubmissionStartedEvent(submission_id))
+                # Run the next submission
+
+                # Set up logs for the submission
+                html_log = HTMLMemoryLog()
+                text_log = MemoryLog()
+                self.channel.add_delegate(html_log, text_log)
+                self.event_manager.dispatch_event(events.SubmissionStartedEvent(
+                    submission_id, html_log, text_log))
 
                 runner = CommandRunner(self.injector, self.channel, self.host, self.settings,
                                        submission)
                 runner.run()
 
-                background_commands += runner.get_background_commands()
-                self.event_manager.dispatch_event(events.SubmissionFinishedEvent(
-                    submission_id, self._submission_log.get_log()))
+                # Stop the logs
+                html_log.close()
+                text_log.close()
 
-                # By default, we want to move on to the next submission in the list
-                if submission_id == total:
-                    submission_id = 1
-                else:
+                background_commands += runner.get_background_commands()
+
+                if submission_id != total:
+                    # By default, we want to move on to the next submission in the list
                     submission_id += 1
+                else:
+                    # Special case: we're at the end
+                    self.channel.print()
+                    self.channel.status_bordered("End of submissions!")
+                    loop = self.channel.prompt(
+                        "Loop back around to the front?", ["y", "n"],
+                        empty_choice_msg="C'mon, you're almost done; you can make a simple choice "
+                                         "between `yes' and `no'")
+                    if loop == "y":
+                        submission_id = 1
+                    else:
+                        # Well, they said they're done
+                        break
 
         # All done with everything
         self.event_manager.dispatch_event(events.EndOfSubmissionsEvent())
@@ -370,9 +387,13 @@ class CommandRunner:
         """
         _logger.info("Running commands for: %s", self._submission)
         try:
-            self._do_command_set(self.settings.commands,
-                                 self._check_folder(self._submission.path),
-                                 self.settings.base_env)
+            base_path = self._check_folder(self._submission.path)
+            if base_path is None:
+                _logger.info("Skipping submission because user didn't pick a folder")
+                self.channel.error("Skipping submission")
+                return
+
+            self._do_command_set(self.settings.commands, base_path, self.settings.base_env)
         except (InterruptedError, KeyboardInterrupt):
             self.channel.print("")
             self.channel.error("Submission interrupted")

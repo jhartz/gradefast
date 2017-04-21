@@ -109,6 +109,7 @@ def get_parser():
         help="A file to save all output to. This is usually better than using \"tee\" since it "
              "includes user input (stdin) as well. If a log file already exists at this path, it "
              "is appended to.\n"
+             "If the filename ends in \".html\" or \".htm\", then the output is logged as HTML.\n"
              "Default: [yaml filename].log (in the same directory as the YAML file)"
     )
     parser.add_argument(
@@ -181,6 +182,10 @@ def build_settings(args):
         log_file = LocalPath(os.path.join(yaml_directory, yaml_file_name + ".log"))
     logging.info("Log file: %s", log_file)
 
+    log_as_html = log_file.path.endswith(".html") or log_file.path.endswith(".htm")
+    if log_as_html:
+        logging.info("Logging as HTML")
+
     base_env = dict(os.environ)
     base_env.update({
         "SUPPORT_DIRECTORY": yaml_directory.path,
@@ -198,6 +203,7 @@ def build_settings(args):
     settings_builder.project_name = yaml_file_name
     settings_builder.save_file = save_file
     settings_builder.log_file = log_file
+    settings_builder.log_as_html = log_as_html
     # "grade_structure" filled from YAML file
     settings_builder.host = args.host
     settings_builder.port = args.port

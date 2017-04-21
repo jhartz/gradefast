@@ -83,3 +83,4 @@ def run_gradefast(injector: Injector, submission_paths: List[Path]):
         except (InterruptedError, KeyboardInterrupt):
             # Pretend that they pressed "Enter"
             channel.print()
+        channel.close()
