@@ -633,7 +633,10 @@ class CommandRunner:
                                    "\"content\", \"file\", \"submission_file\", or \"command\"")
 
         try:
-            output = self.host.run_command(command.command, path, environment, command.stdin)
+            if command.is_passthrough:
+                output = self.host.run_command_passthrough(command.command, path, environment)
+            else:
+                output = self.host.run_command(command.command, path, environment, command.stdin)
         except CommandStartError as e:
             self.channel.print()
             self.channel.error("Error starting command: {}", e.message)

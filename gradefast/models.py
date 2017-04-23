@@ -19,7 +19,8 @@ from typing import Dict, List, NamedTuple, Optional, Union
 
 
 class CommandItem:
-    __slots__ = ("name", "command", "environment", "is_background", "stdin", "diff", "version")
+    __slots__ = ("name", "command", "environment", "is_background", "is_passthrough", "stdin",
+                 "diff", "version")
 
     class Diff(NamedTuple):
         # ONE AND ONLY ONE of these 4 properties must be specified
@@ -32,12 +33,13 @@ class CommandItem:
         collapse_whitespace: bool
 
     def __init__(self, name: str, command: str, environment: Optional[Dict[str, str]] = None,
-                 is_background: Optional[bool] = False, stdin: Optional[str] = None,
-                 diff: Optional["Diff"] = None):
+                 is_background: Optional[bool] = False, is_passthrough: Optional[bool] = False,
+                 stdin: Optional[str] = None, diff: Optional["Diff"] = None):
         self.name = name
         self.command = command
         self.environment = environment or {}
         self.is_background = is_background or False
+        self.is_passthrough = is_passthrough or False
         self.stdin = stdin
         self.diff = diff
         self.version = 1
@@ -49,7 +51,7 @@ class CommandItem:
 
     def get_modified(self, new_command: str) -> "CommandItem":
         command_item = CommandItem(self.name, new_command, self.environment, self.is_background,
-                                   self.stdin, self.diff)
+                                   self.is_passthrough, self.stdin, self.diff)
         command_item.version += self.version
         return command_item
 

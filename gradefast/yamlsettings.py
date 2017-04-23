@@ -86,13 +86,28 @@ def _parse_commands(command_list: list) -> List[Command]:
             # It's a command item
             if "name" not in command_dict:
                 raise YAMLStructureError("Command item missing \"name\"")
+
+            is_background = command_dict.get("background")
+            is_passthrough = command_dict.get("passthrough") or command_dict.get("passthru")
+            stdin = command_dict.get("input") or command_dict.get("stdin")
+            diff_value = command_dict.get("diff")
+
+            if is_passthrough:
+                if is_background:
+                    raise YAMLStructureError("%s has both \"background\" and \"passthrough\" set")
+                if stdin:
+                    raise YAMLStructureError("%s has both \"passthrough\" and \"input\" set")
+                if diff_value:
+                    raise YAMLStructureError("%s has both \"passthrough\" and \"diff\" set")
+
             commands.append(CommandItem(
                 command_dict["name"],
                 command_dict["command"],
                 command_dict.get("environment"),
-                command_dict.get("background"),
-                command_dict.get("input") or command_dict.get("stdin"),
-                _parse_command_diff(command_dict.get("diff"))
+                is_background,
+                is_passthrough,
+                stdin,
+                _parse_command_diff(diff_value)
             ))
     return commands
 

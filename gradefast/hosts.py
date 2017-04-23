@@ -137,6 +137,21 @@ class Host:
         """
         raise NotImplementedError()
 
+    def run_command_passthrough(self, command: str, path: Path, environment: Dict[str, str]):
+        """
+        Execute a command on this host, without wrapping any input/output pipes or file
+        descriptors. If possible, this should let the child command talk directly to the terminal.
+
+        If there is an error when starting the command (e.g. command not found), a
+        CommandStartError will be raised. If there is an error running the command (e.g. the
+        command exited with a nonzero return code), a CommandRunError will be raised.
+
+        :param command: The command to run.
+        :param path: The working directory for the command.
+        :param environment: Any environmental variables for this command.
+        """
+        raise NotImplementedError()
+
     def start_background_command(self, command: str, path: Path, environment: Dict[str, str],
                                  stdin: Optional[str] = None) -> BackgroundCommand:
         """
@@ -428,10 +443,27 @@ class LocalHost(Host):
         self.logger.debug("Starting process %s (cwd: %s)", repr(command), local_path_str)
         try:
             return subprocess.Popen(command, cwd=local_path_str, env=environment,
-                                    universal_newlines=True, stdin=subprocess.PIPE,
-                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, **kwargs)
+                                    universal_newlines=True, **kwargs)
         except (NotADirectoryError, FileNotFoundError) as ex:
             raise CommandStartError("File or directory not found: " + str(ex))
+
+    def _start_process_with_pipes(self, command: str, path: Path, environment: Dict[str, str],
+                                  **kwargs) -> subprocess.Popen:
+        return self._start_process(command, path, environment, stdin=subprocess.PIPE,
+                                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT, **kwargs)
+
+    def _kill_process_gracefully(self, process: subprocess.Popen):
+        # Stop the process gracefully (with a "SIGTERM")
+        process.terminate()
+        # We won't leave until the process is actually dead
+        self.logger.debug("Waiting for process to die")
+        while process.poll() is None:
+            try:
+                process.wait()
+            except (InterruptedError, KeyboardInterrupt):
+                if process.poll() is None:
+                    # We tried being peaceful; this time, go for the "SIGKILL"
+                    process.kill()
 
     @staticmethod
     def _try_stdin_write(process: subprocess.Popen, stdin: str = None):
@@ -495,7 +527,7 @@ class LocalHost(Host):
         self.logger.info("Running command %s", repr(command))
 
         with self.channel.blocking_io() as (output_func, input_func, prompt_func):
-            process = self._start_process(command, path, environment, bufsize=0)
+            process = self._start_process_with_pipes(command, path, environment, bufsize=0)
 
             # Start a thread to handle the command's output
             output = io.StringIO()
@@ -531,18 +563,7 @@ class LocalHost(Host):
                     process.wait()
             except (InterruptedError, KeyboardInterrupt):
                 print_status_when_done.clear()
-                if process.poll() is None:
-                    # Stop the process gracefully (with a "SIGTERM")
-                    process.terminate()
-                    # We won't leave until the process is actually dead
-                    self.logger.debug("Waiting for process to die")
-                    while process.poll() is None:
-                        try:
-                            process.wait()
-                        except (InterruptedError, KeyboardInterrupt):
-                            if process.poll() is None:
-                                # We tried being peaceful; this time, go for the "SIGKILL"
-                                process.kill()
+                self._kill_process_gracefully(process)
                 LocalHost._try_stdin_close(process)
             t.join()
 
@@ -551,10 +572,21 @@ class LocalHost(Host):
         output.seek(0)
         return output.read()
 
+    def run_command_passthrough(self, command: str, path: Path, environment: Dict[str, str]):
+        self.logger.info("Running command without I/O wrapping: %s", repr(command))
+        process = self._start_process(command, path, environment)
+        try:
+            process.wait()
+        except (InterruptedError, KeyboardInterrupt):
+            self._kill_process_gracefully(process)
+
+        if process.returncode != 0:
+            raise CommandRunError("Command had nonzero return code: {}".format(process.returncode))
+
     def start_background_command(self, command: str, path: Path, environment: Dict[str, str],
                                  stdin: Optional[str] = None) -> BackgroundCommand:
         self.logger.info("Starting background command %s", repr(command))
-        process = self._start_process(command, path, environment, bufsize=0)
+        process = self._start_process_with_pipes(command, path, environment, bufsize=0)
         LocalHost._try_stdin_write(process, stdin)
         LocalHost._try_stdin_close(process)
         return LocalHost.LocalBackgroundCommand(process, command, path)
