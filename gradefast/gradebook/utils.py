@@ -7,38 +7,9 @@ Author: Jake Hartz <jake@hartz.io>
 """
 
 import json
-import traceback
 import uuid
 from collections import OrderedDict
 from typing import Any, Optional
-
-
-def print_error(*messages: Any, start="\n", sep: str = "\n", end="\n",
-                print_traceback: bool = False):
-    """
-    Print an error message, with details.
-
-    :param messages: The messages to include
-    :param start: A string to print before the error message. (If the grader is running, the user
-        is probably in the middle of some interaction. To interrupt them a teensy bit less, this
-        pads with some newlines by default.)
-    :param sep: The separator used to join items in "messages".
-    :param end: A string to print after the error messages (not including the line break at the end
-        of the last message).
-    :param print_traceback: Whether to include a traceback of the last exception.
-    """
-    message = sep.join(str(message) for message in messages)
-    if print_traceback:
-        message += "\n" + traceback.format_exc()
-
-    print(start, end="")
-    for line in message.split("\n"):
-        line = line.rstrip()
-        if line:
-            print("==>", line.rstrip())
-        else:
-            print()
-    print(end, end="")
 
 
 class GradeBookPublicError(Exception):
@@ -60,7 +31,7 @@ class GradeBookPublicError(Exception):
         return self.__class__.__name__
 
     def get_message(self) -> str:
-        return "%s: %s" % (self._get_error_name(), self._message)
+        return "{}: {}".format(self._get_error_name(), self._message)
 
     def get_details(self) -> OrderedDict:
         return self._details

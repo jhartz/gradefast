@@ -8,10 +8,8 @@ Author: Jake Hartz <jake@hartz.io>
 
 import csv
 import io
-import logging
 import mimetypes
 import queue
-import sys
 import threading
 import time
 import uuid
@@ -21,18 +19,18 @@ from typing import Dict, List, Optional, Set, Union
 from iochannels import MemoryLog
 from pyprovide import inject
 
-from gradefast import events
+from gradefast import events, required_package_error
 from gradefast.gradebook import clients, eventhandlers, grades, utils
+from gradefast.log import get_logger
 from gradefast.models import Settings, Submission
 
 try:
     import flask
 except ImportError:
     flask = None
-    utils.print_error("Couldn't find Flask package!", "Please install 'flask' and try again.")
-    sys.exit(1)
+    required_package_error("flask")
 
-_logger = logging.getLogger("gradebook")
+_logger = get_logger("gradebook")
 
 
 class GradeBook:
@@ -190,8 +188,8 @@ class GradeBook:
                     pass
 
             resp = flask.Response(gen(), mimetype="text/csv")
-            filename_param = 'filename="%s.csv"' % \
-                self.settings.project_name.replace("\\", "").replace('"', '\\"')
+            filename_param = 'filename="{}.csv"'.format(
+                self.settings.project_name.replace("\\", "").replace('"', '\\"'))
             resp.headers["Content-disposition"] = "attachment; " + filename_param
             return resp
 
@@ -211,7 +209,7 @@ class GradeBook:
                 flask.abort(404)
             else:
                 content_html = "\n\n\n<hr>\n\n\n\n".join(
-                    "%s\n\n%s\n\n%s\n\n" % (
+                    "{}\n\n{}\n\n{}\n\n".format(
                         "Started: " + time.asctime(time.localtime(log.open_timestamp)),
                         log.get_content(),
                         "Finished: " + time.asctime(time.localtime(log.close_timestamp))
@@ -221,7 +219,7 @@ class GradeBook:
                 )
                 return flask.render_template(
                     "log.html",
-                    title="Log for %s" % grade.submission.name,
+                    title="Log for {}".format(grade.submission.name),
                     content_html=content_html
                 )
 
@@ -234,7 +232,7 @@ class GradeBook:
                 flask.abort(404)
             else:
                 def gen():
-                    yield "Log for %s\n" % grade.submission.name
+                    yield "Log for {}\n".format(grade.submission.name)
                     for log in grade.get_text_logs():
                         yield "\n" + "=" * 79 + "\n"
                         yield time.asctime(time.localtime(log.open_timestamp))
@@ -260,7 +258,7 @@ class GradeBook:
 
             device = flask.request.form.get("device", "unknown device")
             event = events.AuthRequestedEvent("device: " + device)
-            _logger.debug("Client %s requesting auth (event %s); device: %s",
+            _logger.debug("Client {} requesting auth (event {}); device: {}",
                           client_id, event.event_id, device)
             self._auth_event_id_to_client_id[event.event_id] = client_id
             self.event_manager.dispatch_event(event)
@@ -294,11 +292,8 @@ class GradeBook:
             except utils.GradeBookPublicError as err:
                 return json_bad_request("GradeBook Error", **err.get_details())
 
-            except Exception as ex:
-                _logger.error("Non-public exception in _update handler: %s", ex)
-                utils.print_error("GRADEBOOK ERROR:",
-                                  "Non-public exception (%s) in _update handler" % str(ex),
-                                  print_traceback=True)
+            except:
+                _logger.exception("Non-public exception in _update handler")
                 return json_bad_request(
                     "Look what you did... (seriously, look in the server error console)")
 
@@ -312,7 +307,7 @@ class GradeBook:
             if events_key not in self._events_keys:
                 return flask.abort(401)
             client_id = self._events_keys[events_key]
-            _logger.debug("Client %s connected to _events", client_id)
+            _logger.debug("Client {} connected to _events", client_id)
 
             def gen():
                 update_queue = queue.Queue(999)
@@ -382,9 +377,7 @@ class GradeBook:
                 try:
                     self._client_update_queues[client_id].put_nowait(client_update)
                 except queue.Full:
-                    _logger.warning("Client %s event queue is full", client_id)
-                    utils.print_error("GRADEBOOK WARNING:",
-                                      "Client %s event queue is full" % client_id)
+                    _logger.warning("Client {} event queue is full", client_id)
 
     def auth_granted(self, auth_event_id: int):
         """
@@ -394,7 +387,7 @@ class GradeBook:
         client_id = self._auth_event_id_to_client_id[auth_event_id]
         assert client_id not in self._authenticated_client_ids
         assert client_id not in self._client_update_keys
-        _logger.debug("Authentication granted to client %s (event %s)", client_id, auth_event_id)
+        _logger.debug("Authentication granted to client {} (event {})", client_id, auth_event_id)
 
         self._authenticated_client_ids.add(client_id)
         data_key = uuid.uuid4()
@@ -509,7 +502,7 @@ class GradeBook:
         # Make the header row
         point_titles = grades.get_point_titles(self._grade_structure)
         row_titles = ["Name", "Total Score", "Percentage", "Feedback", ""] + \
-                     ["(%s) %s" % (points, title) for title, points in point_titles]
+                     ["({}) {}".format(points, title) for title, points in point_titles]
         csv_writer.writerow(row_titles)
 
         # Make the value rows

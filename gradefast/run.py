@@ -44,7 +44,8 @@ def run_gradefast(injector: Injector, submission_paths: List[Path]):
 
         # Give the user the grade book URL
         settings: Settings = injector.get_instance(Settings)
-        gradebook_url = "http://%s:%s/gradefast/gradebook" % (settings.host, settings.port)
+        gradebook_url = "http://{host}:{port}/gradefast/gradebook".format(host=settings.host,
+                                                                          port=settings.port)
         channel.print()
         channel.print_bordered("Grade Book URL: {}", gradebook_url)
         channel.print()

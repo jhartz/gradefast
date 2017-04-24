@@ -7,26 +7,27 @@ Licensed under the MIT License. For more, see the LICENSE file.
 Author: Jake Hartz <jake@hartz.io>
 """
 
-import sys
 from typing import Any, Dict, List, Optional, Union
 
+from gradefast import required_package_error
 from gradefast.models import Command, CommandItem, CommandSet, SettingsBuilder
 
 try:
     import yaml
 except ImportError:
     yaml = None
-    print("")
-    print("==> Couldn't find YAML package!")
-    print("==> Please install 'PyYAML' and try again.")
-    print("")
-    sys.exit(1)
+    required_package_error("yaml", "PyYAML")
 
 
 class YAMLStructureError(Exception):
     """
     Any error with the structure of the YAML configuration file.
     """
+
+    def __init__(self, base: str, *args, **kwargs):
+        if args or kwargs:
+            base = base.format(*args, **kwargs)
+        super().__init__(base)
 
 
 def _load_yaml_data(yaml_file) -> dict:
@@ -52,7 +53,7 @@ def _load_yaml_data(yaml_file) -> dict:
             raise YAMLStructureError("Found unexpected top-level key: \"config\" "
                                      "(did you mean \"settings\"?")
         if key not in ("grades", "commands", "settings"):
-            raise YAMLStructureError("Found unexpected top-level key: \"%s\"" % key)
+            raise YAMLStructureError("Found unexpected top-level key: \"{}\"", key)
 
     return yaml_data
 
@@ -65,14 +66,14 @@ def _parse_commands(command_list: list) -> List[Command]:
     for command_dict in command_list:
         display_name = command_dict.get("name")
         if display_name:
-            display_name = 'Command "%s"' % display_name
+            display_name = 'Command "{}"'.format(display_name)
         else:
             display_name = "Command"
 
         if "command" not in command_dict and "commands" not in command_dict:
-            raise YAMLStructureError("%s missing \"command\" or \"commands\"" % display_name)
+            raise YAMLStructureError("{} missing \"command\" or \"commands\"", display_name)
         if "command" in command_dict and "commands" in command_dict:
-            raise YAMLStructureError("%s has both \"command\" and \"commands\"" % display_name)
+            raise YAMLStructureError("{} has both \"command\" and \"commands\"", display_name)
 
         if "commands" in command_dict:
             # It's a command set
@@ -94,15 +95,18 @@ def _parse_commands(command_list: list) -> List[Command]:
 
             if is_passthrough:
                 if is_background:
-                    raise YAMLStructureError("%s has both \"background\" and \"passthrough\" set")
+                    raise YAMLStructureError("{} has both \"background\" and \"passthrough\" set",
+                                             display_name)
                 if stdin:
-                    raise YAMLStructureError("%s has both \"passthrough\" and \"input\" set")
+                    raise YAMLStructureError("{} has both \"passthrough\" and \"input\" set",
+                                             display_name)
                 if diff_value:
-                    raise YAMLStructureError("%s has both \"passthrough\" and \"diff\" set")
+                    raise YAMLStructureError("{} has both \"passthrough\" and \"diff\" set",
+                                             display_name)
 
             commands.append(CommandItem(
-                command_dict["name"],
-                command_dict["command"],
+                command_dict["name"].strip(),
+                command_dict["command"].rstrip(),
                 command_dict.get("environment"),
                 is_background,
                 is_passthrough,
@@ -160,10 +164,10 @@ def _parse_settings(settings_dict: dict) -> Dict[str, Any]:
         if key in yaml_key_to_setting:
             setting = yaml_key_to_setting[key]
             if not setting_type_checks[setting](value):
-                raise YAMLStructureError("Invalid type for setting: %s" % key)
+                raise YAMLStructureError("Invalid type for setting: {}", key)
             settings[setting] = value
         else:
-            raise YAMLStructureError("Invalid setting: %s" % key)
+            raise YAMLStructureError("Invalid setting: {}", key)
 
     return settings
 

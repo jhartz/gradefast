@@ -18,13 +18,12 @@ if sys.version_info < (3, 6):
     sys.exit(1)
 
 import argparse
-import logging
 import os
 from typing import Optional
 
 from pyprovide import Injector
 
-from gradefast import yamlsettings
+from gradefast import log, yamlsettings
 from gradefast.config.local import GradeFastLocalModule
 from gradefast.hosts import LocalHost
 from gradefast.models import LocalPath
@@ -59,12 +58,12 @@ def get_parser():
     )
     parser.add_argument(
         "--host",
-        help="The hostname to run the gradebook HTTP server on.\nDefault: %s" % DEFAULT_HOST,
+        help="The hostname to run the gradebook HTTP server on.\nDefault: {}".format(DEFAULT_HOST),
         default=DEFAULT_HOST
     )
     parser.add_argument(
         "--port",
-        help="The port to run the gradebook HTTP server on.\nDefault: %s" % DEFAULT_PORT,
+        help="The port to run the gradebook HTTP server on.\nDefault: {}".format(DEFAULT_PORT),
         default=DEFAULT_PORT
     )
     parser.add_argument(
@@ -131,22 +130,6 @@ def get_parser():
     return parser
 
 
-def init_logging(log_file: str):
-    logging.basicConfig(
-        filename=log_file,
-        level=logging.DEBUG,
-        format="%(asctime)s  %(threadName)-11s %(levelname)-5s [%(name)s]  %(message)s"
-    )
-
-
-def disable_logging():
-    logging.basicConfig(level=logging.CRITICAL)
-
-
-def shutdown_logging():
-    logging.shutdown()
-
-
 def _absolute_path_if_exists(item: str, base: LocalPath) -> Optional[str]:
     # Search order: working directory, YAML file directory
     if not item:
@@ -160,11 +143,13 @@ def _absolute_path_if_exists(item: str, base: LocalPath) -> Optional[str]:
 
 
 def build_settings(args):
+    logger = log.get_logger("build_settings")
+
     yaml_file_path = os.path.abspath(args.yaml_file)
-    logging.info("YAML file: %s", yaml_file_path)
+    logger.info("YAML file: {}", yaml_file_path)
     if not os.path.isfile(yaml_file_path):
-        logging.info("(not found)")
-        print("YAML file not found: %s" % yaml_file_path)
+        logger.info("(not found)")
+        print("YAML file not found:", yaml_file_path)
         sys.exit(1)
 
     yaml_file_name = os.path.splitext(os.path.basename(yaml_file_path))[0]
@@ -174,17 +159,17 @@ def build_settings(args):
         save_file = LocalPath(os.path.abspath(args.save_file))
     else:
         save_file = LocalPath(os.path.join(yaml_directory, yaml_file_name + ".save.data"))
-    logging.info("Save file: %s", save_file)
+    logger.info("Save file: {}", save_file)
 
     if args.log_file:
         log_file = LocalPath(os.path.abspath(args.log_file))
     else:
         log_file = LocalPath(os.path.join(yaml_directory, yaml_file_name + ".log"))
-    logging.info("Log file: %s", log_file)
+    logger.info("Log file: {}", log_file)
 
     log_as_html = log_file.path.endswith(".html") or log_file.path.endswith(".htm")
     if log_as_html:
-        logging.info("Logging as HTML")
+        logger.info("Logging as HTML")
 
     base_env = dict(os.environ)
     base_env.update({
@@ -224,11 +209,7 @@ def build_settings(args):
 
 def main():
     args = get_parser().parse_args()
-    if args.debug_file:
-        init_logging(args.debug_file)
-    else:
-        disable_logging()
-    logging.info("STARTING GRADEFAST")
+    log.init_logging(args.debug_file)
 
     settings = build_settings(args)
 
@@ -255,8 +236,7 @@ def main():
     run_gradefast(injector, submission_paths)
 
     # Make sure that all of our doors are shut for the winter
-    logging.info("SHUTTING DOWN GRADEFAST")
-    shutdown_logging()
+    log.shutdown_logging()
     os._exit(0)
 
 

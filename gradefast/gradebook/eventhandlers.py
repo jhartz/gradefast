@@ -6,9 +6,8 @@ Licensed under the MIT License. For more, see the LICENSE file.
 Author: Jake Hartz <jake@hartz.io>
 """
 
-import logging
-
 from gradefast import events
+from gradefast.log import get_logger
 
 # All concrete event handlers should be listed here.
 # This is used by the register_all_event_handlers method of EventManager.
@@ -19,7 +18,7 @@ __all__ = [
     "AuthGrantedEventHandler"
 ]
 
-_logger = logging.getLogger("gradebook.eventhandlers")
+_logger = get_logger("gradebook.eventhandlers")
 
 
 class GradeBookEventHandler(events.EventNameHandler, event=None):
@@ -38,9 +37,9 @@ class GradeBookEventHandler(events.EventNameHandler, event=None):
         self.gradebook_instance = gradebook_instance
 
     def handle(self, event: events.Event):
-        _logger.debug("%s got event %s", self.__class__.__name__, event)
+        _logger.debug("{} got event {}", self.__class__.__name__, event)
         with self.gradebook_instance.event_lock:
-            _logger.info("%s handling event %s", self.__class__.__name__, event)
+            _logger.info("{} handling event {}", self.__class__.__name__, event)
             self._handle_sync(event)
 
     def _handle_sync(self, event: events.Event):

@@ -10,7 +10,6 @@ Author: Jake Hartz <jake@hartz.io>
 """
 
 import itertools
-import logging
 import queue
 import threading
 from typing import List
@@ -18,9 +17,10 @@ from typing import List
 from iochannels import MemoryLog
 from pyprovide import Injector, inject
 
+from gradefast.log import get_logger
 from gradefast.models import Submission
 
-_logger = logging.getLogger("events")
+_logger = get_logger("events")
 
 
 class Event:
@@ -40,6 +40,9 @@ class Event:
             self.event_id = Event._last_event_id
 
     def get_name(self) -> str:
+        return self.__class__.__name__
+
+    def __str__(self) -> str:
         return self.__class__.__name__
 
 
@@ -67,6 +70,9 @@ class EventHandler:
         fresh thread (different from the one that called "accept").
         """
         raise NotImplementedError()
+
+    def __str__(self) -> str:
+        return self.__class__.__name__
 
 
 class EventNameHandler(EventHandler):
@@ -114,7 +120,7 @@ class EventManager:
             for handler in self._handlers:
                 if handler.accept(event):
                     threading.Thread(
-                        name="EventTh-%02d" % next(count),
+                        name="EventTh-{:02}".format(next(count)),
                         target=handler.handle,
                         args=(event,),
                         daemon=True
@@ -125,7 +131,8 @@ class EventManager:
         Register one or more new event handler instances that will be called for any future event
         dispatches.
         """
-        _logger.info("Registering event handlers %s", event_handlers)
+        _logger.info("Registering event handlers: {}",
+                     ", ".join(str(h) for h in event_handlers))
         self._handlers += event_handlers
 
     def register_event_handler_classes(self, *event_handler_classes):
@@ -136,7 +143,8 @@ class EventManager:
         Instances of these classes are created using the same injector that was used when creating
         the EventManager (so the classes' constructors should be decorated with "@inject()").
         """
-        _logger.info("Registering event handler classes %s", event_handler_classes)
+        _logger.info("Registering event handler classes: {}",
+                     ", ".join(str(c) for c in event_handler_classes))
         self._handlers += [self.injector.get_instance(cls) for cls in event_handler_classes]
 
     def register_all_event_handlers(self, module):
@@ -196,6 +204,9 @@ class NewSubmissionListEvent(Event):
         super().__init__()
         self.submissions = submissions
 
+    def __str__(self) -> str:
+        return "{} ({} submissions)".format(super().__str__(), len(self.submissions))
+
 
 class SubmissionStartedEvent(Event):
     """
@@ -206,6 +217,9 @@ class SubmissionStartedEvent(Event):
         self.submission_id = submission_id
         self.html_log = html_log
         self.text_log = text_log
+
+    def __str__(self) -> str:
+        return "{} (submission ID {})".format(super().__str__(), self.submission_id)
 
 
 class EndOfSubmissionsEvent(Event):
@@ -240,3 +254,6 @@ class AuthGrantedEvent(Event):
     def __init__(self, auth_event_id: int):
         super().__init__()
         self.auth_event_id = auth_event_id
+
+    def __str__(self) -> str:
+        return "{} (auth event ID was {})".format(super().__str__(), self.auth_event_id)

@@ -6,12 +6,11 @@ Licensed under the MIT License. For more, see the LICENSE file.
 Author: Jake Hartz <jake@hartz.io>
 """
 
-import logging
-
 from iochannels import Channel, Msg, DEFAULT_BAD_CHOICE_MSG
 from pyprovide import inject
 
 from gradefast import events
+from gradefast.log import get_logger
 
 # All concrete event handlers should be listed here.
 # This is used by the register_all_event_handlers method of EventManager.
@@ -19,7 +18,7 @@ __all__ = [
     "AuthRequestedEventHandler"
 ]
 
-_logger = logging.getLogger("grader.eventhandlers")
+_logger = get_logger("grader.eventhandlers")
 
 
 class AuthRequestedEventHandler(events.EventNameHandler, event="AuthRequestedEvent"):
@@ -29,7 +28,7 @@ class AuthRequestedEventHandler(events.EventNameHandler, event="AuthRequestedEve
         self.event_manager = event_manager
 
     def handle(self, event: events.AuthRequestedEvent):
-        _logger.info("Handling AuthRequestedEvent (event %s)", event.event_id)
+        _logger.info("Handling AuthRequestedEvent (event {})", event.event_id)
 
         with self.channel.blocking_io() as (output_func, input_func, prompt_func):
             lines = [
@@ -52,6 +51,6 @@ class AuthRequestedEventHandler(events.EventNameHandler, event="AuthRequestedEve
             output_func(separator)
             output_func(Msg().print())
 
-        _logger.debug("Handling AuthRequestedEvent: Did user allow? %s", choice)
+        _logger.debug("Handling AuthRequestedEvent: Did user allow? {}", choice)
         if choice == "y":
             self.event_manager.dispatch_event(events.AuthGrantedEvent(event.event_id))

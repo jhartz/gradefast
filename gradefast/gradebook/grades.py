@@ -10,7 +10,9 @@ from typing import Iterable, List, Optional, Tuple, Union
 
 from iochannels import MemoryLog
 
+from gradefast import required_package_warning
 from gradefast.gradebook import utils
+from gradefast.log import get_logger
 from gradefast.models import Submission
 
 try:
@@ -18,8 +20,7 @@ try:
     _markdown = mistune.Markdown(renderer=mistune.Renderer(hard_wrap=True))
     has_markdown = True
 except ImportError:
-    utils.print_error("Couldn't find mistune package!",
-                      "Comments and hints will not be Markdown-parsed.")
+    required_package_warning("mistune", "Comments and hints will not be Markdown-parsed.")
     mistune = None
     has_markdown = False
 
@@ -30,36 +31,55 @@ WeakScore = Union[Score, str]
 # "Plain Old Data"
 POD = Union[list, dict]
 
-FEEDBACK_HTML_TEMPLATES = {
-    # (content)
-    "base": """<div style="font-family: Helvetica, Arial, sans-serif; """
-            """font-size: 10pt; line-height: 1.3;">%s"""
-            """<p style="font-size: 11pt;">%s</p></div>""",
+_logger = get_logger("gradebook.grades")
 
-    # (points added/deducted, reason); used by GradeScore and GradeSection for hints
-    "credit": """<div style="text-indent: -20px; margin-left: 20px;"><b>%+d:</b> %s</div>""",
 
-    # (title, points earned, total points)
-    "section_header_top": "<p><b><u>%s</u></b><br>Section Score: %s / %s</p>",
-    "section_header": "<p><u>%s</u><br>Section Score: %s / %s</p>",
-    # (points deducted, percentage deducted)
-    "section_deduction": """<p><b>-%s</b> (%s%%)<b>:</b> <i>Turned in late</i></p>""",
-    # (content)
-    "section_body": """<div style="margin-left: 15px;">%s</div>""",
+class FeedbackHTMLTemplates:
+    base = """\
+<div style="font-family: Helvetica, Arial, sans-serif; font-size: 10pt; line-height: 1.3;">
+{content}
 
-    # (title, score)
-    "item_header_top": """<p><b><u>%s</u></b><br>%s</p>""",
-    "item_header": """<p><u>%s</u><br>%s</p>""",
-    # (points earned, total points)
-    "item_score": """Score: %s / %s""",
-    # (points)
-    "item_score_bonus": """%+d Points""",
-    # (content)
-    "item_body": """<p>%s</p>"""
-}
+<div style="font-size: 10.5pt;">
+{overall_comments}
+</div>
+</div>"""
+
+    hint = """
+<div style="text-indent: -20px; margin-left: 20px;">
+<b>{points:+}:</b> {reason}
+</div>"""
+
+    section_header = """
+<p>
+<u>{title}</u><br>
+Section Score: {points_earned} / {points_possible}
+</p>"""
+
+    section_late = """
+<p><b>{points:+}</b> ({percentage}%)<b>:</b> <i>Turned in late</i></p>"""
+
+    section_body = """
+<div style="margin-left: 15px;">
+{content}
+</div>"""
+
+    item_header = """
+<p>
+<u>{title}</u><br>
+{content}
+</p>"""
+
+    item_score = "Score: {points_earned} / {points_possible}"
+    item_score_bonus = "{points:+} Points"
+
+    item_comments = """
+<div>
+{content}
+</div>"""
 
 
 def _markdown_to_html(text: str, inline_only: bool = False) -> str:
+    text = text.rstrip()
     if not has_markdown:
         html = text.replace("&", "&amp;")   \
                    .replace("\"", "&quot;") \
@@ -73,11 +93,22 @@ def _markdown_to_html(text: str, inline_only: bool = False) -> str:
         else:
             html = html.replace('<p>', '<p style="margin: 3px 0">')
 
-        # Stylize code tags (even though MyCourses cuts out the background anyway...)
+        # WARNING: MyCourses (Desire2Learn platform) will cut out any colors provided in "rgba"
+        # format for any CSS properties in the "style" attribute
+        CODE_STYLE = "background-color: #f5f5f5; padding: 1px 3px; border: 1px solid #cccccc; " \
+                     "border-radius: 4px;"
+        # Make <code> tags prettier
         html = html.replace(
             '<code>',
-            '<code style="background-color: rgba(0, 0, 0, 0.04); padding: 1px 3px; '
-            'border: 1px solid rgba(0, 0, 0, 0.2); border-radius: 5px;">')
+            '<code style="' + CODE_STYLE + '">')
+        # Except where we have a case of <pre><code>, then apply it to the <pre> instead
+        html = html.replace(
+            '<pre><code style="' + CODE_STYLE + '">',
+            '<pre style="' + CODE_STYLE + '"><code>')
+
+    html = html.rstrip()
+    if html.endswith('<br>'):
+        html = html[:-4].rstrip()
 
     return html
 
@@ -140,12 +171,9 @@ def check_grade_structure(st: list, _path: List[int] = None) -> bool:
     if _path is None:
         _path = []
 
-    def warn(*args):
-        utils.print_error("STRUCTURE WARNING:", *args, start="", sep=" ", end="")
-
-    def error(*args):
+    def error(base, *args, **kwargs):
         nonlocal found_error
-        utils.print_error("STRUCTURE ERROR:", *args, start="", sep=" ", end="")
+        _logger.error("STRUCTURE ERROR: " + base, *args, **kwargs)
         found_error = True
 
     if not isinstance(st, list):
@@ -157,22 +185,25 @@ def check_grade_structure(st: list, _path: List[int] = None) -> bool:
         path = _path.copy()
         path.append(index)
 
+        # Used for error messages
+        title = "#" + ".".join(str(p) for p in path)
+
         # Check "name"
         if "name" not in grade or not isinstance(grade["name"], str) or not grade["name"]:
-            error("Grade item", path, "missing a name")
-
-        # Make sure the name is trimmed of trailing whitespace
-        grade["name"] = grade["name"].strip()
-
-        # Make sure the name is unique (among the others in this section)
-        if grade["name"] in used_names:
-            error("Grade item", path, "has name", grade["name"],
-                  "that was already used in this section")
+            error("Grade item {} missing a name", title)
         else:
-            used_names.add(grade["name"])
+            # Make sure the name is trimmed of trailing whitespace
+            grade["name"] = grade["name"].strip()
 
-        # This title is used in all of the rest of the error messages
-        title = "#" + ".".join(str(p) for p in path) + " (\"" + grade["name"] + "\")"
+            # Make sure the name is unique (among the others in this section)
+            if grade["name"] in used_names:
+                error("Grade item {} has name {} that was already used in this section",
+                      title, grade["name"])
+            else:
+                used_names.add(grade["name"])
+
+            # This title is used in all of the rest of the error messages
+            title += " (\"" + grade["name"] + "\")"
 
         # Check stuff specific to grade sections
         if "grades" in grade:
@@ -181,7 +212,7 @@ def check_grade_structure(st: list, _path: List[int] = None) -> bool:
                 grade["deduct percent if late"] = grade["deductPercentIfLate"]
             if "deduct percent if late" in grade:
                 if grade["deduct percent if late"] < 0 or grade["deduct percent if late"] > 100:
-                    error("Grade section", title, "has an invalid \"deduct percent if late\"")
+                    error("Grade section {} has an invalid \"deduct percent if late\"", title)
 
             found_error = check_grade_structure(grade["grades"], path) or found_error
 
@@ -189,23 +220,23 @@ def check_grade_structure(st: list, _path: List[int] = None) -> bool:
         elif "points" in grade:
             # Check "points"
             if grade["points"] < 0:
-                error("Points in grade score", title, "must be at least zero")
+                error("Points in grade score {} must be at least zero", title)
 
             # Check "default points"
             if "default points" in grade:
                 if grade["default points"] < 0:
-                    error("Default points in grade score", title, "must be at least zero")
+                    error("Default points in grade score {} must be at least zero", title)
                 if grade["default points"] > grade["points"]:
-                    error("Default points in grade score", title, "must be less than total points")
+                    error("Default points in grade score {} must be less than total points", title)
         else:
-            error("Grade item", title, "needs one of either \"points\" or \"grades\"")
+            error("Grade item {} needs one of either \"points\" or \"grades\"", title)
 
         # Check for old, deprecated versions of "hints"
         bad_hints = []
         for old in ["section deductions", "deductions", "point hints"]:
             if old in grade:
-                warn("Found deprecated \"%s\"" % old, "in grade item", title,
-                     "(converted to hints)")
+                _logger.warning("Found deprecated \"{}\" in grade item {} (converted to hints)",
+                                old, title)
                 bad_hints += grade[old]
         if len(bad_hints):
             if "hints" not in grade:
@@ -220,17 +251,17 @@ def check_grade_structure(st: list, _path: List[int] = None) -> bool:
         if "hints" in grade:
             for hint in grade["hints"]:
                 if "name" not in hint:
-                    error("Hint in", title, "missing name")
+                    error("Hint in {} missing name", title)
                 hint["name"] = hint["name"].strip()
                 if "value" not in hint:
-                    warn("Hint \"%s\"" % hint["name"], "in grade item", title,
-                         "is missing a \"value\"; assuming \"0\"")
+                    _logger.warning('Hint "{}" in grade item {} is missing a "value"; assuming "0"',
+                                    hint["name"], title)
                     hint["value"] = 0
                 try:
                     hint["value"] = _make_number(hint["value"])
                 except BadValueError as ex:
-                    error("Hint \"%s\"" % hint["name"], "in grade item", title,
-                          "has a bad \"value\" (%s)" % ex.get_message())
+                    error("Hint \"{}\" in grade item {} has a bad \"value\" ({})",
+                          hint["name"], title, ex.get_message())
 
     return not found_error
 
@@ -437,33 +468,33 @@ class GradeScore(GradeItem):
         return score, self._points, [(self._name, score)]
 
     def get_feedback(self, is_late: bool, depth: int = 0) -> str:
-        # Bolded header only if depth 2 or less
-        header_name = "item_header"
-        if depth < 2:
-            header_name += "_top"
-
-        # Start off with the score
-        # (although we skip the score if it's 0 out of 0)
+        # Start off with the score (although we skip the score if it's 0 out of 0)
         score, points, _ = self.get_score(is_late)
         score_feedback = ""
         if score and not points:
             # No total points, but still points earned
-            score_feedback = FEEDBACK_HTML_TEMPLATES["item_score_bonus"] % score
+            score_feedback = FeedbackHTMLTemplates.item_score_bonus.format(points=score)
         elif points:
             # We have total points, and possibly points earned
-            score_feedback = FEEDBACK_HTML_TEMPLATES["item_score"] % (score, points)
+            score_feedback = FeedbackHTMLTemplates.item_score.format(points_earned=score,
+                                                                     points_possible=points)
 
         # Generate dat feedback
-        feedback = FEEDBACK_HTML_TEMPLATES[header_name] % (self._name_html, score_feedback)
+        item_title = self._name_html
+        if depth < 2:
+            item_title = "<b>" + item_title + "</b>"
+        feedback = FeedbackHTMLTemplates.item_header.format(title=item_title,
+                                                            content=score_feedback)
 
         # Add hints, if applicable
         for index, hint in enumerate(self._hints):
             if self._hints_set.get(index):
-                feedback += FEEDBACK_HTML_TEMPLATES["credit"] % (hint["value"], hint["name_html"])
+                feedback += FeedbackHTMLTemplates.hint.format(points=hint["value"],
+                                                              reason=hint["name_html"])
 
         # Now, add any comments
         if self._comments:
-            feedback += FEEDBACK_HTML_TEMPLATES["item_body"] % self._comments_html
+            feedback += FeedbackHTMLTemplates.item_comments.format(content=self._comments_html)
 
         return feedback
 
@@ -559,36 +590,32 @@ class GradeSection(GradeItem):
         return points_earned, points_possible, individual_points
 
     def get_feedback(self, is_late: bool, depth: int = 0) -> str:
-        # Get the score for this section
         points_earned, points_possible, _ = self.get_score(is_late)
 
-        # Add the name of this grading section, the total score, and any
-        # deduction feedback
-        header_name = "section_header"
+        # Add the title and overall points earned / points possible
+        section_title = self._name_html
         if depth < 2:
-            header_name += "_top"
-        feedback = FEEDBACK_HTML_TEMPLATES[header_name] % (
-            self._name_html,
-            points_earned,
-            points_possible
-        )
+            section_title = "<b>" + section_title + "</b>"
+        feedback = FeedbackHTMLTemplates.section_header.format(title=section_title,
+                                                               points_earned=points_earned,
+                                                               points_possible=points_possible)
 
         # Add hint feedback
         for index, hint in enumerate(self._hints):
             if self._hints_set.get(index):
-                feedback += FEEDBACK_HTML_TEMPLATES["credit"] % (hint["value"], hint["name_html"])
+                feedback += FeedbackHTMLTemplates.hint.format(points=hint["value"],
+                                                              reason=hint["name_html"])
 
         # Add lateness feedback if necessary
         if is_late and self._late_deduction:
-            feedback += FEEDBACK_HTML_TEMPLATES["section_deduction"] % (
-                _get_late_deduction(points_earned, self._late_deduction),
-                self._late_deduction
-            )
+            feedback += FeedbackHTMLTemplates.section_late.format(
+                points=-_get_late_deduction(points_earned, self._late_deduction),
+                percentage=self._late_deduction)
 
         # Add the feedback for any children
-        feedback += FEEDBACK_HTML_TEMPLATES["section_body"] % \
-            "\n".join(item.get_feedback(is_late, depth + 1)
-                      for item in self.enumerate_enabled_children())
+        feedback += FeedbackHTMLTemplates.section_body.format(
+            content="\n".join(item.get_feedback(is_late, depth + 1)
+                              for item in self.enumerate_enabled_children()))
 
         return feedback
 
@@ -709,7 +736,7 @@ class SubmissionGrade:
             for index in path_indexes:
                 item = item.children[index]
         except (ValueError, IndexError, AttributeError) as ex:
-            raise BadPathError("Error parsing path %s" % path, exception=ex)
+            raise BadPathError("Error parsing path {}".format(path), exception=ex)
 
         return item
 
@@ -757,7 +784,7 @@ class SubmissionGrade:
         try:
             self.get_by_path(path).replace_hint(index, name, value)
         except (ValueError, IndexError) as ex:
-            raise BadPathError("Invalid hint index %s at path %s" % (index, path), exception=ex)
+            raise BadPathError("Invalid hint index {} at path {}".format(index, path), exception=ex)
 
     def get_score(self) -> Tuple[Score, Score, List[Tuple[str, Score]]]:
         """
@@ -772,8 +799,8 @@ class SubmissionGrade:
         """
         Patch together all the grade comments for this submission.
         """
-        return FEEDBACK_HTML_TEMPLATES["base"] % (self._grades.get_feedback(self._is_late),
-                                                  self._overall_comments_html)
+        return FeedbackHTMLTemplates.base.format(content=self._grades.get_feedback(self._is_late),
+                                                 overall_comments=self._overall_comments_html)
 
     def to_plain_data(self) -> POD:
         """

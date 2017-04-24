@@ -46,7 +46,7 @@ class CommandItem:
 
     def get_name(self):
         if self.version > 1:
-            return "%s (%s)" % (self.name, self.version)
+            return "{} ({})".format(self.name, self.version)
         return self.name
 
     def get_modified(self, new_command: str) -> "CommandItem":
@@ -56,7 +56,7 @@ class CommandItem:
         return command_item
 
     def __str__(self):
-        return "%s: %s" % (self.get_name(), repr(self.command))
+        return "{}: {!r}".format(self.get_name(), self.command)
 
 
 class CommandSet:
@@ -163,7 +163,7 @@ class Path:
         return self._path
 
     def __repr__(self):
-        return "Path(%s)" % repr(self._path)
+        return "Path({!r})".format(self._path)
 
     def __eq__(self, other):
         if not isinstance(other, Path):
@@ -196,7 +196,7 @@ class LocalPath(PathLike):
         return self.path
 
     def __repr__(self):
-        return "LocalPath(%s)" % repr(self.path)
+        return "LocalPath({!r})".format(self.path)
 
     def __eq__(self, other):
         if not isinstance(other, LocalPath):
@@ -233,7 +233,7 @@ class Submission:
 
     def __str__(self):
         if self.name != self.full_name:
-            return "%s (%s)" % (self.name, self.full_name)
+            return "{} ({})".format(self.name, self.full_name)
         return self.name
 
     def to_json(self) -> dict:
@@ -331,7 +331,7 @@ class SettingsBuilder(collections.MutableMapping):
 
     def __setitem__(self, key, value):
         if key not in Settings._fields:
-            raise NameError("Invalid setting name: %s" % key)
+            raise NameError("Invalid setting name: {}".format(key))
         self._settings[key] = value
 
     def __delitem__(self, key):
