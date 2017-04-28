@@ -72,7 +72,7 @@ class ClientUpdate:
 
 class ClientAction:
     """
-    Represents an action from a GradeBook client that can be applied to a GradeItem.
+    Represents an action from a GradeBook client that can be applied to a SubmissionGradeItem.
     """
 
     class BadSubmissionError(utils.GradeBookPublicError):
@@ -183,17 +183,17 @@ class ClientAction:
             return done
 
         if action_type == "SET_SCORE":
-            if isinstance(grade_item, grades.GradeScore):
+            if isinstance(grade_item, grades.SubmissionGradeScore):
                 grade_item.set_effective_score(value)
                 return done
 
         if action_type == "SET_COMMENTS":
-            if isinstance(grade_item, grades.GradeScore):
+            if isinstance(grade_item, grades.SubmissionGradeScore):
                 grade_item.set_comments(value)
                 return done
 
-        if action_type == "SET_HINT" and "index" in action:
-            grade_item.set_hint(action["index"], bool(value))
+        if action_type == "SET_HINT_ENABLED" and "index" in action:
+            grade_item.set_hint_enabled(action["index"], bool(value))
             return done
 
         # If we're still here, something went wrong...

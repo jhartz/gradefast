@@ -12,25 +12,66 @@ from os import PathLike
 from typing import Dict, List, NamedTuple, Optional, Union
 
 
+class SlotEqualityMixin:
+    __slots__ = ()
+
+    def __eq__(self, other):
+        if isinstance(other, self.__class__) and self.__slots__ == other.__slots__:
+            for attr in self.__slots__:
+                if getattr(self, attr) != getattr(other, attr):
+                    return False
+            return True
+        return NotImplemented
+
+    def __ne__(self, other):
+        return not self == other
+
+    def __hash__(self):
+        return hash(tuple(getattr(self, attr) for attr in self.__slots__))
+
+    def __repr__(self):
+        return "{}({})".format(
+            self.__class__.__name__,
+            ", ".join("{}={!r}".format(attr, getattr(self, attr)) for attr in self.__slots__)
+        )
+
+    def __str__(self):
+        return repr(self)
+
+
 ###################################################################################################
 # Models for commands. See the GradeFast wiki:
 # https://github.com/jhartz/gradefast/wiki/Command-Structure
 ###################################################################################################
 
 
-class CommandItem:
+class CommandItem(SlotEqualityMixin):
+    """
+    See https://github.com/jhartz/gradefast/wiki/Command-Structure#command-items
+    """
+
     __slots__ = ("name", "command", "environment", "is_background", "is_passthrough", "stdin",
                  "diff", "version")
 
-    class Diff(NamedTuple):
-        # ONE AND ONLY ONE of these 4 properties must be specified
-        content: Optional[str]
-        file: Optional[str]
-        submission_file: Optional[str]
-        command: Optional[str]
+    class Diff(SlotEqualityMixin):
+        __slots__ = ("content", "file", "submission_file", "command", "collapse_whitespace")
 
-        # Diff options
-        collapse_whitespace: bool
+        def __init__(self, content: Optional[str] = None, file: Optional[str] = None,
+                     submission_file: Optional[str] = None, command: Optional[str] = None,
+                     collapse_whitespace: Optional[bool] = False):
+            """
+            ONE AND ONLY ONE of the following parameters must be provided:
+            content, file, submission_file, or command.
+
+            For more, see: https://github.com/jhartz/gradefast/wiki/Command-Structure#command-items
+            """
+            assert [content, file, submission_file, command].count(None) == 3
+            self.content = content
+            self.file = file
+            self.submission_file = submission_file
+            self.command = command
+
+            self.collapse_whitespace = collapse_whitespace
 
     def __init__(self, name: str, command: str, environment: Optional[Dict[str, str]] = None,
                  is_background: Optional[bool] = False, is_passthrough: Optional[bool] = False,
@@ -59,10 +100,14 @@ class CommandItem:
         return "{}: {!r}".format(self.get_name(), self.command)
 
 
-class CommandSet:
+class CommandSet(SlotEqualityMixin):
+    """
+    See https://github.com/jhartz/gradefast/wiki/Command-Structure#command-sets
+    """
+
     __slots__ = ("name", "commands", "folder", "environment")
 
-    def __init__(self, name: str, commands: List["Command"],
+    def __init__(self, commands: List["Command"], name: Optional[str] = None,
                  folder: Optional[Union[str, List[str]]] = None,
                  environment: Optional[Dict[str, str]] = None):
         self.name = name
@@ -75,11 +120,56 @@ Command = Union[CommandSet, CommandItem]
 
 
 ###################################################################################################
+# Models for the grade structure. See the GradeFast wiki:
+# https://github.com/jhartz/gradefast/wiki/Grade-Structure
+###################################################################################################
+
+ScoreNumber = Union[int, float]
+# Will usually be passed to "make_score_number" to convert to a ScoreNumber
+WeakScoreNumber = Union[ScoreNumber, str]
+
+
+class Hint(NamedTuple):
+    name: str
+    value: ScoreNumber
+
+
+class GradeScore(NamedTuple):
+    """
+    See https://github.com/jhartz/gradefast/wiki/Grade-Structure#grade-score
+    """
+
+    name: str
+    points: ScoreNumber
+    hints: List[Hint]
+    default_enabled: bool
+    default_score: ScoreNumber
+    default_comments: str
+    note: str
+
+
+class GradeSection(NamedTuple):
+    """
+    See https://github.com/jhartz/gradefast/wiki/Grade-Structure#grade-section
+    """
+
+    name: str
+    grades: List[Union[GradeScore, "GradeSection"]]
+    hints: List[Hint]
+    default_enabled: bool
+    deduct_percent_if_late: ScoreNumber
+    note: str
+
+
+GradeItem = Union[GradeScore, GradeSection]
+
+
+###################################################################################################
 # Other models that hold data needed by GradeFast components
 ###################################################################################################
 
 
-class Path:
+class Path(SlotEqualityMixin):
     """
     Represents a path to a file or folder. The path follows POSIX style (with forward slashes).
     The path may be relative or absolute depending on the Host instance that created it.
@@ -91,6 +181,8 @@ class Path:
     This is used for any representations of file paths within GradeFast to make it easier to use
     GradeFast configurations in a platform-agnostic way.
     """
+
+    __slots__ = ("_path",)
 
     def __init__(self, gradefast_path: str):
         """
@@ -165,18 +257,8 @@ class Path:
     def __repr__(self):
         return "Path({!r})".format(self._path)
 
-    def __eq__(self, other):
-        if not isinstance(other, Path):
-            return NotImplemented
-        return self._path == other.get_gradefast_path()
 
-    def __ne__(self, other):
-        if not isinstance(other, Path):
-            return NotImplemented
-        return not self.__eq__(other)
-
-
-class LocalPath(PathLike):
+class LocalPath(PathLike, SlotEqualityMixin):
     """
     Similar to Path, but the path is stored in the local operating system's format. You should NOT
     be using this class for anything that interacts with a Host instance (use Path instead).
@@ -185,6 +267,8 @@ class LocalPath(PathLike):
     it clear which kind of path a section of code is using). Since it is a path-like object, you
     can pass it directly to functions in the os.path module.
     """
+
+    __slots__ = ("path",)
 
     def __init__(self, path: str):
         self.path = path
@@ -198,18 +282,8 @@ class LocalPath(PathLike):
     def __repr__(self):
         return "LocalPath({!r})".format(self.path)
 
-    def __eq__(self, other):
-        if not isinstance(other, LocalPath):
-            return NotImplemented
-        return self.path == other.path
 
-    def __ne__(self, other):
-        if not isinstance(other, LocalPath):
-            return NotImplemented
-        return not self.__eq__(other)
-
-
-class Submission:
+class Submission(SlotEqualityMixin):
     """
     A submission by a particular student.
     """
@@ -257,7 +331,7 @@ class Settings(NamedTuple):
     log_as_html: Optional[bool]
 
     # GradeBook settings
-    grade_structure: List[dict]
+    grade_structure: List[GradeItem]
     host: int
     port: int
 

@@ -38,7 +38,7 @@ const HintTable = React.createClass({
     },
 
     handleSetHintEnabled(index, isEnabled) {
-        store.dispatch(actions.grade_setHint(this.props.path, index, isEnabled));
+        store.dispatch(actions.grade_setHintEnabled(this.props.path, index, isEnabled));
     },
 
     handleEditHint(event, index) {
@@ -106,14 +106,22 @@ const HintTable = React.createClass({
             <form onSubmit={this.handleSubmit}>
             <table className="hint-table"><tbody>
                 {this.props.hints.map((hint, index) => {
-                    const isEnabled = this.props.hints_set.get("" + index);
+                    let hintValueLabel = undefined;
+                    if (hint.get("value")) {
+                        if (hint.get("value") > 0) {
+                            hintValueLabel = "+" + hint.get("value");
+                        } else {
+                            hintValueLabel = "" + hint.get("value");
+                        }
+                        hintValueLabel = hintValueLabel + ":";
+                    }
                     if (this.state.currentlyEditing === index) return (
                         <tr key={"editing-" + index}>
                             <td style={{width: "1px"}}>
                                 <input type="checkbox"
                                        id={id(this.props.path, index, "enabled")}
                                        disabled="disabled"
-                                       checked={isEnabled}
+                                       checked={!!hint.get("enabled")}
                                        onChange={(event) => this.handleSetHintEnabled(index, event.target.checked)}
                                 />
                             </td>
@@ -145,13 +153,13 @@ const HintTable = React.createClass({
                             <td style={{width: "1px"}}>
                                 <input type="checkbox"
                                        id={id(this.props.path, index, "enabled")}
-                                       checked={isEnabled}
+                                       checked={!!hint.get("enabled")}
                                        onChange={(event) => this.handleSetHintEnabled(index, event.target.checked)}
                                 />
                             </td>
                             <td style={{textAlign: "right", whiteSpace: "nowrap"}}>
                                 <label htmlFor={id(this.props.path, index, "enabled")}>
-                                    <strong>{hint.get("value") ? (hint.get("value") + ":") : undefined}&nbsp;</strong>
+                                    <strong>{hintValueLabel}&nbsp;</strong>
                                 </label>
                             </td>
                             <td>

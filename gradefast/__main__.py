@@ -23,11 +23,18 @@ from typing import Optional
 
 from pyprovide import Injector
 
-from gradefast import log, yamlsettings
+from gradefast import log, required_package_error
 from gradefast.config.local import GradeFastLocalModule
 from gradefast.hosts import LocalHost
-from gradefast.models import LocalPath
+from gradefast.models import LocalPath, SettingsBuilder
+from gradefast.parsers import ModelParseError, parse_commands, parse_grade_structure, parse_settings
 from gradefast.run import run_gradefast
+
+try:
+    import yaml
+except ImportError:
+    yaml = None
+    required_package_error("yaml", "PyYAML")
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8051
@@ -47,7 +54,7 @@ class Formatter(argparse.HelpFormatter):
         return lines
 
 
-def get_parser():
+def get_argument_parser():
     parser = argparse.ArgumentParser(
         "GradeFast",
         usage="python3 -m gradefast [-h|--help] [options] yaml-file",
@@ -130,6 +137,59 @@ def get_parser():
     return parser
 
 
+def parse_yaml_file(yaml_file) -> SettingsBuilder:
+    """
+    Parse a GradeFast YAML configuration file and convert it to the GradeFast data structures,
+    returning them in a partially-populated SettingsBuilder.
+
+    See https://github.com/jhartz/gradefast/wiki/YAML-Configuration-Format
+
+    :param yaml_file: An open stream containing the YAML data.
+    """
+    errors = ModelParseError()
+
+    yaml_data = yaml.load(yaml_file)
+    if not yaml_data:
+        raise errors.add_line("YAML file is empty")
+
+    settings_builder = SettingsBuilder()
+
+    for key in yaml_data.keys():
+        if key == "config":
+            # compatibility :(
+            raise errors.add_line("Found unexpected top-level key: \"config\" "
+                                  "(did you mean \"settings\"?")
+        if key not in ("grades", "commands", "settings"):
+            raise errors.add_line("Found unexpected top-level key: \"{}\"".format(key))
+
+    # Parse the "commands" section using parse_command
+    if "commands" in yaml_data:
+        try:
+            settings_builder.commands = parse_commands(yaml_data["commands"])
+        except ModelParseError as exc:
+            errors.add_all(exc)
+    else:
+        errors.add_line("YAML file missing \"commands\" section")
+
+    # Parse the "grades" section using parse_grade_structure
+    if "grades" in yaml_data:
+        try:
+            settings_builder.grade_structure = parse_grade_structure(yaml_data["grades"])
+        except ModelParseError as exc:
+            errors.add_all(exc)
+    else:
+        errors.add_line("YAML file missing \"grades\" section")
+
+    try:
+        settings_builder.update(parse_settings(
+            yaml_data["settings"] if "settings" in yaml_data else {}))
+    except ModelParseError as exc:
+        errors.add_all(exc)
+
+    errors.raise_if_errors()
+    return settings_builder
+
+
 def _absolute_path_if_exists(item: str, base: LocalPath) -> Optional[str]:
     # Search order: working directory, YAML file directory
     if not item:
@@ -180,9 +240,11 @@ def build_settings(args):
 
     with open(yaml_file_path, encoding="utf-8") as yaml_file:
         try:
-            settings_builder = yamlsettings.parse_yaml(yaml_file)
-        except yamlsettings.YAMLStructureError as e:
-            print("Error parsing YAML file:", e)
+            settings_builder = parse_yaml_file(yaml_file)
+        except ModelParseError as exc:
+            print()
+            print("Error parsing YAML file:")
+            print(exc)
             sys.exit(1)
 
     settings_builder.project_name = yaml_file_name
@@ -208,7 +270,7 @@ def build_settings(args):
 
 
 def main():
-    args = get_parser().parse_args()
+    args = get_argument_parser().parse_args()
     log.init_logging(args.debug_file)
 
     settings = build_settings(args)

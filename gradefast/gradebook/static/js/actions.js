@@ -19,7 +19,7 @@ const SET_OVERALL_COMMENTS = "SET_OVERALL_COMMENTS";
 const GRADE_SET_ENABLED = "SET_ENABLED";
 const GRADE_SET_SCORE = "SET_SCORE";
 const GRADE_SET_COMMENTS = "SET_COMMENTS";
-const GRADE_SET_HINT = "SET_HINT";
+const GRADE_SET_HINT_ENABLED = "SET_HINT_ENABLED";
 // These 2 modify the actual grade structure (server-side)
 const GRADE_ADD_HINT = "ADD_HINT";
 const GRADE_EDIT_HINT = "EDIT_HINT";
@@ -70,12 +70,12 @@ export const actions = {
     },
 
     initSubmission(submission_id, submission, is_late, overall_comments, overall_comments_html,
-                   current_score, max_score, grades) {
+                   points_earned, points_possible, grades) {
         return {
             type: INIT_SUBMISSION,
 
             submission_id, submission: Immutable.fromJS(submission), is_late, overall_comments, overall_comments_html,
-            current_score, max_score, grades: Immutable.fromJS(grades)
+            points_earned, points_possible, grades: Immutable.fromJS(grades)
         }
     },
 
@@ -127,9 +127,9 @@ export const actions = {
         });
     },
 
-    grade_setHint(path, index, value) {
+    grade_setHintEnabled(path, index, value) {
         return dispatchActionAndTellServer({
-            type: GRADE_SET_HINT,
+            type: GRADE_SET_HINT_ENABLED,
             path, index, value
         });
     },
@@ -170,17 +170,16 @@ const initialGradeState = Immutable.Map({
 
     // We could also have the following things...
     //hints: Immutable.List()
-    //hints_set: Immutable.Map()
     //note: string
     //note_html: string
 
-    // If it's a GradeScore...
+    // If it's a SubmissionGradeScore...
     //score: number
     //points: number
     //comments: string
     //comments_html: string
 
-    // If it's a GradeSection...
+    // If it's a SubmissionGradeSection...
     //children: Immutable.List()
 });
 
@@ -203,8 +202,9 @@ function gradeReducer(state, action) {
             case GRADE_SET_COMMENTS:
                 state = state.set("comments", action.value);
                 break;
-            case GRADE_SET_HINT:
-                state = state.set("hints_set", state.get("hints_set").set("" + action.index, action.value));
+            case GRADE_SET_HINT_ENABLED:
+                const hint = state.get("hints").get(action.index).set("enabled", action.value);
+                state = state.set("hints", state.get("hints").set(action.index, hint));
                 break;
             case GRADE_ADD_HINT:
                 state = state.set("hints", state.get("hints").push(Immutable.fromJS(action.content)));
@@ -235,8 +235,8 @@ const initialState = Immutable.Map({
     "submission_is_late": false,
     "submission_overall_comments": "",
     "submission_overall_comments_html": "",
-    "submission_current_score": 0,
-    "submission_max_score": 0,
+    "submission_points_earned": 0,
+    "submission_points_possible": 0,
     "submission_grades": Immutable.List()
 });
 
@@ -273,8 +273,8 @@ export function app(state, action) {
                     "submission_is_late": action.is_late,
                     "submission_overall_comments": action.overall_comments,
                     "submission_overall_comments_html": action.overall_comments_html,
-                    "submission_current_score": action.current_score,
-                    "submission_max_score": action.max_score,
+                    "submission_points_earned": action.points_earned,
+                    "submission_points_possible": action.points_possible,
                     "submission_grades": action.grades
                 });
             }

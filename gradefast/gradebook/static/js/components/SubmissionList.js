@@ -45,12 +45,12 @@ const SubmissionList = ({submissions, data_key}) => {
                                 </td>
                                 <td>
                                     <label>
-                                        {submission.get("current_score")}
+                                        {submission.get("points_earned")}
                                     </label>
                                 </td>
                                 <td style={{paddingLeft: "0"}}>
                                     <label>
-                                        / {submission.get("max_score")}
+                                        / {submission.get("points_possible")}
                                         {submission.get("is_late") ? <em>&nbsp;&nbsp;(late)</em> : undefined}
                                     </label>
                                 </td>

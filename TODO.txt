@@ -14,7 +14,6 @@ GradeBook TODOs:
   not shown, and we just enter one big point value, one big comment. This probably means
   implementing a custom checkbox, or doing something hacky like: https://jsfiddle.net/urtwh9t7/2/
 - If a hint is worth 0, then don't include the point number in the feedback.
-- Change "default points" to "default score" in YAML config
 - In YAML config, "notes" should be allowed to be a list of MD-parsed strings (which we'll show as
   a HTML list)
 - Push the "dist/" folder to GitHub, so that people can use GradeFast without needing npm. (But,

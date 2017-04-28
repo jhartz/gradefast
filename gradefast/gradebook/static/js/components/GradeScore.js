@@ -54,7 +54,6 @@ const GradeScore = React.createClass({
                                     }
                                 </p>
                                 <HintTable hints={this.props.grade.get("hints")}
-                                           hints_set={this.props.grade.get("hints_set")}
                                            path={this.props.path}
                                 />
                             </div>

@@ -76,8 +76,8 @@ const updateTypeHandlers = {
             data.is_late,
             data.overall_comments,
             data.overall_comments_html,
-            data.current_score,
-            data.max_score,
+            data.points_earned,
+            data.points_possible,
             data.grades
         ));
     },

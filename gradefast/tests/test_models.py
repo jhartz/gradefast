@@ -1,6 +1,43 @@
 import unittest
 
-from gradefast.models import Path
+from gradefast.models import Path, SlotEqualityMixin
+
+
+class TestSlotEqualityMixin(unittest.TestCase):
+    class Example(SlotEqualityMixin):
+        __slots__ = ("a", "b", "c")
+
+        def __init__(self, a, b, c):
+            self.a = a
+            self.b = b
+            self.c = c
+
+    def test_equality(self):
+        example1 = self.Example(1, 2, 3)
+        example2 = self.Example(1, 2, 3)
+        example3 = self.Example(2, 3, 4)
+
+        self.assertEqual(example1, example2)
+        self.assertFalse(example1.__eq__(example3))
+        self.assertIs(example1.__eq__(""), NotImplemented)
+
+    def test_inequality(self):
+        example1 = self.Example(1, 2, 3)
+        example2 = self.Example(1, 2, 3)
+        example3 = self.Example(2, 3, 4)
+
+        self.assertNotEqual(example1, example3)
+        self.assertFalse(example1.__ne__(example2))
+        self.assertNotEqual(example1, "")
+        self.assertNotEqual("", example1)
+
+    def test_hash(self):
+        example1 = self.Example(1, 2, 3)
+        example2 = self.Example(1, 2, 3)
+        example3 = self.Example(2, 3, 4)
+
+        self.assertEqual(hash(example1), hash(example2))
+        self.assertNotEqual(hash(example1), hash(example3))
 
 
 class TestPath(unittest.TestCase):

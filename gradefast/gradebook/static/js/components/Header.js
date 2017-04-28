@@ -19,7 +19,7 @@ const Header = React.createClass({
         if (this.props.showScore) {
             score = (
                 <span>
-                    <label>Current Score: </label>{this.props.current_score}&nbsp;/&nbsp;{this.props.max_score}
+                    <label>Current Score: </label>{this.props.points_earned}&nbsp;/&nbsp;{this.props.points_possible}
                         &emsp;
                         <input id="late"
                                type="checkbox"
@@ -69,8 +69,8 @@ function mapStateToProps(state) {
         data_key: state.get("data_key"),
         list_visible: state.get("list_visible"),
 
-        current_score: state.get("submission_current_score"),
-        max_score: state.get("submission_max_score"),
+        points_earned: state.get("submission_points_earned"),
+        points_possible: state.get("submission_points_possible"),
         is_late: state.get("submission_is_late")
     }
 }

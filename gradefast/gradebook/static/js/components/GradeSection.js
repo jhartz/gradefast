@@ -26,7 +26,6 @@ const GradeSection = React.createClass({
                         {!this.props.grade.get("enabled") ? undefined :
                             <div className="row-grade-body">
                                 <HintTable hints={this.props.grade.get("hints")}
-                                           hints_set={this.props.grade.get("hints_set")}
                                            path={this.props.path}
                                 />
                             </div>

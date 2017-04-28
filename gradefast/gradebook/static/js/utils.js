@@ -4,10 +4,10 @@
  * @param {string} status - The HTTP status, if any.
  * @param {string} [details] - Details about what went wrong, if applicable. This is included in
  *      the alert message to the user.
- * @param [objects] - An errors or objects to log, if applicable.
+ * @param [objects] - Any errors or objects to log, if applicable.
  */
 export function reportRequestError(path, status, details, ...objects) {
-    reportError(`Request to ${path} was not successful (status: ${status})`, details, objects);
+    reportError(`Request to ${path} failed (status: ${status})`, details, ...objects);
 }
 
 /**
@@ -19,10 +19,10 @@ export function reportRequestError(path, status, details, ...objects) {
  * @param [objects] - Any errors or objects to log.
  */
 export function reportResponseError(path, status, details, ...objects) {
-    reportError(`Error response from ${path} (status: ${status})`, details, objects);
+    reportError(`Error response from ${path} (status: ${status})`, details, ...objects);
 }
 
-function reportError(message, details, objects) {
+function reportError(message, details, ...objects) {
     console.log.apply(console, [message, details, ...objects]);
     alert(message + (details ? `:\n\n${details}` : `.`));
 }
@@ -39,7 +39,7 @@ export function parseJson(str, errorPath, errorStatus, ...errorObjects) {
     try {
         jsonData = JSON.parse(str);
     } catch (err) {
-        reportResponseError.apply(undefined, [errorPath, errorStatus, str, err, ...errorObjects]);
+        reportResponseError(errorPath, errorStatus, str, err, ...errorObjects);
     }
     return jsonData;
 }
@@ -62,17 +62,25 @@ export function post(path, data) {
     });
 
     const xhr = new XMLHttpRequest();
+    const getStatus = () => {
+        if (xhr.statusText) {
+            return `${xhr.status} ${xhr.statusText}`;
+        } else {
+            return `${xhr.status}`;
+        }
+    };
+
     xhr.addEventListener("load", (event) => {
-        let jsonData = parseJson(xhr.responseText, path, xhr.statusText, event);
+        let jsonData = parseJson(xhr.responseText, path, getStatus(), event);
         if (jsonData && jsonData.status === "Aight") {
             // All good!
         } else {
-            reportResponseError(path, xhr.statusText, JSON.stringify(jsonData, null, 2), event, jsonData);
+            reportResponseError(path, getStatus(), JSON.stringify(jsonData, null, 2), event, jsonData);
         }
     }, false);
 
     xhr.addEventListener("error", (event) => {
-        reportRequestError(path, xhr.statusText, xhr.responseText, event);
+        reportRequestError(path, getStatus(), xhr.responseText, event);
     }, false);
 
     xhr.open("POST", path, true);

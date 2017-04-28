@@ -38,12 +38,6 @@ class GradeBook:
     Represents a grade book with submissions and grade structures.
     """
 
-    class BadStructureError(utils.GradeBookPublicError):
-        """
-        Error resulting from a bad grade structure.
-        """
-        pass
-
     @inject()
     def __init__(self, event_manager: events.EventManager, settings: Settings):
         """
@@ -58,11 +52,6 @@ class GradeBook:
         self.event_lock = threading.Lock()
         self.event_manager: events.EventManager = event_manager
         event_manager.register_all_event_handlers_with_args(eventhandlers, gradebook_instance=self)
-
-        # Check validity of the project's grade_structure
-        self._grade_structure = settings.grade_structure
-        if not grades.check_grade_structure(self._grade_structure):
-            raise GradeBook.BadStructureError()
 
         self._grades_by_submission_id: Dict[int, grades.SubmissionGrade] = {}
         self._current_submission_id: Optional[int] = None
@@ -413,7 +402,7 @@ class GradeBook:
         for submission in submission_list:
             if submission.id not in self._grades_by_submission_id:
                 self._grades_by_submission_id[submission.id] = grades.SubmissionGrade(
-                    submission, self._grade_structure)
+                    submission, self.settings.grade_structure)
 
         # Tell GradeBook clients about this new list
         self._send_client_update(clients.ClientUpdate.create_update_event("NEW_SUBMISSION_LIST", {
@@ -500,7 +489,7 @@ class GradeBook:
         csv_writer = csv.writer(csv_stream)
 
         # Make the header row
-        point_titles = grades.get_point_titles(self._grade_structure)
+        point_titles = grades.get_point_titles(self.settings.grade_structure)
         row_titles = ["Name", "Total Score", "Percentage", "Feedback", ""] + \
                      ["({}) {}".format(points, title) for title, points in point_titles]
         csv_writer.writerow(row_titles)
