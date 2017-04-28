@@ -12,6 +12,10 @@ their mistakes. Best of all, it lets you help them without putting much time int
 
 GradeFast requires **Python *3.6*** or later! (We use type hints.)
 
+> NOTE: All the command line examples below use `python3` as the python executable. Depending on
+> your platform, you may need to use `python` or `python.exe` instead (just make sure it's at least
+> Python version 3.6!)
+
 Additionally, these packages are required:
 
  - [YAML](https://pypi.python.org/pypi/PyYAML) to... I don't know... parse the input files, or
@@ -23,6 +27,10 @@ Optional (but recommended) dependencies:
 
  - [Colorama](https://pypi.python.org/pypi/colorama) to make the CLI look pretty
  - [Mistune](https://pypi.python.org/pypi/mistune/) to parse Markdown in comments and feedback
+
+You can install all these dependencies with:
+
+    python3 -m pip install pyyaml flask colorama mistune
 
 Additionally, some Python dependencies are included in the repository as git submodules. To get
 these, after cloning, run:
@@ -46,11 +54,11 @@ dependencies above).
 
 Then, to start GradeFast, run:
 
-    python3 -m gradefast YAML_FILE [HOSTNAME [PORT]]
+    python3 -m gradefast [OPTIONS] YAML-FILE
 
 or, for more detailed usage:
 
-    python3 -m gradefast
+    python3 -m gradefast --help
 
 ## But... how do I use this thing?
 
