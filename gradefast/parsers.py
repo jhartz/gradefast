@@ -105,7 +105,7 @@ def _parse_command(command_dict: dict, path: List[int], subject: str) -> Command
     if name:
         name = name.strip()
     if name:
-        subject += " (\"{}\")".format(name)
+        subject += " ({})".format(name)
 
     if "command" not in command_dict and "commands" not in command_dict:
         raise errors.add("Command", subject, "has neither \"command\" nor \"commands\"")
@@ -199,7 +199,7 @@ def _parse_command_diff(diff_object: Optional[Union[dict, str]],
     if [content, file, submission_file, command].count(None) != 3:
         errors.add("Command item", subject,
                    "diff object must have one and only one of the following: "
-                   "content, file, submission_file, command")
+                   "content, file, submission file, command")
 
     for key in diff_object.keys():
         if key not in ["content", "file", "submission file", "command", "collapse whitespace"]:
@@ -228,7 +228,7 @@ def _parse_grade_item(item: dict, path: List[int], subject: str) -> GradeItem:
     if name:
         name = str(name).strip()
     if name:
-        subject += " (\"{}\")".format(name)
+        subject += " ({})".format(name)
     else:
         errors.add("Grade item", subject, "missing \"name\"")
 
@@ -352,8 +352,8 @@ def _parse_grade_item(item: dict, path: List[int], subject: str) -> GradeItem:
             if "default score" in item:
                 default_score = make_score_number(item["default score"])
             elif "default points" in item:
-                _logger.warning("Grade score {} has deprecated \"default points\"; converted to "
-                                "\"default score\"", subject)
+                _logger.warning("Grade score {} has deprecated \"default points\" (converted to "
+                                "\"default score\")", subject)
                 default_score = make_score_number(item["default points"])
         except ValueError:
             error("default score (\"{}\") must be a number".format(item["default score"] or
