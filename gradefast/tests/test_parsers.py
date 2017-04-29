@@ -343,3 +343,7 @@ class TestParseCommands(unittest.TestCase):
             ])
 
         self.assertIn("diff object has an invalid property: \"bad prop\"", str(assertion.exception))
+
+
+if __name__ == "__main__":
+    unittest.main()
