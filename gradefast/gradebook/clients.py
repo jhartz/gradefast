@@ -6,7 +6,8 @@ Licensed under the MIT License. For more, see the LICENSE file.
 Author: Jake Hartz <jake@hartz.io>
 """
 
-from typing import Any
+import uuid
+from typing import Any, Dict, List, cast
 
 from gradefast.gradebook import grades, utils
 
@@ -18,7 +19,8 @@ class ClientUpdate:
 
     _last_id = 0
 
-    def __init__(self, event: str, data: Any = None, requires_authentication: bool = True):
+    def __init__(self, event: str, data: object = None,
+                 requires_authentication: bool = True) -> None:
         """
         Create a new ClientUpdate to send to GradeBook clients.
 
@@ -49,7 +51,7 @@ class ClientUpdate:
             "update_data": update_data or {}
         })
 
-    def requires_authentication(self):
+    def requires_authentication(self) -> bool:
         return self._requires_authentication
 
     def encode(self) -> str:
@@ -75,41 +77,33 @@ class ClientAction:
     Represents an action from a GradeBook client that can be applied to a SubmissionGradeItem.
     """
 
-    class BadSubmissionError(utils.GradeBookPublicError):
-        """
-        Error resulting from a bad submission ID being passed into this action.
-        """
-        pass
-
     class BadActionError(utils.GradeBookPublicError):
         """
         Error resulting from a bad action being passed into this action.
         """
         pass
 
-    def __init__(self, submission_id: int, client_id: int, client_seq: int, action: dict):
+    def __init__(self, submission_id: int, client_id: uuid.UUID, client_seq: int,
+                 grade: grades.SubmissionGrade, action: Dict[str, object]) -> None:
         """
         :param submission_id: The ID of the submission that this action applies to.
         :param client_id: The ID of the GradeBook client that submitted this action event.
         :param client_seq: The sequence number from the GradeBook client that submitted this event.
+        :param grade: The SubmissionGrade instance that corresponds to submission_id.
         :param action: The action, directly from the GradeBook client that submitted it.
         """
         self.submission_id = submission_id
         self.client_id = client_id
         self.client_seq = client_seq
+        self.grade = grade
         self.action = action
 
-    def apply_to_gradebook(self, gradebook_instance: "GradeBook"):
-        grade = gradebook_instance.get_grade(self.submission_id)
-        if grade is None:
-            raise ClientAction.BadSubmissionError("Invalid submission_id: " +
-                                                  str(self.submission_id))
-
+    def apply_to_gradebook(self, gradebook_instance: Any) -> Dict[str, object]:
         # Apply this event on the grade
-        more_data = self._apply_to_grade(grade)
+        more_data = self._apply_to_grade(self.grade)
 
         # Recalculate the score, etc.
-        data = grade.to_plain_data()
+        data = self.grade.to_plain_data()
         data.update({
             "submission_id": self.submission_id
         })
@@ -119,7 +113,7 @@ class ClientAction:
         # Update any GradeBook clients of the changes
         return data
 
-    def _apply_to_grade(self, grade: grades.SubmissionGrade) -> dict:
+    def _apply_to_grade(self, grade: grades.SubmissionGrade) -> Dict[str, object]:
         action = self.action
         action_type = action["type"] if "type" in action else None
 
@@ -143,13 +137,16 @@ class ClientAction:
         if action_type == "SET_OVERALL_COMMENTS":
             # Set the overall comments of the submission
             if "overall_comments" in action:
-                grade.set_overall_comments(action["overall_comments"])
+                grade.set_overall_comments(str(action["overall_comments"]))
                 return done
 
         # All of the other action types have a path
         if "path" not in action:
             raise ClientAction.BadActionError("Action missing a path", action=action)
-        path = action["path"]
+        try:
+            path = [int(p) for p in cast(List[int], action["path"])]
+        except (TypeError, ValueError) as ex:
+            raise utils.BadPathError("Error parsing path {}".format(action["path"]), exception=ex)
 
         if action_type == "ADD_HINT":
             # Add a hint by changing the grade structure (MUA HA HA HA)
@@ -164,8 +161,13 @@ class ClientAction:
             # Edit a hint by changing the grade structure (MUA HA HA HA)
             if "index" in action and "content" in action and \
                     "name" in action["content"] and "value" in action["content"]:
+                try:
+                    index = int(cast(int, action["index"]))
+                except ValueError as ex:
+                    raise utils.BadPathError("Invalid hint index \"{}\" at path {}"
+                                             .format(action["index"], path), exception=ex)
                 grade.replace_hint_for_all_grades(path,
-                                                  action["index"],
+                                                  index,
                                                   action["content"]["name"],
                                                   action["content"]["value"])
                 return done
@@ -184,17 +186,22 @@ class ClientAction:
 
         if action_type == "SET_SCORE":
             if isinstance(grade_item, grades.SubmissionGradeScore):
-                grade_item.set_effective_score(value)
+                grade_item.set_effective_score(str(value))
                 return done
 
         if action_type == "SET_COMMENTS":
             if isinstance(grade_item, grades.SubmissionGradeScore):
-                grade_item.set_comments(value)
+                grade_item.set_comments(str(value))
                 return done
 
         if action_type == "SET_HINT_ENABLED" and "index" in action:
-            grade_item.set_hint_enabled(action["index"], bool(value))
-            return done
+            try:
+                index = int(cast(int, action["index"]))
+                grade_item.set_hint_enabled(index, bool(value))
+                return done
+            except (ValueError, IndexError) as ex:
+                raise utils.BadPathError("Invalid hint index \"{}\" at path {}"
+                                         .format(action["index"], path), exception=ex)
 
         # If we're still here, something went wrong...
         raise ClientAction.BadActionError("Action does not have a valid type", action=action)

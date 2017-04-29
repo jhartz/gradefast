@@ -10,7 +10,7 @@ import platform
 import time
 
 import iochannels
-from pyprovide import InjectableClass, Module, class_provider, provider
+from pyprovide import InjectableClass, InjectableClassType, Module, class_provider, provider
 
 from gradefast import hosts
 from gradefast.models import Settings
@@ -21,7 +21,7 @@ class GradeFastLocalModule(Module):
     A PyProvide module that includes the providers necessary to run GradeFast locally.
     """
 
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings) -> None:
         super().__init__()
         self._settings = settings
 
@@ -34,7 +34,7 @@ class GradeFastLocalModule(Module):
         if not settings.log_file:
             return iochannels.NullLog()
 
-        file = open(settings.log_file, "a")
+        file = open(settings.log_file.get_local_path(), "a")
         if settings.log_as_html:
             file.write("<h1>\n")
         else:

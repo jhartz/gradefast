@@ -1,8 +1,18 @@
 TODO
 ====
 
+- BUG: When adding new submissions while grading ("a" at the prompt), the "total" variable isn't
+  updated
+- Add 'd'rop at that prompt to delete that submission from the list (gradebook should be fine...
+  right? ... It might need to trigger a new "initSubmission", which could run into issues if the
+  dropped one was the last one, and that was the one opened in the gradebook...)
+- Change 'quit' to 'q'uit (just make sure to prompt for confirmation)
+
 GradeBook TODOs:
 
+- Write tests for grade structure parser
+- Refactor clients.py (or move its functionality into gradebook.py, since it's not all that big
+  anymore)
 - In the gradebook (particularly gradebook.grades and the UI), find something better to call the
   path to the grade item than "path" (it's confusing with the Path model for filesystem paths).
 - For sections, add a "scale" option that takes a ratio to scale the section by (or a string
@@ -23,9 +33,10 @@ GradeBook TODOs:
 Grader TODOs:
 
 - Add a diff config option for whether to show the raw output as it comes in (since we need to wait
-  for the process to end before we do the diff). Pros: you get to see that the command is running,
-  and provide input if needed. Cons: double output. (Should probably still be enabled by default,
-  though).
+  for the process to end before we do the diff).
+  - Pros: you get to see that the command is running, and provide input if needed.
+  - Cons: double output. (Should probably still be enabled by default, though).
+  - We could also have an option to capture user input and include that in the diffing
 - subprocess.CREATE_NEW_PROCESS_GROUP, and make sure we catch Ctrl-C properly and do
   process.terminate() (for the current foreground process, and for background processes when we're
   in the "waiting" stage). Also test the current functionality on Linux; and this might be useful:

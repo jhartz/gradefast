@@ -24,7 +24,7 @@ class LazyUserError(Exception):
     pass
 
 
-def run_gradefast(injector: Injector, submission_paths: List[Path]):
+def run_gradefast(injector: Injector, submission_paths: List[Path]) -> None:
     # Create and start the GradeBook WSGI server in a new thread
     threading.Thread(
         name="GradeBookTh",
@@ -36,14 +36,14 @@ def run_gradefast(injector: Injector, submission_paths: List[Path]):
 
     # Wrap the rest in a `try` so that exceptions in the Grader don't kill everything
     # (i.e. the web server will still be running)
-    channel: iochannels.Channel = injector.get_instance(iochannels.Channel)
+    channel = injector.get_instance(iochannels.Channel)
     try:
         # Start the grader before showing the gradebook URL so "AuthRequestedEvent"s don't fall
         # away into the void
-        grader: Grader = injector.get_instance(Grader)
+        grader = injector.get_instance(Grader)
 
         # Give the user the grade book URL
-        settings: Settings = injector.get_instance(Settings)
+        settings = injector.get_instance(Settings)
         gradebook_url = "http://{host}:{port}/gradefast/gradebook".format(host=settings.host,
                                                                           port=settings.port)
         channel.print()

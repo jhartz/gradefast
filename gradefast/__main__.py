@@ -6,27 +6,23 @@ Licensed under the MIT License. For more, see the LICENSE file.
 Author: Jake Hartz <jake@hartz.io>
 """
 
-# NOTE: In order for this version check to be executed, the interpreter must be able to parse this
-# file. Therefore, avoid using new syntax (like variable type annotations). Stick to anything that
-# would've been valid Python 3.0 (showing the error message for Python 2 is sort of a lost cause).
-
 import sys
-if sys.version_info < (3, 6):
-    print("==> GradeFast requires Python 3.6 or later.")
+if sys.version_info < (3, 5):
+    print("==> GradeFast requires Python 3.5 or later.")
     print("==> You have version:")
     print("    " + str(sys.version).replace("\n", "\n    "))
     sys.exit(1)
 
 import argparse
 import os
-from typing import Optional
+from typing import List, Optional, TextIO
 
 from pyprovide import Injector
 
 from gradefast import log, required_package_error
 from gradefast.config.local import GradeFastLocalModule
 from gradefast.hosts import LocalHost
-from gradefast.models import LocalPath, SettingsBuilder
+from gradefast.models import LocalPath, Path, Settings, SettingsBuilder
 from gradefast.parsers import ModelParseError, parse_commands, parse_grade_structure, parse_settings
 from gradefast.run import run_gradefast
 
@@ -54,7 +50,7 @@ class Formatter(argparse.HelpFormatter):
         return lines
 
 
-def get_argument_parser():
+def get_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         "GradeFast",
         usage="python3 -m gradefast [-h|--help] [options] yaml-file",
@@ -137,7 +133,7 @@ def get_argument_parser():
     return parser
 
 
-def parse_yaml_file(yaml_file) -> SettingsBuilder:
+def parse_yaml_file(yaml_file: TextIO) -> SettingsBuilder:
     """
     Parse a GradeFast YAML configuration file and convert it to the GradeFast data structures,
     returning them in a partially-populated SettingsBuilder.
@@ -196,13 +192,13 @@ def _absolute_path_if_exists(item: str, base: LocalPath) -> Optional[str]:
         return None
     if os.path.exists(item):
         return os.path.abspath(item)
-    alt_path = os.path.join(base, item)
+    alt_path = os.path.join(base.get_local_path(), item)
     if os.path.exists(alt_path):
         return alt_path
     return item
 
 
-def build_settings(args):
+def build_settings(args) -> Settings:
     logger = log.get_logger("build_settings")
 
     yaml_file_path = os.path.abspath(args.yaml_file)
@@ -218,24 +214,26 @@ def build_settings(args):
     if args.save_file:
         save_file = LocalPath(os.path.abspath(args.save_file))
     else:
-        save_file = LocalPath(os.path.join(yaml_directory, yaml_file_name + ".save.data"))
+        save_file = LocalPath(os.path.join(yaml_directory.get_local_path(),
+                                           yaml_file_name + ".save.data"))
     logger.info("Save file: {}", save_file)
 
     if args.log_file:
         log_file = LocalPath(os.path.abspath(args.log_file))
     else:
-        log_file = LocalPath(os.path.join(yaml_directory, yaml_file_name + ".log"))
+        log_file = LocalPath(os.path.join(yaml_directory.get_local_path(),
+                                          yaml_file_name + ".log"))
     logger.info("Log file: {}", log_file)
 
-    log_as_html = log_file.path.endswith(".html") or log_file.path.endswith(".htm")
+    log_as_html = any(log_file.get_local_path().endswith(ext) for ext in (".html", ".htm"))
     if log_as_html:
         logger.info("Logging as HTML")
 
     base_env = dict(os.environ)
     base_env.update({
-        "SUPPORT_DIRECTORY": yaml_directory.path,
-        "HELPER_DIRECTORY": yaml_directory.path,
-        "CONFIG_DIRECTORY": yaml_directory.path
+        "SUPPORT_DIRECTORY": yaml_directory.get_local_path(),
+        "HELPER_DIRECTORY": yaml_directory.get_local_path(),
+        "CONFIG_DIRECTORY": yaml_directory.get_local_path()
     })
 
     with open(yaml_file_path, encoding="utf-8") as yaml_file:
@@ -269,7 +267,7 @@ def build_settings(args):
     return settings_builder.build()
 
 
-def main():
+def main() -> None:
     args = get_argument_parser().parse_args()
     log.init_logging(args.debug_file)
 
@@ -280,7 +278,7 @@ def main():
 
     # Get and validate the initial list of submission folders
     local_host = injector.get_instance(LocalHost)
-    submission_paths = []
+    submission_paths = []  # type: List[Path]
     if args.submissions:
         found_bad = False
         for folder in args.submissions:

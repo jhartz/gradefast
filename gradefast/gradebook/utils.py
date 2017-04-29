@@ -9,7 +9,7 @@ Author: Jake Hartz <jake@hartz.io>
 import json
 import uuid
 from collections import OrderedDict
-from typing import Any, Optional
+from typing import Any, Dict
 
 
 class GradeBookPublicError(Exception):
@@ -17,10 +17,10 @@ class GradeBookPublicError(Exception):
     An error with a name and a message that are okay to send to the GradeBook client (or, if on a
     public endpoint, anyone who can access our HTTP server).
     """
-    def __init__(self, message: Optional[str] = None, **more_details):
+    def __init__(self, message: str = None, **more_details: object) -> None:
         self._message = message
 
-        self._details = OrderedDict()
+        self._details = OrderedDict()  # type: Dict[str, str]
         self._details["name"] = self._get_error_name()
         if message is not None:
             self._details["message"] = message
@@ -33,8 +33,15 @@ class GradeBookPublicError(Exception):
     def get_message(self) -> str:
         return "{}: {}".format(self._get_error_name(), self._message)
 
-    def get_details(self) -> OrderedDict:
+    def get_details(self) -> Dict[str, str]:
         return self._details
+
+
+class BadPathError(GradeBookPublicError):
+    """
+    Error resulting from a bad path.
+    """
+    pass
 
 
 class GradeBookJSONEncoder(json.JSONEncoder):
@@ -57,10 +64,10 @@ class GradeBookJSONEncoder(json.JSONEncoder):
         return super().default(o)
 
 
-_json_encoder_instance: GradeBookJSONEncoder = None
+_json_encoder_instance = None
 
 
-def to_json(o: Any) -> str:
+def to_json(o: object) -> str:
     """
     Convert an object to a JSON string. For usage, see json.dumps(...).
     """
@@ -70,11 +77,11 @@ def to_json(o: Any) -> str:
     return _json_encoder_instance.encode(o)
 
 
-def from_json(*args, **kwargs):
+def from_json(s: str, **kwargs: Any) -> object:
     """
     Convert a JSON string to an object representation. For usage, see json.loads(...).
     """
-    return json.loads(*args, **kwargs)
+    return json.loads(s, **kwargs)
 
 
 JSONDecodeError = json.JSONDecodeError

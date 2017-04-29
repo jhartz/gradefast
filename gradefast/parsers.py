@@ -6,7 +6,7 @@ Licensed under the MIT License. For more, see the LICENSE file.
 Author: Jake Hartz <jake@hartz.io>
 """
 
-from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, Union
+from typing import Callable, Dict, List, Optional, Tuple, TypeVar, Union
 
 from gradefast.log import get_logger
 from gradefast.models import Command, CommandItem, CommandSet, \
@@ -21,8 +21,8 @@ class ModelParseError(Exception):
     model, multiple errors can be batched up and included in a single exception.
     """
 
-    def __init__(self):
-        self._errors: List[Union[str, Tuple[str, str, str]]] = []
+    def __init__(self) -> None:
+        self._errors = []  # type: List[Union[str, Tuple[str, str, str]]]
 
     def add(self, title: str, subject: str, error: str) -> "ModelParseError":
         self._errors.append((title, subject, error))
@@ -39,7 +39,7 @@ class ModelParseError(Exception):
     def has_errors(self) -> bool:
         return len(self._errors) > 0
 
-    def raise_if_errors(self):
+    def raise_if_errors(self) -> None:
         if self.has_errors():
             raise self
 
@@ -70,14 +70,14 @@ def make_score_number(val: WeakScoreNumber) -> ScoreNumber:
 
 
 def _parse_list(lst: List[dict], parse_func: Callable[[dict, List[int], str], T],
-                _path: Optional[List[int]] = None) -> List[T]:
+                _path: List[int] = None) -> List[T]:
     if _path is None:
         _path = []
 
     if not isinstance(lst, list):
         raise ModelParseError().add("Item", "#" + ".".join(map(str, _path)), "must be a list")
 
-    items: List[T] = []
+    items = []  # type: List[T]
     errors = ModelParseError()
     for index, item in enumerate(lst, start=1):
         path = _path + [index]
@@ -242,7 +242,7 @@ def _parse_grade_item(item: dict, path: List[int], subject: str) -> GradeItem:
     def error(error_str: str) -> ModelParseError:
         return errors.add(title, subject, error_str)
 
-    hint_dicts = []
+    hint_dicts = []  # type: List[Dict[str, object]]
     if "hints" in item:
         if not isinstance(item["hints"], list):
             error("\"hints\" section is not a list")
@@ -259,19 +259,19 @@ def _parse_grade_item(item: dict, path: List[int], subject: str) -> GradeItem:
                 "value": old_hint.get("value", 0) or (-1 * old_hint.get("minus", 0))
             }, item[old_hints_prop])
 
-    hints: List[Hint] = []
+    hints = []  # type: List[Hint]
     for hint_dict in hint_dicts:
         if "name" not in hint_dict:
             error("has a hint without a name")
         else:
-            hint_name = hint_dict["name"].strip()
-            hint_value = 0
+            hint_name = str(hint_dict["name"]).strip()
+            hint_value = 0  # type: ScoreNumber
             if "value" not in hint_dict:
                 _logger.warning("Hint \"{}\" in {} {} is missing a value; assuming 0",
                                 hint_dict["name"], title, subject)
             else:
                 try:
-                    hint_value = float(hint_dict["value"])
+                    hint_value = make_score_number(hint_dict["value"])
                 except ValueError:
                     error("value for hint \"{}\" (\"{}\") is not a number".format(
                         hint_name, hint_dict["value"]))
@@ -295,7 +295,7 @@ def _parse_grade_item(item: dict, path: List[int], subject: str) -> GradeItem:
     # Check stuff specific to grade sections
     if "grades" in item:
         deduct_percent_if_late_prop = None
-        deduct_percent_if_late = 0
+        deduct_percent_if_late = 0  # type: ScoreNumber
         try:
             if "deduct percent if late" in item:
                 deduct_percent_if_late_prop = "deduct percent if late"
@@ -347,7 +347,7 @@ def _parse_grade_item(item: dict, path: List[int], subject: str) -> GradeItem:
         if points < 0:
             error("points (\"{}\") must be at least zero".format(points))
 
-        default_score = points
+        default_score = points  # type: ScoreNumber
         try:
             if "default score" in item:
                 default_score = make_score_number(item["default score"])
@@ -383,7 +383,7 @@ def _parse_grade_item(item: dict, path: List[int], subject: str) -> GradeItem:
         )
 
 
-def parse_settings(settings_dict: dict) -> Dict[str, Any]:
+def parse_settings(settings_dict: dict) -> Dict[str, object]:
     """
     Parse the "settings" section of a YAML file into the properties expected by SettingsBuilder.
 
@@ -401,7 +401,7 @@ def parse_settings(settings_dict: dict) -> Dict[str, Any]:
                                                all(isinstance(item, str) for item in value)
     }
 
-    settings: Dict[str, Any] = {}
+    settings = {}  # type: Dict[str, object]
     errors = ModelParseError()
 
     for key, value in settings_dict.items():

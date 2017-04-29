@@ -13,7 +13,7 @@ import shutil
 import subprocess
 import threading
 import zipfile
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from iochannels import Channel, Msg
 from pyprovide import inject
@@ -26,10 +26,10 @@ class BackgroundCommand:
     """
     A command that may or may not have finished running.
     """
-    def __init__(self):
+    def __init__(self) -> None:
         self._output = io.StringIO()
         self._output_lock = threading.Lock()
-        self._error: Optional[str] = None
+        self._error = None  # type: Optional[str]
 
     def get_description(self) -> str:
         """
@@ -37,19 +37,19 @@ class BackgroundCommand:
         """
         raise NotImplementedError()
 
-    def wait(self):
+    def wait(self) -> None:
         """
         Either wait for the command to finish, or return immediately if it is already finished.
         """
         raise NotImplementedError()
 
-    def kill(self):
+    def kill(self) -> None:
         """
         Kill the command if it is still running.
         """
         raise NotImplementedError()
 
-    def _add_output(self, output: str):
+    def _add_output(self, output: str) -> None:
         """
         Add more output to the output that we have seen thus far. This should be called in the
         wait() and kill() implementations.
@@ -57,7 +57,7 @@ class BackgroundCommand:
         with self._output_lock:
             self._output.write(output)
 
-    def _set_error(self, error_message: str):
+    def _set_error(self, error_message: str) -> None:
         """
         Set an error message. If necessary, this should be called in the wait() and kill()
         implementations.
@@ -89,7 +89,7 @@ class CommandStartError(Exception):
     """
     Represents an error in starting a command.
     """
-    def __init__(self, message):
+    def __init__(self, message: str) -> None:
         self.message = message
 
 
@@ -97,7 +97,7 @@ class CommandRunError(Exception):
     """
     Represents an error in running a command.
     """
-    def __init__(self, message):
+    def __init__(self, message: str) -> None:
         self.message = message
 
 
@@ -110,12 +110,12 @@ class Host:
     """
 
     @inject()
-    def __init__(self, channel: Channel, settings: Settings):
+    def __init__(self, channel: Channel, settings: Settings) -> None:
         self.channel = channel
         self.settings = settings
 
     def run_command(self, command: str, path: Path, environment: Dict[str, str],
-                    stdin: Optional[str] = None, print_output: bool = True) -> str:
+                    stdin: str = None, print_output: bool = True) -> str:
         """
         Execute a command on this host.
 
@@ -137,7 +137,8 @@ class Host:
         """
         raise NotImplementedError()
 
-    def run_command_passthrough(self, command: str, path: Path, environment: Dict[str, str]):
+    def run_command_passthrough(self, command: str, path: Path,
+                                environment: Dict[str, str]) -> None:
         """
         Execute a command on this host, without wrapping any input/output pipes or file
         descriptors. If possible, this should let the child command talk directly to the terminal.
@@ -153,7 +154,7 @@ class Host:
         raise NotImplementedError()
 
     def start_background_command(self, command: str, path: Path, environment: Dict[str, str],
-                                 stdin: Optional[str] = None) -> BackgroundCommand:
+                                 stdin: str = None) -> BackgroundCommand:
         """
         Start a command executing in the background.
 
@@ -185,14 +186,14 @@ class Host:
         """
         raise NotImplementedError()
 
-    def move_to_folder(self, path: Path, folder_path: Path):
+    def move_to_folder(self, path: Path, folder_path: Path) -> None:
         """
         Move a file into a destination folder. The destination folder will be created if it doesn't
         already exist.
         """
         raise NotImplementedError()
 
-    def unzip(self, path: Path, folder_path: Path):
+    def unzip(self, path: Path, folder_path: Path) -> None:
         """
         Unzip a zipfile into a destination folder. The destination folder may already exist.
         """
@@ -217,7 +218,7 @@ class Host:
         """
         raise NotImplementedError()
 
-    def print_folder(self, path: Path, base_path: Optional[Path] = None):
+    def print_folder(self, path: Path, base_path: Path = None) -> None:
         """
         Print a listing of the contents of a folder.
 
@@ -236,7 +237,7 @@ class Host:
             else:
                 other.append((name, type, is_link))
 
-        listings: List[Msg] = [Msg(end="").accent("../")]
+        listings = [Msg(end="").accent("../")]
 
         for name, is_link in sorted(folders, key=lambda f: f[0]):
             listing = Msg(end="").accent("{}/", name)
@@ -264,14 +265,14 @@ class Host:
         self.channel.status("{}", path.relative_str(base_path))
         self.channel.output_list(listings)
 
-    def _choose_folder_cli(self, start_path: Optional[Path] = None) -> Optional[Path]:
+    def _choose_folder_cli(self, start_path: Path = None) -> Optional[Path]:
         """
         Interactively choose a folder. This implementation makes use of the other Host methods and
         Channel methods to prompt the user for a folder through the command line. For details, see
         the choose_folder documentation.
         """
         if start_path is not None and not self.folder_exists(start_path):
-            self.channel.output(Msg().error("Start folder not found:").print(start_path))
+            self.channel.output(Msg().error("Start folder not found:").print("{}", start_path))
             start_path = None
         if start_path is None:
             start_path = self.get_home_folder()
@@ -282,7 +283,7 @@ class Host:
             try:
                 folder_listing = self.list_folder(path)
             except FileNotFoundError:
-                self.channel.output(Msg().error("Folder not found:").print(path))
+                self.channel.output(Msg().error("Folder not found:").print("{}", path))
                 if old_path is None:
                     # list_dir must have failed on the results from get_home_folder()
                     # Let's just give up :(
@@ -308,7 +309,7 @@ class Host:
             old_path = path
             path = path.append(choice)
 
-    def _choose_folder_gui(self, start_path: Optional[Path] = None) -> Optional[Path]:
+    def _choose_folder_gui(self, start_path: Path = None) -> Optional[Path]:
         """
         Interactively choose a folder via a graphical interface. This should be overridden by
         subclasses if it is possible to show the user a GUI file chooser window. Otherwise,
@@ -316,7 +317,7 @@ class Host:
         """
         return self._choose_folder_cli(start_path)
 
-    def choose_folder(self, start_path: Optional[Path] = None) -> Optional[Path]:
+    def choose_folder(self, start_path: Path = None) -> Optional[Path]:
         """
         Interactively choose a folder, using either a CLI implementation or a subclass's GUI
         implementation (if available, and if the user doesn't explicitly prefer the CLI).
@@ -340,7 +341,7 @@ class Host:
         """
         raise NotImplementedError()
 
-    def open_shell(self, path: Path, environment: Dict[str, str]):
+    def open_shell(self, path: Path, environment: Dict[str, str]) -> None:
         """
         Open a shell or terminal window, initialized to the provided path. This method should
         return immediately after opening the shell; it should not wait for the shell window to be
@@ -353,7 +354,7 @@ class Host:
         """
         raise NotImplementedError("Not implemented for this host type")
 
-    def open_folder(self, path: Path):
+    def open_folder(self, path: Path) -> None:
         """
         Open a GUI view of a folder (e.g. Windows Explorer, Finder, Nautilus, Nemo, PCManFM, etc.)
         at the provided folder path. This method should return immediately after opening the folder
@@ -386,9 +387,9 @@ class LocalHost(Host):
     class LocalBackgroundCommand(BackgroundCommand):
         logger = get_logger("hosts.LocalBackgroundCommand")
 
-        def __init__(self, process: subprocess.Popen, command_str: str, path: Path):
+        def __init__(self, process: subprocess.Popen, command_str: str, path: Path) -> None:
             super().__init__()
-            self._process: subprocess.Popen = process
+            self._process = process
             self._done = False
             self._lock = threading.Lock()
             self._command_str = command_str
@@ -397,16 +398,16 @@ class LocalHost(Host):
         def get_description(self) -> str:
             return "{} (in {})".format(self._command_str, self._path)
 
-        def _we_are_done(self):
+        def _we_are_done(self) -> None:
             self.logger.debug("Background command DONE: {}", self.get_description())
             self._done = True
-            output: str = self._process.communicate()[0]
+            output = self._process.communicate()[0]  # type: str
             self._add_output(output)
             if self._process.returncode != 0:
                 self._set_error("Command had nonzero return code: {}"
                                 .format(self._process.returncode))
 
-        def wait(self):
+        def wait(self) -> None:
             with self._lock:
                 if self._done:
                     return
@@ -418,7 +419,7 @@ class LocalHost(Host):
                     self._set_error("Command interrupted")
                 self._we_are_done()
 
-        def kill(self):
+        def kill(self) -> None:
             with self._lock:
                 if self._done:
                     return
@@ -429,28 +430,29 @@ class LocalHost(Host):
                 self._we_are_done()
 
     def _start_process(self, command: str, path: Path, environment: Dict[str, str],
-                       **kwargs) -> subprocess.Popen:
+                       **kwargs: Any) -> subprocess.Popen:
+        args = command  # type: Union[str, List[str]]
         if self.settings.shell_command:
             # Use the user-provided shell
-            command = [self.settings.shell_command, command]
+            args = [self.settings.shell_command, command]
         else:
             # Let the platform default shell parse the command
             kwargs["shell"] = True
 
-        local_path_str = self.gradefast_path_to_local_path(path).path
-        self.logger.debug("Starting process {!r} (cwd: {})", command, local_path_str)
+        local_path_str = self.gradefast_path_to_local_path(path).get_local_path()
+        self.logger.debug("Starting process {!r} (cwd: {})", args, local_path_str)
         try:
-            return subprocess.Popen(command, cwd=local_path_str, env=environment,
+            return subprocess.Popen(args, cwd=local_path_str, env=environment,
                                     universal_newlines=True, **kwargs)
         except (NotADirectoryError, FileNotFoundError) as ex:
             raise CommandStartError("File or directory not found: " + str(ex))
 
     def _start_process_with_pipes(self, command: str, path: Path, environment: Dict[str, str],
-                                  **kwargs) -> subprocess.Popen:
+                                  **kwargs: Any) -> subprocess.Popen:
         return self._start_process(command, path, environment, stdin=subprocess.PIPE,
                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, **kwargs)
 
-    def _kill_process_gracefully(self, process: subprocess.Popen):
+    def _kill_process_gracefully(self, process: subprocess.Popen) -> None:
         # Stop the process gracefully (with a "SIGTERM")
         process.terminate()
         # We won't leave until the process is actually dead
@@ -464,10 +466,9 @@ class LocalHost(Host):
                     process.kill()
 
     @staticmethod
-    def _try_stdin_write(process: subprocess.Popen, stdin: str = None):
+    def _try_stdin_write(process: subprocess.Popen, stdin: str = None) -> None:
         if stdin is not None:
             try:
-                LocalHost.logger.debug("Writing to stdin of process {!r}\n{}", process.args, stdin)
                 process.stdin.write(stdin + "\n")
             except BrokenPipeError:
                 LocalHost.logger.debug("BrokenPipeError when writing to stdin of process {!r}",
@@ -476,12 +477,13 @@ class LocalHost(Host):
                 if e.errno == errno.EINVAL and process.poll() is not None:
                     # On Windows, stdin.write() fails with EINVAL if the process already exited
                     # before the write
-                    pass
+                    LocalHost.logger.debug("Errno EINVAL when writing to stdin of process {!r}",
+                                           process.args)
                 else:
                     raise
 
     @staticmethod
-    def _try_stdin_close(process: subprocess.Popen):
+    def _try_stdin_close(process: subprocess.Popen) -> None:
         try:
             LocalHost.logger.debug("Closing stdin of process {!r}", process.args)
             process.stdin.close()
@@ -497,7 +499,7 @@ class LocalHost(Host):
     @staticmethod
     def _stdout_reader_thread(process: subprocess.Popen, buffer: io.StringIO,
                               output_func: Optional[Callable[[Msg], None]],
-                              print_status_when_done: threading.Event):
+                              print_status_when_done: threading.Event) -> None:
         LocalHost.logger.debug("Started thread to read from stdout of process {!r}", process.args)
         while True:
             data = None
@@ -518,7 +520,7 @@ class LocalHost(Host):
                 output_func(Msg(end="").status("Press Enter to continue..."))
 
     def run_command(self, command: str, path: Path, environment: Dict[str, str],
-                    stdin: Optional[str] = None, print_output: bool = True) -> str:
+                    stdin: str = None, print_output: bool = True) -> str:
         self.logger.info("Running command {!r}", command)
 
         with self.channel.blocking_io() as (output_func, input_func, prompt_func):
@@ -567,7 +569,8 @@ class LocalHost(Host):
         output.seek(0)
         return output.read()
 
-    def run_command_passthrough(self, command: str, path: Path, environment: Dict[str, str]):
+    def run_command_passthrough(self, command: str, path: Path,
+                                environment: Dict[str, str]) -> None:
         self.logger.info("Running command without I/O wrapping: {!r}", command)
         process = self._start_process(command, path, environment)
         try:
@@ -579,7 +582,7 @@ class LocalHost(Host):
             raise CommandRunError("Command had nonzero return code: {}".format(process.returncode))
 
     def start_background_command(self, command: str, path: Path, environment: Dict[str, str],
-                                 stdin: Optional[str] = None) -> BackgroundCommand:
+                                 stdin: str = None) -> BackgroundCommand:
         self.logger.info("Starting background command {!r}", command)
         process = self._start_process_with_pipes(command, path, environment, bufsize=0)
         LocalHost._try_stdin_write(process, stdin)
@@ -598,61 +601,62 @@ class LocalHost(Host):
     def local_path_to_gradefast_path(self, local_path: LocalPath) -> Path:
         # Overridden for Windows in LocalWindowsHost
         home_dir = os.path.expanduser("~")
-        path_str = local_path.path
-        if path_str.startswith(home_dir):
-            return Path("~" + path_str[len(home_dir):])
-        return Path(os.path.normpath(path_str))
+        local_path_str = local_path.get_local_path()
+        if local_path_str.startswith(home_dir):
+            return Path("~" + local_path_str[len(home_dir):])
+        return Path(os.path.normpath(local_path_str))
 
     def exists(self, path: Path) -> bool:
-        return os.path.exists(self.gradefast_path_to_local_path(path))
+        return os.path.exists(self.gradefast_path_to_local_path(path).get_local_path())
 
     def folder_exists(self, path: Path) -> bool:
-        return os.path.isdir(self.gradefast_path_to_local_path(path))
+        return os.path.isdir(self.gradefast_path_to_local_path(path).get_local_path())
 
-    def move_to_folder(self, path: Path, folder_path: Path):
+    def move_to_folder(self, path: Path, folder_path: Path) -> None:
         local_path = self.gradefast_path_to_local_path(path)
         folder_local_path = self.gradefast_path_to_local_path(folder_path)
-        file_local_path = LocalPath(os.path.join(folder_local_path, path.basename()))
-        if not os.path.exists(folder_local_path):
-            os.mkdir(folder_local_path)
-        os.rename(local_path, file_local_path)
+        file_local_path = LocalPath(os.path.join(folder_local_path.get_local_path(),
+                                                 path.basename()))
+        if not os.path.exists(folder_local_path.get_local_path()):
+            os.mkdir(folder_local_path.get_local_path())
+        os.rename(local_path.get_local_path(), file_local_path.get_local_path())
 
-    def unzip(self, path: Path, folder_path: Path):
+    def unzip(self, path: Path, folder_path: Path) -> None:
         local_path = self.gradefast_path_to_local_path(path)
         folder_local_path = self.gradefast_path_to_local_path(folder_path)
-        if not os.path.exists(folder_local_path):
-            os.mkdir(folder_local_path)
-        zipfile.ZipFile(local_path.path, "r").extractall(folder_local_path.path)
+        if not os.path.exists(folder_local_path.get_local_path()):
+            os.mkdir(folder_local_path.get_local_path())
+        zipfile.ZipFile(local_path.get_local_path(), "r").extractall(
+            folder_local_path.get_local_path())
 
     def get_home_folder(self) -> Path:
         return self.local_path_to_gradefast_path(LocalPath(os.path.expanduser("~")))
 
-    def list_folder(self, path: Path = None) -> List[Tuple[str, str, bool]]:
-        with os.scandir(self.gradefast_path_to_local_path(path)) as it:
-            results = []
-            for entry in it:
-                entry: os.DirEntry = entry
-                type = None
-                if entry.is_dir():
-                    type = "folder"
-                elif entry.is_file():
-                    type = "file"
-                results.append((entry.name, type, entry.is_symlink()))
-            return results
+    def list_folder(self, path: Path) -> List[Tuple[str, str, bool]]:
+        results = []
+        for entry in os.scandir(self.gradefast_path_to_local_path(path).get_local_path()):
+            type = None
+            if entry.is_dir():
+                type = "folder"
+            elif entry.is_file():
+                type = "file"
+            results.append((entry.name, type, entry.is_symlink()))
+        return results
 
     def read_text_file(self, path: Path) -> str:
-        with open(self.gradefast_path_to_local_path(path).path) as f:
+        with open(self.gradefast_path_to_local_path(path).get_local_path()) as f:
             return f.read()
 
-    def open_shell(self, path: Path, environment: Dict[str, str]):
+    def open_shell(self, path: Path, environment: Dict[str, str]) -> None:
         if self.settings.terminal_command:
             local_path = self.gradefast_path_to_local_path(path)
-            _open_in_background([self.settings.terminal_command, local_path.path], environment)
+            _open_in_background([self.settings.terminal_command, local_path.get_local_path()],
+                                environment)
         else:
             raise NotImplementedError()
 
 
-def _open_in_background(args, env=None):
+def _open_in_background(args: Union[str, List[str]], env: Dict[str, str] = None) -> None:
     subprocess.Popen(args, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                      stderr=subprocess.DEVNULL)
 
@@ -672,13 +676,14 @@ class LocalWindowsHost(LocalHost):
     def local_path_to_gradefast_path(self, local_path: LocalPath) -> Path:
         # Overrides LocalHost's POSIX-specific implementation
         home_path = os.path.expanduser("~")
-        local_path_str = local_path.path
+        local_path_str = local_path.get_local_path()
         if local_path_str.startswith(home_path):
             local_path_str = "~" + local_path_str[len(home_path):]
         return Path(local_path_str.replace("\\", "/"))
 
-    def _choose_folder_gui(self, start_path: Optional[Path] = None) -> Optional[Path]:
-        if start_path and not os.path.isdir(self.gradefast_path_to_local_path(start_path)):
+    def _choose_folder_gui(self, start_path: Path = None) -> Optional[Path]:
+        if start_path and not os.path.isdir(self.gradefast_path_to_local_path(start_path)
+                                                .get_local_path()):
             start_path = None
         if not start_path:
             start_path = self.get_home_folder()
@@ -709,10 +714,10 @@ class LocalWindowsHost(LocalHost):
         self.logger.debug("Starting powershell process to choose folder")
         process = subprocess.Popen(
             ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", "-"],
-            cwd=self.gradefast_path_to_local_path(start_path).path,
+            cwd=self.gradefast_path_to_local_path(start_path).get_local_path(),
             universal_newlines=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL)
-        local_path_str: str = process.communicate(script)[0]
+        local_path_str = process.communicate(script)[0]  # type: str
         self.logger.debug("powershell return code: {}; output: {}",
                           process.returncode, local_path_str)
         if process.returncode == 0:
@@ -722,12 +727,12 @@ class LocalWindowsHost(LocalHost):
                 return self.local_path_to_gradefast_path(LocalPath(local_path_str))
         return None
 
-    def open_shell(self, path: Path, environment: Dict[str, str]):
+    def open_shell(self, path: Path, environment: Dict[str, str]) -> None:
         if self.settings.terminal_command:
             super().open_shell(path, environment)
             return
 
-        local_path_str = self.gradefast_path_to_local_path(path).path
+        local_path_str = self.gradefast_path_to_local_path(path).get_local_path()
         if local_path_str.find('"') != -1:
             # Just get rid of parts with double-quotes
             local_path_str = local_path_str[0:local_path_str.find('"')]
@@ -737,8 +742,8 @@ class LocalWindowsHost(LocalHost):
         _open_in_background(["start", "cmd", "/K", 'cd "{}"'.format(local_path_str)],
                             env=environment)
 
-    def open_folder(self, path: Path):
-        local_path_str = self.gradefast_path_to_local_path(path).path
+    def open_folder(self, path: Path) -> None:
+        local_path_str = self.gradefast_path_to_local_path(path).get_local_path()
         self.logger.debug("Using startfile to open folder at {}", local_path_str)
         os.startfile(local_path_str)
 
@@ -748,21 +753,22 @@ class LocalMacHost(LocalHost):
     Extension of LocalHost for Mac OS X.
     """
 
-    def _choose_folder_gui(self, start_path: Optional[Path] = None) -> Optional[Path]:
-        if start_path and not os.path.isdir(self.gradefast_path_to_local_path(start_path)):
+    def _choose_folder_gui(self, start_path: Path = None) -> Optional[Path]:
+        if start_path and not os.path.isdir(self.gradefast_path_to_local_path(start_path)
+                                                .get_local_path()):
             start_path = None
 
         args = ["osascript", "-"]
         if start_path is None:
             stdin = "return POSIX path of (choose folder)"
         else:
-            args += [self.gradefast_path_to_local_path(start_path).path]
+            args += [self.gradefast_path_to_local_path(start_path).get_local_path()]
             stdin = "return POSIX path of " + \
                     "(choose folder default location POSIX path of item 1 of argv)"
         self.logger.debug("Starting osascript process to choose folder")
         process = subprocess.Popen(args, universal_newlines=True, stdin=subprocess.PIPE,
                                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-        local_path_str: str = process.communicate(stdin)[0].strip()
+        local_path_str = process.communicate(stdin)[0].strip()  # type: str
         self.logger.debug("osascript return code: {}; output: {}",
                           process.returncode, local_path_str)
         if process.returncode == 0 and local_path_str:
@@ -770,17 +776,17 @@ class LocalMacHost(LocalHost):
         else:
             return None
 
-    def open_shell(self, path: Path, environment: Dict[str, str]):
+    def open_shell(self, path: Path, environment: Dict[str, str]) -> None:
         if self.settings.terminal_command:
             super().open_shell(path, environment)
             return
 
-        local_path_str = self.gradefast_path_to_local_path(path).path
+        local_path_str = self.gradefast_path_to_local_path(path).get_local_path()
         self.logger.debug("Using \"open\" to open Terminal.app at {}", local_path_str)
         _open_in_background(["open", "-a", "Terminal", local_path_str], env=environment)
 
-    def open_folder(self, path: Path):
-        local_path_str = self.gradefast_path_to_local_path(path).path
+    def open_folder(self, path: Path) -> None:
+        local_path_str = self.gradefast_path_to_local_path(path).get_local_path()
         self.logger.debug("Using \"open\" to open folder at {}", local_path_str)
         _open_in_background(["open", local_path_str])
 
@@ -790,12 +796,12 @@ class LocalLinuxHost(LocalHost):
     Extension of LocalHost for Linux.
     """
 
-    def open_shell(self, path: Path, environment: Dict[str, str]):
+    def open_shell(self, path: Path, environment: Dict[str, str]) -> None:
         if self.settings.terminal_command:
             super().open_shell(path, environment)
             return
 
-        local_path_str = self.gradefast_path_to_local_path(path).path
+        local_path_str = self.gradefast_path_to_local_path(path).get_local_path()
         if shutil.which("exo-open"):
             # Use the system's default terminal emulator
             self.logger.debug("Using exo-open to open shell at {}", local_path_str)
@@ -823,7 +829,7 @@ class LocalLinuxHost(LocalHost):
         else:
             raise NotImplementedError("No terminal emulator found")
 
-    def open_folder(self, path: Path):
-        local_path_str = self.gradefast_path_to_local_path(path).path
+    def open_folder(self, path: Path) -> None:
+        local_path_str = self.gradefast_path_to_local_path(path).get_local_path()
         self.logger.debug("Using xdg-open to open folder at {}", local_path_str)
         _open_in_background(["xdg-open", local_path_str])

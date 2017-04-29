@@ -11,7 +11,7 @@ import os
 import random
 import re
 from collections import defaultdict
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from iochannels import Channel, HTMLMemoryLog, MemoryLog, Msg
 from pyprovide import Injector, inject
@@ -21,7 +21,7 @@ from gradefast.grader import eventhandlers
 from gradefast.grader.banners import BANNERS
 from gradefast.hosts import BackgroundCommand, CommandRunError, CommandStartError, Host
 from gradefast.log import get_logger
-from gradefast.models import Command, CommandItem, CommandSet, Path, Settings, Submission
+from gradefast.models import Command, CommandItem, Path, Settings, Submission
 
 _logger = get_logger("grader")
 
@@ -33,18 +33,18 @@ class Grader:
 
     @inject(injector=Injector.CURRENT_INJECTOR)
     def __init__(self, injector: Injector, channel: Channel, host: Host,
-                 event_manager: events.EventManager, settings: Settings):
+                 event_manager: events.EventManager, settings: Settings) -> None:
         self.injector = injector
-        self.channel: Channel = channel
-        self.host: Host = host
-        self.event_manager: events.EventManager = event_manager
-        self.settings: Settings = settings
+        self.channel = channel
+        self.host = host
+        self.event_manager = event_manager
+        self.settings = settings
 
-        self._submissions: List[Submission] = []
+        self._submissions = []  # type: List[Submission]
 
         event_manager.register_all_event_handlers(eventhandlers)
 
-    def prompt_for_submissions(self):
+    def prompt_for_submissions(self) -> bool:
         """
         Nag the user into choosing at least one folder of submissions. The user is prompted
         (repeatedly) to choose the folder.
@@ -74,7 +74,7 @@ class Grader:
 
         return len(self._submissions) > 0
 
-    def add_submissions(self, base_folder: Optional[Path] = None):
+    def add_submissions(self, base_folder: Path = None) -> bool:
         """
         Add a folder of submissions to our list of submissions. The user is prompted to choose the
         folder.
@@ -102,22 +102,30 @@ class Grader:
             return False
 
         # Step 2: Find matching submissions
-        regex = re.compile(self.settings.submission_regex)
+        regex = None
+        if self.settings.submission_regex:
+            regex = re.compile(self.settings.submission_regex)
 
         for name, type, is_link in sorted(self.host.list_folder(path)):
-            submission_match = None
-            folder_path = None
+            submission_match = False  # type: Any
+            folder_path = None  # type: Path
 
             valid_submission = False
             if type == "folder":
-                submission_match = regex.fullmatch(name)
+                if regex:
+                    submission_match = regex.fullmatch(name)
+                else:
+                    submission_match = True
                 if submission_match:
                     self.channel.print("Found submission folder: {}", name)
                     folder_path = path.append(name)
                     valid_submission = True
             elif type == "file" and name.find(".") > 0:
                 name, ext = name.rsplit(".", maxsplit=1)
-                submission_match = regex.fullmatch(name)
+                if regex:
+                    submission_match = regex.fullmatch(name)
+                else:
+                    submission_match = True
                 if submission_match and not self.host.exists(path.append(name)):
                     folder_path = path.append(name)
                     file_path = path.append(name + "." + ext)
@@ -135,10 +143,11 @@ class Grader:
             if valid_submission:
                 submission_id = len(self._submissions) + 1
                 submission_name = name
-                for group in submission_match.groups():
-                    if group:
-                        submission_name = group
-                        break
+                if regex:
+                    for group in submission_match.groups():
+                        if group:
+                            submission_name = group
+                            break
                 self._submissions.append(Submission(
                     submission_id, submission_name, name, folder_path))
 
@@ -148,7 +157,7 @@ class Grader:
 
         return True
 
-    def run_commands(self):
+    def run_commands(self) -> None:
         """
         Run some commands on each of the previously added submissions.
 
@@ -163,7 +172,7 @@ class Grader:
 
         submission_id = 1
         total = len(self._submissions)
-        background_commands: List[BackgroundCommand] = []
+        background_commands = []  # type: List[BackgroundCommand]
         while True:
             submission = self._submissions[submission_id - 1]
 
@@ -261,7 +270,7 @@ class Grader:
         self.event_manager.dispatch_event(events.EndOfSubmissionsEvent())
 
         for background_command in background_commands:
-            background_command: BackgroundCommand = background_command
+            background_command = background_command
             self.channel.print()
             self.channel.status("Waiting for background command {} ...",
                                 background_command.get_description())
@@ -280,17 +289,17 @@ class CommandRunner:
     """
 
     def __init__(self, injector: Injector, channel: Channel, host: Host, settings: Settings,
-                 submission: Submission):
+                 submission: Submission) -> None:
         """
         Initialize a new CommandRunner to use for running commands on a submission.
         """
         self.injector = injector
-        self.channel: Channel = channel
-        self.host: Host = host
+        self.channel = channel
+        self.host = host
         self.settings = settings
-        self._submission: Submission = submission
+        self._submission = submission
 
-        self._background_commands: List[BackgroundCommand] = []
+        self._background_commands = []  # type: List[BackgroundCommand]
 
     def _check_folder(self, path: Path) -> Optional[Path]:
         """
@@ -366,7 +375,7 @@ class CommandRunner:
             path = base_path
         return self._check_folder(path)
 
-    def _get_modified_command(self, command: CommandItem):
+    def _get_modified_command(self, command: CommandItem) -> CommandItem:
         """
         Prompt the user for a modified version of a command.
 
@@ -381,7 +390,7 @@ class CommandRunner:
             return command
         return command.get_modified(new_command)
 
-    def run(self):
+    def run(self) -> None:
         """
         Run the commands on the submission.
         """
@@ -393,7 +402,7 @@ class CommandRunner:
                 self.channel.error("Skipping submission")
                 return
 
-            self._do_command_set(self.settings.commands, base_path, self.settings.base_env)
+            self._do_command_set(self.settings.commands, base_path, self.settings.base_env or {})
         except (InterruptedError, KeyboardInterrupt):
             self.channel.print("")
             self.channel.error("Submission interrupted")
@@ -429,7 +438,6 @@ class CommandRunner:
         for command in commands:
             if hasattr(command, "commands"):
                 # It's a command set
-                command: CommandSet = command
 
                 msg = Msg(sep="").print("\n").status("Command Set")
                 if command.name:
@@ -468,7 +476,6 @@ class CommandRunner:
                 self.channel.print()
             else:
                 # It's a command item
-                command: CommandItem = command
 
                 # Run the command
                 # If it returns False, then we want to skip the rest of this submission
@@ -566,7 +573,7 @@ class CommandRunner:
                 return True
 
     def _run_background_command(self, command: CommandItem, path: Path,
-                                environment: Dict[str, str]):
+                                environment: Dict[str, str]) -> None:
         """
         Actually run an individual background command.
 
@@ -585,7 +592,7 @@ class CommandRunner:
             self.channel.status("Background command started.")
 
     def _run_foreground_command(self, command: CommandItem, path: Path,
-                                environment: Dict[str, str]):
+                                environment: Dict[str, str]) -> None:
         """
         Actually run an individual foreground command.
 
@@ -602,9 +609,10 @@ class CommandRunner:
                 diff_reference = command.diff.content
                 diff_reference_source = "content from command config"
             elif command.diff.file and self.settings.diff_file_path:
-                diff_path = os.path.join(self.settings.diff_file_path, command.diff.file)
+                local_diff_path = os.path.join(self.settings.diff_file_path.get_local_path(),
+                                               command.diff.file)
                 try:
-                    with open(diff_path) as f:
+                    with open(local_diff_path) as f:
                         diff_reference = f.read()
                     diff_reference_source = "local file ({})".format(command.diff.file)
                 except FileNotFoundError:
@@ -632,9 +640,10 @@ class CommandRunner:
                 self.channel.error("Diff object doesn't include "
                                    "\"content\", \"file\", \"submission_file\", or \"command\"")
 
+        output = None
         try:
             if command.is_passthrough:
-                output = self.host.run_command_passthrough(command.command, path, environment)
+                self.host.run_command_passthrough(command.command, path, environment)
             else:
                 output = self.host.run_command(command.command, path, environment, command.stdin)
         except CommandStartError as e:
@@ -653,8 +662,8 @@ class CommandRunner:
             self._print_diff(output, diff_reference, command.diff)
 
     @staticmethod
-    def _clean_lines(lines: List[str], collapse_whitespace: bool = False) -> \
-            Tuple[List[str], Dict[str, List[str]]]:
+    def _clean_lines(lines: List[str], collapse_whitespace: bool = False) \
+            -> Tuple[List[str], Dict[str, List[str]]]:
         """
         Clean up some lines of output to make diffing work better. In particular, make an
         entirely-lowercase version and optionally collapse whitespace.
@@ -663,8 +672,8 @@ class CommandRunner:
             (each ending with a newline) and a dictionary mapping each cleaned-up line to a list
             of the original line(s) that it came from (none ending with a newline).
         """
-        clean_to_orig = defaultdict(lambda: [])
-        clean_lines = []
+        clean_to_orig = defaultdict(lambda: [])  # type: Dict[str, List[str]]
+        clean_lines = []  # type: List[str]
         for line in lines:
             if collapse_whitespace:
                 line = re.sub(r'\s+', " ", line.strip())
@@ -676,7 +685,7 @@ class CommandRunner:
             clean_to_orig[clean_line].append(line)
         return clean_lines, clean_to_orig
 
-    def _print_diff(self, output: str, reference: str, options: CommandItem.Diff):
+    def _print_diff(self, output: str, reference: str, options: CommandItem.Diff) -> None:
         """
         Print the results of performing a diff between "output" and "reference".
         """
@@ -688,14 +697,14 @@ class CommandRunner:
         self.channel.print   ("")
 
         # Split everything by lines
-        output = output.splitlines()
-        reference = reference.splitlines()
+        output_lines = output.splitlines()
+        reference_lines = reference.splitlines()
 
         # Try some metric-level hackery to ignore case and clean up a bit
         reference_clean, reference_orig = CommandRunner._clean_lines(
-            reference, options.collapse_whitespace)
+            reference_lines, options.collapse_whitespace)
         output_clean, output_orig = CommandRunner._clean_lines(
-            output, options.collapse_whitespace)
+            output_lines, options.collapse_whitespace)
 
         # Print that diff!
         for line in difflib.ndiff(reference_clean, output_clean):

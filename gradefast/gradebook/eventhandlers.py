@@ -21,7 +21,7 @@ __all__ = [
 _logger = get_logger("gradebook.eventhandlers")
 
 
-class GradeBookEventHandler(events.EventNameHandler, event=None):
+class GradeBookEventHandler(events.EventNameHandler):
     """
     An abstract subclass of EventNameHandler for GradeBook event handlers.
 
@@ -30,38 +30,43 @@ class GradeBookEventHandler(events.EventNameHandler, event=None):
     sure that that is the case here, we use the GradeBook's "event_lock".
     """
 
-    def __init_subclass__(cls, event: str):
-        super().__init_subclass__(event)
-
-    def __init__(self, gradebook_instance):
+    def __init__(self, gradebook_instance) -> None:
         self.gradebook_instance = gradebook_instance
 
-    def handle(self, event: events.Event):
+    def handle(self, event: events.Event) -> None:
         _logger.debug("{} got event {}", self.__class__.__name__, event)
         with self.gradebook_instance.event_lock:
             _logger.info("{} handling event {}", self.__class__.__name__, event)
             self._handle_sync(event)
 
-    def _handle_sync(self, event: events.Event):
+    def _handle_sync(self, event: events.Event) -> None:
         raise NotImplementedError()
 
 
-class NewSubmissionListHandler(GradeBookEventHandler, event="NewSubmissionListEvent"):
-    def _handle_sync(self, event: events.NewSubmissionListEvent):
+class NewSubmissionListHandler(GradeBookEventHandler):
+    handled_event_name = "NewSubmissionListEvent"
+
+    def _handle_sync(self, event: events.NewSubmissionListEvent) -> None:
         self.gradebook_instance.set_submission_list(event.submissions)
 
 
-class SubmissionStartedHandler(GradeBookEventHandler, event="SubmissionStartedEvent"):
-    def _handle_sync(self, event: events.SubmissionStartedEvent):
+class SubmissionStartedHandler(GradeBookEventHandler):
+    handled_event_name = "SubmissionStartedEvent"
+
+    def _handle_sync(self, event: events.SubmissionStartedEvent) -> None:
         self.gradebook_instance.set_current_submission(
             event.submission_id, event.html_log, event.text_log)
 
 
-class EndOfSubmissionsHandler(GradeBookEventHandler, event="EndOfSubmissionsEvent"):
-    def _handle_sync(self, event: events.EndOfSubmissionsEvent):
+class EndOfSubmissionsHandler(GradeBookEventHandler):
+    handled_event_name = "EndOfSubmissionsEvent"
+
+    def _handle_sync(self, event: events.EndOfSubmissionsEvent) -> None:
         self.gradebook_instance.set_done(True)
 
 
-class AuthGrantedEventHandler(GradeBookEventHandler, event="AuthGrantedEvent"):
-    def _handle_sync(self, event: events.AuthGrantedEvent):
+class AuthGrantedEventHandler(GradeBookEventHandler):
+    handled_event_name = "AuthGrantedEvent"
+
+    def _handle_sync(self, event: events.AuthGrantedEvent) -> None:
         self.gradebook_instance.auth_granted(event.auth_event_id)

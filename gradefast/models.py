@@ -8,7 +8,6 @@ Author: Jake Hartz <jake@hartz.io>
 
 import collections
 import posixpath
-from os import PathLike
 from typing import Dict, List, NamedTuple, Optional, Union
 
 
@@ -56,9 +55,8 @@ class CommandItem(SlotEqualityMixin):
     class Diff(SlotEqualityMixin):
         __slots__ = ("content", "file", "submission_file", "command", "collapse_whitespace")
 
-        def __init__(self, content: Optional[str] = None, file: Optional[str] = None,
-                     submission_file: Optional[str] = None, command: Optional[str] = None,
-                     collapse_whitespace: Optional[bool] = False):
+        def __init__(self, content: str = None, file: str = None, submission_file: str = None,
+                     command: str = None, collapse_whitespace: Optional[bool] = False) -> None:
             """
             ONE AND ONLY ONE of the following parameters must be provided:
             content, file, submission_file, or command.
@@ -73,9 +71,9 @@ class CommandItem(SlotEqualityMixin):
 
             self.collapse_whitespace = collapse_whitespace
 
-    def __init__(self, name: str, command: str, environment: Optional[Dict[str, str]] = None,
+    def __init__(self, name: str, command: str, environment: Dict[str, str] = None,
                  is_background: Optional[bool] = False, is_passthrough: Optional[bool] = False,
-                 stdin: Optional[str] = None, diff: Optional["Diff"] = None):
+                 stdin: str = None, diff: "Diff" = None) -> None:
         self.name = name
         self.command = command
         self.environment = environment or {}
@@ -85,7 +83,7 @@ class CommandItem(SlotEqualityMixin):
         self.diff = diff
         self.version = 1
 
-    def get_name(self):
+    def get_name(self) -> str:
         if self.version > 1:
             return "{} ({})".format(self.name, self.version)
         return self.name
@@ -96,7 +94,7 @@ class CommandItem(SlotEqualityMixin):
         command_item.version += self.version
         return command_item
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "{}: {!r}".format(self.get_name(), self.command)
 
 
@@ -107,9 +105,8 @@ class CommandSet(SlotEqualityMixin):
 
     __slots__ = ("name", "commands", "folder", "environment")
 
-    def __init__(self, commands: List["Command"], name: Optional[str] = None,
-                 folder: Optional[Union[str, List[str]]] = None,
-                 environment: Optional[Dict[str, str]] = None):
+    def __init__(self, commands: List[Union[CommandItem, "CommandSet"]], name: str = None,
+                 folder: Union[str, List[str]] = None, environment: Dict[str, str] = None) -> None:
         self.name = name
         self.commands = commands
         self.folder = folder
@@ -128,38 +125,30 @@ ScoreNumber = Union[int, float]
 # Will usually be passed to "make_score_number" to convert to a ScoreNumber
 WeakScoreNumber = Union[ScoreNumber, str]
 
-
-class Hint(NamedTuple):
-    name: str
-    value: ScoreNumber
-
-
-class GradeScore(NamedTuple):
-    """
-    See https://github.com/jhartz/gradefast/wiki/Grade-Structure#grade-score
-    """
-
-    name: str
-    points: ScoreNumber
-    hints: List[Hint]
-    default_enabled: bool
-    default_score: ScoreNumber
-    default_comments: str
-    note: str
+Hint = NamedTuple("Hint", [
+    ("name", str),
+    ("value", ScoreNumber),
+])
 
 
-class GradeSection(NamedTuple):
-    """
-    See https://github.com/jhartz/gradefast/wiki/Grade-Structure#grade-section
-    """
+GradeScore = NamedTuple("GradeScore", [
+    ("name", str),
+    ("points", ScoreNumber),
+    ("hints", List[Hint]),
+    ("default_enabled", bool),
+    ("default_score", ScoreNumber),
+    ("default_comments", str),
+    ("note", str),
+])
 
-    name: str
-    grades: List[Union[GradeScore, "GradeSection"]]
-    hints: List[Hint]
-    default_enabled: bool
-    deduct_percent_if_late: ScoreNumber
-    note: str
-
+GradeSection = NamedTuple("GradeSection", [
+    ("name", str),
+    ("grades", List[Union[GradeScore, "GradeSection"]]),
+    ("hints", List[Hint]),
+    ("default_enabled", bool),
+    ("deduct_percent_if_late", ScoreNumber),
+    ("note", str),
+])
 
 GradeItem = Union[GradeScore, GradeSection]
 
@@ -184,7 +173,7 @@ class Path(SlotEqualityMixin):
 
     __slots__ = ("_path",)
 
-    def __init__(self, gradefast_path: str):
+    def __init__(self, gradefast_path: str) -> None:
         """
         :param gradefast_path: A path following POSIX style.
         """
@@ -251,36 +240,35 @@ class Path(SlotEqualityMixin):
         """
         return posixpath.basename(self._path)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self._path
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "Path({!r})".format(self._path)
 
 
-class LocalPath(PathLike, SlotEqualityMixin):
+class LocalPath(SlotEqualityMixin):
     """
     Similar to Path, but the path is stored in the local operating system's format. You should NOT
     be using this class for anything that interacts with a Host instance (use Path instead).
 
     The path is just stored as a string; this class exists more for documentation purposes (to make
-    it clear which kind of path a section of code is using). Since it is a path-like object, you
-    can pass it directly to functions in the os.path module.
+    it clear which kind of path a section of code is using).
     """
 
-    __slots__ = ("path",)
+    __slots__ = ("_path",)
 
-    def __init__(self, path: str):
-        self.path = path
+    def __init__(self, path: str) -> None:
+        self._path = path
 
-    def __fspath__(self):
-        return self.path
+    def get_local_path(self) -> str:
+        return self._path
 
-    def __str__(self):
-        return self.path
+    def __str__(self) -> str:
+        return self._path
 
-    def __repr__(self):
-        return "LocalPath({!r})".format(self.path)
+    def __repr__(self) -> str:
+        return "LocalPath({!r})".format(self._path)
 
 
 class Submission(SlotEqualityMixin):
@@ -290,7 +278,7 @@ class Submission(SlotEqualityMixin):
 
     __slots__ = ("id", "name", "full_name", "path")
 
-    def __init__(self, id: int, name: str, full_name: str, path: Path):
+    def __init__(self, id: int, name: str, full_name: str, path: Path) -> None:
         """
         Initialize a new Submission.
 
@@ -305,7 +293,7 @@ class Submission(SlotEqualityMixin):
         self.full_name = full_name
         self.path = path
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self.name != self.full_name:
             return "{} ({})".format(self.name, self.full_name)
         return self.name
@@ -319,43 +307,39 @@ class Submission(SlotEqualityMixin):
         }
 
 
-class Settings(NamedTuple):
-    """
-    Settings and metadata about a particular instance of GradeFast, including details about the
-    assignment currently being graded.
-    """
-
-    project_name: str
-    save_file: Optional[LocalPath]
-    log_file: Optional[LocalPath]
-    log_as_html: Optional[bool]
+Settings = NamedTuple("Settings", [
+    ("project_name", str),
+    ("save_file", Optional[LocalPath]),
+    ("log_file", Optional[LocalPath]),
+    ("log_as_html", Optional[bool]),
 
     # GradeBook settings
-    grade_structure: List[GradeItem]
-    host: int
-    port: int
+    ("grade_structure", List[GradeItem]),
+    ("host", int),
+    ("port", int),
 
     # Grader settings
-    commands: List[Command]
-    submission_regex: Optional[str]
-    check_zipfiles: bool
-    check_file_extensions: Optional[List[str]]
-    diff_file_path: Optional[LocalPath]
+    ("commands", List[Command]),
+    ("submission_regex", Optional[str]),
+    ("check_zipfiles", bool),
+    ("check_file_extensions", Optional[List[str]]),
+    ("diff_file_path", Optional[LocalPath]),
 
     # {Color,}CLIChannel (iochannels.py) settings
-    use_readline: bool
-    use_color: bool
+    ("use_readline", bool),
+    ("use_color", bool),
 
     # Host (hosts.py) settings
-    base_env: Optional[Dict[str, str]]
-    prefer_cli_file_chooser: bool
+    ("base_env", Optional[Dict[str, str]]),
+    ("prefer_cli_file_chooser", bool),
 
     # LocalHost (hosts.py) settings
     # These "command" settings aren't necessarily local paths or GradeFast paths (hell, they could
     # just be the string "sh" or something).
     # We'll trust the user to tailor these to whatever Host subclass is in play.
-    shell_command: Optional[str]
-    terminal_command: Optional[str]
+    ("shell_command", Optional[str]),
+    ("terminal_command", Optional[str]),
+])
 
 
 class SettingsDefaults:
@@ -391,7 +375,7 @@ class SettingsBuilder(collections.MutableMapping):
     Mutable builder class to build a Settings object.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.__dict__["_settings"] = {}
 
     def __getattr__(self, key):

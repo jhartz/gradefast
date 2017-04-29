@@ -14,7 +14,7 @@ import threading
 import time
 import uuid
 from collections import OrderedDict
-from typing import Dict, List, Optional, Set, Union
+from typing import Callable, Dict, Iterable, List, Set, TypeVar
 
 from iochannels import MemoryLog
 from pyprovide import inject
@@ -32,6 +32,8 @@ except ImportError:
 
 _logger = get_logger("gradebook")
 
+T = TypeVar("T")
+
 
 class GradeBook:
     """
@@ -39,52 +41,52 @@ class GradeBook:
     """
 
     @inject()
-    def __init__(self, event_manager: events.EventManager, settings: Settings):
+    def __init__(self, event_manager: events.EventManager, settings: Settings) -> None:
         """
         Create a WSGI app representing a grade book.
 
         A grade structure is a list of grade items (grade scores and grade sections). For more, see
         the GradeFast wiki: https://github.com/jhartz/gradefast/wiki/Grade-Structure
         """
-        self.settings: Settings = settings
+        self.settings = settings
 
         # Register our event handlers with the event manager
         self.event_lock = threading.Lock()
-        self.event_manager: events.EventManager = event_manager
+        self.event_manager = event_manager
         event_manager.register_all_event_handlers_with_args(eventhandlers, gradebook_instance=self)
 
-        self._grades_by_submission_id: Dict[int, grades.SubmissionGrade] = {}
-        self._current_submission_id: Optional[int] = None
-        self._submission_list: List[Submission] = []
-        self.is_done: bool = False
+        self._grades_by_submission_id = {}  # type: Dict[int, grades.SubmissionGrade]
+        self._current_submission_id = None  # type: int
+        self._submission_list = []  # type: List[Submission]
+        self.is_done = False
 
         # Each instance of the GradeBook client is given its own unique ID (a UUID).
         # They are stored in these sets.
-        self._client_ids: Set[uuid.UUID] = set()
-        self._authenticated_client_ids: Set[uuid.UUID] = set()
+        self._client_ids = set()  # type: Set[uuid.UUID]
+        self._authenticated_client_ids = set()  # type: Set[uuid.UUID]
 
         # When we send out an AuthRequestedEvent for a client, store the event ID here so we can
         # handle the corresponding AuthGrantedEvent when it comes.
-        self._auth_event_id_to_client_id = {}
+        self._auth_event_id_to_client_id = {}  # type: Dict[int, uuid.UUID]
 
         # When a client accesses the events stream, it has an "update queue" (a Queue that update
         # events are sent to).
-        self._client_update_queues: Dict[uuid.UUID, queue.Queue] = {}
+        self._client_update_queues = {}  # type: Dict[uuid.UUID, queue.Queue]
 
         # Secret key used by the client and any other integrations for accessing downloadables
         # (CSV and JSON).
         # This is sent to the client through the client's events stream after authentication.
-        self._data_keys: Set[uuid.UUID] = set()
+        self._data_keys = set()  # type: Set[uuid.UUID]
 
         # Secret key used by the client to access the events stream
         # (mapping an events key to a client ID).
         # This is included in the client's HTML page when it is loaded.
-        self._events_keys: Dict[uuid.UUID, uuid.UUID] = {}
+        self._events_keys = {}  # type: Dict[uuid.UUID, uuid.UUID]
 
         # Secret key used by the client for sending updates to the _update AJAX endpoint
         # (mapping a client ID to an update key).
         # This is sent to the client through the client's events stream after authentication.
-        self._client_update_keys: Dict[uuid.UUID, uuid.UUID] = {}
+        self._client_update_keys = {}  # type: Dict[uuid.UUID, uuid.UUID]
 
         # Set up MIME type for JS source map
         mimetypes.add_type("application/json", ".map")
@@ -97,7 +99,7 @@ class GradeBook:
         ###########################################################################################
         # Helper functions for Flask routes
 
-        def check_data_key():
+        def check_data_key() -> None:
             try:
                 key = uuid.UUID(flask.request.args["data_key"])
                 if key not in self._data_keys:
@@ -105,8 +107,9 @@ class GradeBook:
             except ValueError:
                 flask.abort(400)
 
-        def json_response(flask_response_args: Optional[dict] = None, **data) -> flask.Response:
-            kwargs: dict = flask_response_args or {}
+        def json_response(flask_response_args: Dict[str, object] = None,
+                          **data: object) -> flask.Response:
+            kwargs = flask_response_args or {}  # type: Dict[str, object]
             return flask.Response(utils.to_json(data),
                                   mimetype="application/json",
                                   **kwargs)
@@ -114,41 +117,43 @@ class GradeBook:
         def json_aight() -> flask.Response:
             return json_response(status="Aight")
 
-        def json_bad_request(status: str, **data) -> flask.Response:
+        def json_bad_request(status: str, **data: object) -> flask.Response:
             return json_response(flask_response_args={"status": 400}, status=status, **data)
 
-        def _get_value_from_form(field: str, constructor):
+        def _get_value_from_form(field: str, constructor: Callable[[str], T]) -> T:
+            # flask.abort will raise an exception (so the "raise" here does nothing but satisfy
+            # type checkers)
             if field not in flask.request.form:
-                return json_bad_request("Missing " + field)
+                raise flask.abort(json_bad_request("Missing " + field))
             try:
                 value = constructor(flask.request.form[field])
             except (ValueError, utils.JSONDecodeError):
-                return json_bad_request("Invalid " + field)
+                raise flask.abort(json_bad_request("Invalid " + field))
             return value
 
-        def get_uuid_from_form(field: str):
+        def get_uuid_from_form(field: str) -> uuid.UUID:
             return _get_value_from_form(field, uuid.UUID)
 
-        def get_int_from_form(field: str):
+        def get_int_from_form(field: str) -> int:
             return _get_value_from_form(field, int)
 
-        def get_json_form_field(field: str):
+        def get_json_form_field(field: str) -> object:
             return _get_value_from_form(field, utils.from_json)
 
         ###########################################################################################
         # Flask routes
 
         @app.route("/gradefast/")
-        def _gradefast_():
+        def _gradefast_() -> flask.Response:
             return flask.redirect(flask.url_for("_gradefast_gradebook_html"))
 
         @app.route("/gradefast/gradebook/")
-        def _gradefast_gradebook_():
+        def _gradefast_gradebook_() -> flask.Response:
             return flask.redirect(flask.url_for("_gradefast_gradebook_html"))
 
         # GradeBook page (yes, the HTM is solely for trolling, teehee)
         @app.route("/gradefast/gradebook.HTM")
-        def _gradefast_gradebook_html():
+        def _gradefast_gradebook_html() -> flask.Response:
             client_id = uuid.uuid4()
             events_key = uuid.uuid4()
             self._client_ids.add(client_id)
@@ -161,12 +166,12 @@ class GradeBook:
 
         # Grades CSV file
         @app.route("/gradefast/grades.csv")
-        def _gradefast_grades_csv():
+        def _gradefast_grades_csv() -> flask.Response:
             check_data_key()
             _logger.debug("Generating CSV export")
             csv_stream = self._get_csv()
 
-            def gen():
+            def gen() -> Iterable[str]:
                 try:
                     while True:
                         line = csv_stream.readline()
@@ -184,59 +189,61 @@ class GradeBook:
 
         # Grades JSON file
         @app.route("/gradefast/grades.json")
-        def _gradefast_grades_json():
+        def _gradefast_grades_json() -> flask.Response:
             check_data_key()
             _logger.debug("Generating JSON export")
             return flask.Response(self._get_json(), mimetype="application/json")
 
         # Log page (HTML)
         @app.route("/gradefast/log/<submission_id>.html")
-        def _gradefast_log_html(submission_id):
+        def _gradefast_log_html(submission_id: str) -> flask.Response:
             check_data_key()
-            grade = self.get_grade(submission_id)
-            if grade is None:
-                flask.abort(404)
-            else:
-                content_html = "\n\n\n<hr>\n\n\n\n".join(
-                    "{}\n\n{}\n\n{}\n\n".format(
-                        "Started: " + time.asctime(time.localtime(log.open_timestamp)),
-                        log.get_content(),
-                        "Finished: " + time.asctime(time.localtime(log.close_timestamp))
-                        if log.close_timestamp else "..."
-                    )
-                    for log in grade.get_html_logs()
+            try:
+                grade = self._grades_by_submission_id[int(submission_id)]
+            except (ValueError, IndexError):
+                raise flask.abort(404)
+
+            content_html = "\n\n\n<hr>\n\n\n\n".join(
+                "{}\n\n{}\n\n{}\n\n".format(
+                    "Started: " + time.asctime(time.localtime(log.open_timestamp)),
+                    log.get_content(),
+                    "Finished: " + time.asctime(time.localtime(log.close_timestamp))
+                    if log.close_timestamp else "..."
                 )
-                return flask.render_template(
-                    "log.html",
-                    title="Log for {}".format(grade.submission.name),
-                    content_html=content_html
-                )
+                for log in grade.get_html_logs()
+            )
+            return flask.render_template(
+                "log.html",
+                title="Log for {}".format(grade.submission.name),
+                content_html=content_html
+            )
 
         # Log page (plain text)
         @app.route("/gradefast/log/<submission_id>.txt")
-        def _gradefast_log_txt(submission_id):
+        def _gradefast_log_txt(submission_id: str) -> flask.Response:
             check_data_key()
-            grade = self.get_grade(submission_id)
-            if grade is None:
-                flask.abort(404)
-            else:
-                def gen():
-                    yield "Log for {}\n".format(grade.submission.name)
-                    for log in grade.get_text_logs():
-                        yield "\n" + "=" * 79 + "\n"
-                        yield time.asctime(time.localtime(log.open_timestamp))
-                        if log.close_timestamp:
-                            yield " - "
-                            yield time.asctime(time.localtime(log.close_timestamp))
-                        yield "\n\n"
-                        yield log.get_content()
-                        yield "\n"
-                return flask.Response(gen(), mimetype="text/plain")
+            try:
+                grade = self._grades_by_submission_id[int(submission_id)]
+            except (ValueError, IndexError):
+                raise flask.abort(404)
+
+            def gen() -> Iterable[str]:
+                yield "Log for {}\n".format(grade.submission.name)
+                for log in grade.get_text_logs():
+                    yield "\n" + "=" * 79 + "\n"
+                    yield time.asctime(time.localtime(log.open_timestamp))
+                    if log.close_timestamp:
+                        yield " - "
+                        yield time.asctime(time.localtime(log.close_timestamp))
+                    yield "\n\n"
+                    yield log.get_content()
+                    yield "\n"
+            return flask.Response(gen(), mimetype="text/plain")
 
         # AJAX endpoint to request update and data keys
         # (can only be called once per client ID)
         @app.route("/gradefast/_auth", methods=["POST"])
-        def _gradefast_auth():
+        def _gradefast_auth() -> flask.Response:
             client_id = get_uuid_from_form("client_id")
             if client_id not in self._client_ids:
                 return json_bad_request("Unknown client ID")
@@ -247,16 +254,18 @@ class GradeBook:
 
             device = flask.request.form.get("device", "unknown device")
             event = events.AuthRequestedEvent("device: " + device)
+            auth_event_id = event.event_id  # type: int
+
             _logger.debug("Client {} requesting auth (event {}); device: {}",
-                          client_id, event.event_id, device)
-            self._auth_event_id_to_client_id[event.event_id] = client_id
+                          client_id, auth_event_id, device)
+            self._auth_event_id_to_client_id[auth_event_id] = client_id
             self.event_manager.dispatch_event(event)
 
             return json_aight()
 
         # AJAX endpoint to update grades based on an action
         @app.route("/gradefast/_update", methods=["POST"])
-        def _gradefast_update():
+        def _gradefast_update() -> flask.Response:
             try:
                 client_id = get_uuid_from_form("client_id")
                 if client_id not in self._client_ids:
@@ -270,7 +279,7 @@ class GradeBook:
 
                 client_seq = get_int_from_form("client_seq")
                 submission_id = get_int_from_form("submission_id")
-                action = get_json_form_field("action")
+                action = get_json_form_field("action")  # type: Dict[str, object]
 
                 # Parse the action and apply it (may raise a subclass of GradeBookPublicError)
                 self._parse_action(submission_id, client_id, client_seq, action)
@@ -288,7 +297,7 @@ class GradeBook:
 
         # Event stream
         @app.route("/gradefast/_events")
-        def _gradefast_events():
+        def _gradefast_events() -> flask.Response:
             try:
                 events_key = uuid.UUID(flask.request.args["events_key"])
             except ValueError:
@@ -298,8 +307,8 @@ class GradeBook:
             client_id = self._events_keys[events_key]
             _logger.debug("Client {} connected to _events", client_id)
 
-            def gen():
-                update_queue = queue.Queue(999)
+            def gen() -> Iterable[str]:
+                update_queue = queue.Queue(999)  # type: queue.Queue
                 self._client_update_queues[client_id] = update_queue
                 # Some browsers need an initial kick to fire the "open" event on the EventSource
                 update_queue.put(clients.ClientUpdate("hello", requires_authentication=False))
@@ -319,33 +328,15 @@ class GradeBook:
                         del self._client_update_queues[client_id]
             return flask.Response(gen(), mimetype="text/event-stream")
 
-    def get_grade(self, submission_id: Union[str, int]) -> Optional[grades.SubmissionGrade]:
-        """
-        Test whether a submission ID is valid and, if so, get the Grade corresponding to it.
-        
-        :param submission_id: The ID to test
-        :return: a Grade if valid, or None otherwise
-        """
-        try:
-            submission_id = int(submission_id)
-        except ValueError:
-            submission_id = None
-            pass
-        if submission_id is None:
-            return None
-
-        if submission_id not in self._grades_by_submission_id:
-            return None
-        return self._grades_by_submission_id[submission_id]
-
-    def get_submission_list(self):
+    def get_submission_list(self) -> List[Dict[str, object]]:
         """
         Get the current list of submissions, with each submission represented by its "simple data"
         format.
         """
-        return list(map(lambda s: self.get_grade(s.id).to_simple_data(), self._submission_list))
+        return [self._grades_by_submission_id[s.id].to_simple_data() for s in self._submission_list]
 
-    def _send_client_update(self, client_update: clients.ClientUpdate, client_id: uuid.UUID = None):
+    def _send_client_update(self, client_update: clients.ClientUpdate,
+                            client_id: uuid.UUID = None) -> None:
         """
         Send a ClientUpdate to either a specific GradeBook client or to all open, authenticated
         GradeBook clients.
@@ -359,7 +350,7 @@ class GradeBook:
         if client_id is None:
             client_ids = self._authenticated_client_ids
         else:
-            client_ids = [client_id]
+            client_ids = {client_id}
 
         for client_id in client_ids:
             if client_id in self._client_update_queues:
@@ -368,7 +359,7 @@ class GradeBook:
                 except queue.Full:
                     _logger.warning("Client {} event queue is full", client_id)
 
-    def auth_granted(self, auth_event_id: int):
+    def auth_granted(self, auth_event_id: int) -> None:
         """
         Indicate that a client ID is now authenticated, identified by the event ID of the original
         AuthRequestEvent that was sent out.
@@ -392,7 +383,7 @@ class GradeBook:
             "is_done": self.is_done
         }), client_id)
 
-    def set_submission_list(self, submission_list: List[Submission]):
+    def set_submission_list(self, submission_list: List[Submission]) -> None:
         """
         Set a new submission list.
         """
@@ -409,7 +400,8 @@ class GradeBook:
             "submissions": self.get_submission_list()
         }))
 
-    def set_current_submission(self, submission_id: int, html_log: MemoryLog, text_log: MemoryLog):
+    def set_current_submission(self, submission_id: int, html_log: MemoryLog,
+                               text_log: MemoryLog) -> None:
         """
         Set a submission ID to be the current submission ID, and add new html/text logs for it.
 
@@ -419,7 +411,7 @@ class GradeBook:
         """
         assert submission_id in self._grades_by_submission_id
         self._current_submission_id = submission_id
-        self.get_grade(submission_id).append_logs(html_log, text_log)
+        self._grades_by_submission_id[submission_id].append_logs(html_log, text_log)
 
         # Tell GradeBook clients about this change in the current submission
         # (include the list of submissions so the clients have an updated idea of who has a log)
@@ -428,7 +420,7 @@ class GradeBook:
             "submission_id": submission_id
         }))
 
-    def set_done(self, is_done: bool):
+    def set_done(self, is_done: bool) -> None:
         """
         Set whether we are done grading.
         """
@@ -437,7 +429,8 @@ class GradeBook:
         # Tell GradeBook clients that we're done
         self._send_client_update(clients.ClientUpdate.create_update_event("END_OF_SUBMISSIONS"))
 
-    def _parse_action(self, submission_id: int, client_id: int, client_seq: int, action: dict):
+    def _parse_action(self, submission_id: int, client_id: uuid.UUID, client_seq: int,
+                      action: Dict[str, object]) -> None:
         """
         Parse and apply an action received from a GradeBook client.
 
@@ -446,7 +439,12 @@ class GradeBook:
         :param client_seq: The sequence number from the GradeBook client that submitted this event.
         :param action: The action, directly from the GradeBook client that submitted it.
         """
-        client_action = clients.ClientAction(submission_id, client_id, client_seq, action)
+        try:
+            grade = self._grades_by_submission_id[submission_id]
+        except IndexError:
+            raise utils.GradeBookPublicError("Invalid submission ID: {}".format(submission_id))
+
+        client_action = clients.ClientAction(submission_id, client_id, client_seq, grade, action)
         data = client_action.apply_to_gradebook(self)
         self._send_client_update(
             clients.ClientUpdate.create_update_event("SUBMISSION_UPDATED", data))
@@ -468,7 +466,7 @@ class GradeBook:
         with self.event_lock:
             for grade in self._grades_by_submission_id.values():
                 points_earned, points_possible, individual_points = grade.get_score()
-                grade_details = OrderedDict()
+                grade_details = OrderedDict()  # type: Dict[str, object]
                 grade_details["name"] = grade.submission.name
                 grade_details["score"] = points_earned
                 grade_details["possible_score"] = points_possible
@@ -514,7 +512,7 @@ class GradeBook:
         """
         return utils.to_json(self._get_grades_export())
 
-    def run(self, debug: bool = False):
+    def run(self, debug: bool = False) -> None:
         """
         Start the Flask server (using Werkzeug internally).
 

@@ -21,13 +21,15 @@ __all__ = [
 _logger = get_logger("grader.eventhandlers")
 
 
-class AuthRequestedEventHandler(events.EventNameHandler, event="AuthRequestedEvent"):
+class AuthRequestedEventHandler(events.EventNameHandler):
+    handled_event_name = "AuthRequestedEvent"
+
     @inject()
-    def __init__(self, channel: Channel, event_manager: events.EventManager):
-        self.channel: Channel = channel
+    def __init__(self, channel: Channel, event_manager: events.EventManager) -> None:
+        self.channel = channel
         self.event_manager = event_manager
 
-    def handle(self, event: events.AuthRequestedEvent):
+    def handle(self, event: events.AuthRequestedEvent) -> None:
         _logger.info("Handling AuthRequestedEvent (event {})", event.event_id)
 
         with self.channel.blocking_io() as (output_func, input_func, prompt_func):

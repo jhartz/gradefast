@@ -15,12 +15,15 @@ In addition to PEP 8:
 
 - The line length cut-off is 100 characters (don't feel constrained to just 80).
 
-- Always use Python [type hints](https://www.python.org/dev/peps/pep-0484/) for function arguments
-  and return types. Feel free to use the built-in
-  [typing](https://docs.python.org/3/library/typing.html) library.
+- Use `str.format` instead of `%`-style string formatting.
 
-- Always use docstrings for both classes and functions (unless the function is overriding another
-  already-documented function from a superclass).
+- Always use Python [type hints](https://www.python.org/dev/peps/pep-0484/) for function parameters
+  and return types.
+    - If a parameter has a default value of `None`, omit the `Optional[]` around the type.
+    - Feel free to use the built-in [typing](https://docs.python.org/3/library/typing.html) library.
+
+- Always use docstrings for both classes and public functions (unless the function is overriding
+  another already-documented function from a superclass).
 
   Docstring format:
     - General description of the function

@@ -6,7 +6,7 @@ Licensed under the MIT License. For more, see the LICENSE file.
 Author: Jake Hartz <jake@hartz.io>
 """
 
-from typing import Iterable, List, Optional, Tuple, Union
+from typing import Dict, Iterable, List, Optional, Tuple
 
 from iochannels import MemoryLog
 
@@ -24,10 +24,6 @@ except ImportError:
     required_package_warning("mistune", "Comments and hints will not be Markdown-parsed.")
     mistune = None
     has_markdown = False
-
-Path = List[Union[int, str]]
-# "Plain Old Data"
-POD = Union[list, dict]
 
 
 class FeedbackHTMLTemplates:
@@ -128,30 +124,23 @@ def _get_late_deduction(score: ScoreNumber, percent_to_deduct: ScoreNumber,
     return max(0, d)
 
 
-class BadPathError(utils.GradeBookPublicError):
-    """
-    Error resulting from a bad path.
-    """
-    pass
-
-
 class SubmissionGradeItem:
     """
-    Superclass for SubmissionGradeScore, SubmissionGradeSection, and SubmissionGradeRoot.
+    Superclass for SubmissionGradeScore and SubmissionGradeSection.
     """
-    def __init__(self, grade_item: Optional[GradeItem]):
+    def __init__(self, grade_item: Optional[GradeItem]) -> None:
         """
         Initialize the basic components of a SubmissionGradeItem from a base GradeItem.
         """
-        self._name = None
-        self._name_html = None
+        self._name = None       # type: str
+        self._name_html = None  # type: str
         self._enabled = True
-        self._hints = []
-        self._hints_name_html = []
-        self._hints_set = {}
-        self._note = None
-        self._note_html = None
-        self.children: List["SubmissionGradeItem"] = None
+        self._hints = []        # type: List[Hint]
+        self._hints_name_html = []  # type: List[str]
+        self._hints_set = {}    # type: Dict[int, bool]
+        self._note = None       # type: str
+        self._note_html = None  # type: str
+        self._children = None   # type: List["SubmissionGradeItem"]
 
         if grade_item:
             self._name = grade_item.name
@@ -173,30 +162,11 @@ class SubmissionGradeItem:
         """
         raise NotImplementedError("enumerate_all must be implemented by subclass")
 
-    def enumerate_enabled_children(self) -> Iterable["SubmissionGradeItem"]:
-        """
-        Enumerate over all enabled children (sections and scores) of this grade section.
-        """
-        if self.children is None:
-            raise TypeError("This subclass does not have children")
-        for item in self.children:
-            if item._enabled:
-                yield item
-
-    def get_point_titles(self, include_disabled: bool = False) -> List[Tuple[str, int]]:
-        """
-        Get a list of the titles for individual point items (i.e. GradeScores). This only includes
-        titles for leaf nodes, not sections.
-
-        :param include_disabled: Whether to include titles for disabled items.
-        :return: A list of item titles represented by a tuple: (name, points)
-        """
-        raise NotImplementedError("get_point_titles must be implemented by subclass")
-
     def get_score(self, is_late: bool) -> Tuple[ScoreNumber, ScoreNumber,
                                                 List[Tuple[str, ScoreNumber]]]:
         """
-        Get the current point values for this grade item.
+        Get the current point values for this grade item. The third item in each returned tuple
+        matches the format used by the get_point_titles function.
 
         :param is_late: Whether the parent submission is marked as late
         :return: A tuple with the points earned for this item/section (int or float), the total
@@ -224,13 +194,11 @@ class SubmissionGradeItem:
         """
         return self._name is not None and self._name.lower() == other_name.lower()
 
-    def to_plain_data(self) -> POD:
+    def to_plain_data(self) -> Dict[str, object]:
         """
         Get a representation of this grade item as plain data (just lists, dicts, etc.)
         This should be overridden in subclasses to extend the dict returned here, or replace it
         with a more appropriate representation.
-
-        :return: A dictionary or list representing this grade item.
         """
         return {
             "name": self._name,
@@ -249,13 +217,13 @@ class SubmissionGradeItem:
             "note_html": self._note_html
         }
 
-    def set_enabled(self, is_enabled: bool):
+    def set_enabled(self, is_enabled: bool) -> None:
         """
         Set whether this grade item is enabled.
         """
         self._enabled = is_enabled
 
-    def set_hint_enabled(self, index: int, is_enabled: bool):
+    def set_hint_enabled(self, index: int, is_enabled: bool) -> None:
         """
         Set whether a specific hint is enabled for this grade item.
 
@@ -264,7 +232,7 @@ class SubmissionGradeItem:
         """
         self._hints_set[index] = is_enabled
 
-    def add_hint(self, name: str, value: WeakScoreNumber):
+    def add_hint(self, name: str, value: WeakScoreNumber) -> None:
         """
         Add a new possible hint to this grade item (and all other instances in other submissions)
         by modifying a list still tied to the original grade structure.
@@ -275,7 +243,7 @@ class SubmissionGradeItem:
         self._hints.append(Hint(name=name, value=make_score_number(value)))
         self._hints_name_html.append(_markdown_to_html_inline(name))
 
-    def replace_hint(self, index: int, name: str, value: WeakScoreNumber):
+    def replace_hint(self, index: int, name: str, value: WeakScoreNumber) -> None:
         """
         Replace an existing hint for this grade item (and all other instances in other submissions)
         by modifying a list still tied to the original grade structure.
@@ -296,13 +264,13 @@ class SubmissionGradeScore(SubmissionGradeItem):
     Represents an individual grade item with a point value and score.
     This is a leaf node in the grade structure tree.
     """
-    def __init__(self, grade_score: GradeScore):
+    def __init__(self, grade_score: GradeScore) -> None:
         super().__init__(grade_score)
 
         self._points = make_score_number(grade_score.points)
-        self._base_score = None
-        self._comments = None
-        self._comments_html = None
+        self._base_score = None     # type: ScoreNumber
+        self._comments = None       # type: str
+        self._comments_html = None  # type: str
 
         self.set_base_score(grade_score.default_score)
         self.set_comments(grade_score.default_comments)
@@ -310,12 +278,6 @@ class SubmissionGradeScore(SubmissionGradeItem):
     def enumerate_all(self, include_disabled: bool = False) -> Iterable[SubmissionGradeItem]:
         if self._enabled or include_disabled:
             yield self
-
-    def get_point_titles(self, include_disabled: bool = False) -> List[Tuple[str, ScoreNumber]]:
-        if self._enabled or include_disabled:
-            return [(self._name, self._points)]
-        else:
-            return []
 
     def get_score(self, is_late: bool) -> Tuple[ScoreNumber, ScoreNumber,
                                                 List[Tuple[str, ScoreNumber]]]:
@@ -356,7 +318,7 @@ class SubmissionGradeScore(SubmissionGradeItem):
 
         return feedback
 
-    def to_plain_data(self) -> POD:
+    def to_plain_data(self) -> Dict[str, object]:
         data = super().to_plain_data()
         points_earned, points_possible, _ = self.get_score(False)
         data.update({
@@ -367,13 +329,13 @@ class SubmissionGradeScore(SubmissionGradeItem):
         })
         return data
 
-    def set_base_score(self, score: WeakScoreNumber):
+    def set_base_score(self, score: WeakScoreNumber) -> None:
         """
         Set the score for this grade item, excluding the effects of enabled hints.
         """
         self._base_score = make_score_number(score)
 
-    def set_effective_score(self, score: WeakScoreNumber):
+    def set_effective_score(self, score: WeakScoreNumber) -> None:
         """
         Set the score for this grade item, including any hints that are applied.
         """
@@ -384,7 +346,7 @@ class SubmissionGradeScore(SubmissionGradeItem):
                 score -= hint.value
         self._base_score = score
 
-    def set_comments(self, comments: str):
+    def set_comments(self, comments: str) -> None:
         """
         Set the comments for this grade item.
         """
@@ -397,35 +359,31 @@ class SubmissionGradeSection(SubmissionGradeItem):
     Represents a section of grade items with SubmissionGradeItem children.
     This is an internal node in the grade structure tree.
     """
-    def __init__(self, grade_section: GradeSection):
+    def __init__(self, grade_section: GradeSection) -> None:
         super().__init__(grade_section)
 
         self._late_deduction = grade_section.deduct_percent_if_late
-        self.children = _create_tree_from_structure(grade_section.grades)
+        self._children = _create_tree_from_structure(grade_section.grades)
 
     def enumerate_all(self, include_disabled: bool = False) -> Iterable[SubmissionGradeItem]:
-        # If we're not enabled, stop
         if self._enabled or include_disabled:
-            # First, yield ourself
             yield self
-
-            # Next, yield our children
-            for item in self.children:
+            for item in self._children:
                 yield from item.enumerate_all(include_disabled)
 
-    def get_point_titles(self, include_disabled: bool = False) -> List[Tuple[str, ScoreNumber]]:
-        items = []
-        if self._enabled or include_disabled:
-            for item in self.children:
-                items += [(self._name + ": " + name, points) for name, points in
-                          item.get_point_titles(include_disabled)]
-        return items
+    def enumerate_enabled_children(self) -> Iterable["SubmissionGradeItem"]:
+        """
+        Enumerate over all enabled children (sections and scores) of this grade section.
+        """
+        for item in self._children:
+            if item._enabled:
+                yield item
 
     def get_score(self, is_late: bool) -> Tuple[ScoreNumber, ScoreNumber,
                                                 List[Tuple[str, ScoreNumber]]]:
         points_earned = 0.0
         points_possible = 0.0
-        individual_points = []
+        individual_points = []  # type: List[Tuple[str, ScoreNumber]]
 
         for item in self.enumerate_enabled_children():
             item_earned, item_possible, item_points = item.get_score(is_late)
@@ -476,65 +434,19 @@ class SubmissionGradeSection(SubmissionGradeItem):
 
         return feedback
 
-    def to_plain_data(self) -> dict:
+    def to_plain_data(self) -> Dict[str, object]:
         data = super().to_plain_data()
         data.update({
-            "children": [child.to_plain_data() for child in self.children]
+            "children": [child.to_plain_data() for child in self._children]
         })
         return data
-
-
-class SubmissionGradeRoot(SubmissionGradeItem):
-    """
-    Represents the root of the grade item tree.
-    """
-
-    def __init__(self, structure: List[GradeItem]):
-        super().__init__(None)
-
-        self.children = _create_tree_from_structure(structure)
-
-    def enumerate_all(self, include_disabled: bool = False) -> Iterable[SubmissionGradeItem]:
-        for item in self.children:
-            yield from item.enumerate_all()
-
-    def get_point_titles(self, include_disabled: bool = False) -> List[Tuple[str, ScoreNumber]]:
-        items = []
-        for item in self.children:
-            items += item.get_point_titles(include_disabled)
-        return items
-
-    def get_score(self, is_late: bool) -> Tuple[ScoreNumber, ScoreNumber,
-                                                List[Tuple[str, ScoreNumber]]]:
-        points_earned = 0.0
-        points_possible = 0.0
-        individual_points = []
-
-        for item in self.enumerate_enabled_children():
-            item_earned, item_possible, item_points = item.get_score(is_late)
-            # Add to the total
-            points_earned += item_earned
-            points_possible += item_possible
-            individual_points += item_points
-
-        # Make everything an int if we can
-        points_earned = make_score_number(points_earned)
-        points_possible = make_score_number(points_possible)
-
-        return points_earned, points_possible, individual_points
-
-    def get_feedback(self, is_late: bool, depth: int = 0) -> str:
-        return "\n".join(item.get_feedback(is_late, depth + 1) for item in self.children)
-
-    def to_plain_data(self) -> List[POD]:
-        return [child.to_plain_data() for child in self.children]
 
 
 def _create_tree_from_structure(structure: List[GradeItem]) -> List[SubmissionGradeItem]:
     """
     Create a list of SubmissionGradeItem subclass instances from a list of GradeItems.
     """
-    items: List[SubmissionGradeItem] = []
+    items = []  # type: List[SubmissionGradeItem]
     for item in structure:
         if isinstance(item, GradeScore):
             items.append(SubmissionGradeScore(item))
@@ -545,21 +457,22 @@ def _create_tree_from_structure(structure: List[GradeItem]) -> List[SubmissionGr
     return items
 
 
-def get_point_titles(structure: List[GradeItem], include_disabled: bool = False) \
-        -> List[Tuple[str, ScoreNumber]]:
+def get_point_titles(structure: List[GradeItem]) -> List[Tuple[str, ScoreNumber]]:
     """
-    Get the point titles for all the grade items within the provided grade structure.
-
-    NOTE: Each SubmissionGrade also has a get_point_titles that works just like this one, except it
-    respects whether items are disabled.
+    Get the point titles for all the grade items within the provided grade structure. This matches
+    the format used by a SubmissionGradeItem's get_score method.
 
     :param structure: A list of GradeItems
-    :param include_disabled: Whether to include items that are disabled by default
     :return: A list of item titles represented by tuples: (name, points)
     """
-    # Create a temporary SubmissionGradeItem tree based on this structure
-    grades = SubmissionGradeRoot(structure)
-    return grades.get_point_titles(include_disabled)
+    items = []  # type: List[Tuple[str, ScoreNumber]]
+    for item in structure:
+        if isinstance(item, GradeScore):
+            items.append((item.name, item.points))
+        elif isinstance(item, GradeSection):
+            items += [(item.name + ": " + name, points)
+                      for name, points in get_point_titles(item.grades)]
+    return items
 
 
 class SubmissionGrade:
@@ -567,38 +480,34 @@ class SubmissionGrade:
     Represents a submission's grade.
     """
 
-    def __init__(self, submission: Submission, grade_structure: List[GradeItem]):
-        """
-        :param submission: The the submission being graded
-        :param grade_structure: A list of GradeItems
-        """
+    def __init__(self, submission: Submission, grade_structure: List[GradeItem]) -> None:
         self.submission = submission
-        self._grades = SubmissionGradeRoot(grade_structure)
-        self._html_logs: List[MemoryLog] = []
-        self._text_logs: List[MemoryLog] = []
+        self._grades = _create_tree_from_structure(grade_structure)
+        self._html_logs = []  # type: List[MemoryLog]
+        self._text_logs = []  # type: List[MemoryLog]
 
         self._is_late = False
         self._overall_comments = ""
         self._overall_comments_html = ""
 
-    def get_by_path(self, path: Path) -> SubmissionGradeItem:
+    def enumerate_all(self, include_disabled: bool = False) -> Iterable[SubmissionGradeItem]:
+        for item in self._grades:
+            yield from item.enumerate_all(include_disabled)
+
+    def get_by_path(self, path: List[int]) -> SubmissionGradeItem:
         """
         Find a path in the grade structure.
 
-        :param path: A list of ints (or ints as strings) that acts as a path of indices
-            representing a location within the grade item tree
+        :param path: A list of ints that acts as a path of indices representing a location within
+            the grade item tree
         :return: A SubmissionGradeItem subclass instance
         """
-        item = self._grades
         try:
-            path_indexes = [int(index) for index in path]
-
-            # Traverse all the GradeSections until we get to where we want
-            for index in path_indexes:
-                item = item.children[index]
-        except (ValueError, IndexError, AttributeError) as ex:
-            raise BadPathError("Error parsing path {}".format(path), exception=ex)
-
+            item = self._grades[path[0]]
+            for index in path[1:]:
+                item = item._children[index]
+        except (ValueError, IndexError) as ex:
+            raise utils.BadPathError("Error parsing path {}".format(path), exception=ex)
         return item
 
     def get_by_name(self, name: str, include_disabled: bool = False) \
@@ -610,11 +519,11 @@ class SubmissionGrade:
         :param include_disabled: Whether to include disabled grade items
         :return: A generator that yields SubmissionGradeItem subclass instances
         """
-        for item in self._grades.enumerate_all(include_disabled):
+        for item in self.enumerate_all(include_disabled):
             if item.is_name_like(name):
                 yield item
 
-    def add_hint_to_all_grades(self, path: Path, name: str, value: ScoreNumber):
+    def add_hint_to_all_grades(self, path: List[int], name: str, value: ScoreNumber) -> None:
         """
         Add a new possible hint to ALL grade structures (by modifying a list still tied into the
         original grade_structure).
@@ -625,11 +534,12 @@ class SubmissionGrade:
         :param value: The point value of the hint to add
         """
         if len(path) == 0:
-            raise BadPathError("Path is empty")
+            raise utils.BadPathError("Path is empty")
 
         self.get_by_path(path).add_hint(name, value)
 
-    def replace_hint_for_all_grades(self, path: Path, index: int, name: str, value: ScoreNumber):
+    def replace_hint_for_all_grades(self, path: List[int], index: int, name: str,
+                                    value: ScoreNumber) -> None:
         """
         Replace an existing hint for ALL grade structures (by modifying a list still tied into the
         original grade_structure).
@@ -641,12 +551,13 @@ class SubmissionGrade:
         :param value: The new point value of the hint
         """
         if len(path) == 0:
-            raise BadPathError("Path is empty")
+            raise utils.BadPathError("Path is empty")
 
         try:
             self.get_by_path(path).replace_hint(index, name, value)
         except (ValueError, IndexError) as ex:
-            raise BadPathError("Invalid hint index {} at path {}".format(index, path), exception=ex)
+            raise utils.BadPathError("Invalid hint index {} at path {}".format(index, path),
+                                     exception=ex)
 
     def get_score(self) -> Tuple[ScoreNumber, ScoreNumber, List[Tuple[str, ScoreNumber]]]:
         """
@@ -655,16 +566,33 @@ class SubmissionGrade:
         :return: A tuple with the points earned for this submission, the total points possible for
             this submission, and the individual point scores for this submission
         """
-        return self._grades.get_score(self._is_late)
+        points_earned = 0.0
+        points_possible = 0.0
+        individual_points = []  # type: List[Tuple[str, ScoreNumber]]
+
+        for item in self._grades:
+            if item._enabled:
+                item_earned, item_possible, item_points = item.get_score(self._is_late)
+                # Add to the total
+                points_earned += item_earned
+                points_possible += item_possible
+                individual_points += item_points
+
+        # Make everything an int if we can
+        points_earned = make_score_number(points_earned)
+        points_possible = make_score_number(points_possible)
+
+        return points_earned, points_possible, individual_points
 
     def get_feedback(self) -> str:
         """
         Patch together all the grade comments for this submission.
         """
-        return FeedbackHTMLTemplates.base.format(content=self._grades.get_feedback(self._is_late),
+        content = "\n".join(item.get_feedback(self._is_late, 1) for item in self._grades)
+        return FeedbackHTMLTemplates.base.format(content=content,
                                                  overall_comments=self._overall_comments_html)
 
-    def to_plain_data(self) -> POD:
+    def to_plain_data(self) -> Dict[str, object]:
         """
         Get the grade values as plain old data.
         """
@@ -676,10 +604,10 @@ class SubmissionGrade:
             "overall_comments_html": self._overall_comments_html,
             "points_earned": points_earned,
             "points_possible": points_possible,
-            "grades": self._grades.to_plain_data()
+            "grades": [item.to_plain_data() for item in self._grades]
         }
 
-    def to_simple_data(self) -> POD:
+    def to_simple_data(self) -> Dict[str, object]:
         """
         Get simple grade metadata as plain old data.
         """
@@ -693,14 +621,14 @@ class SubmissionGrade:
         })
         return data
 
-    def set_late(self, is_late: bool):
+    def set_late(self, is_late: bool) -> None:
         self._is_late = is_late
 
-    def set_overall_comments(self, overall_comments: str):
+    def set_overall_comments(self, overall_comments: str) -> None:
         self._overall_comments = overall_comments
         self._overall_comments_html = _markdown_to_html(overall_comments)
 
-    def append_logs(self, html_log: MemoryLog, text_log: MemoryLog):
+    def append_logs(self, html_log: MemoryLog, text_log: MemoryLog) -> None:
         self._html_logs.append(html_log)
         self._text_logs.append(text_log)
 

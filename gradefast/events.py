@@ -12,7 +12,7 @@ Author: Jake Hartz <jake@hartz.io>
 import itertools
 import queue
 import threading
-from typing import List
+from typing import Any, Iterable, List, Optional, Type
 
 from iochannels import MemoryLog
 from pyprovide import Injector, inject
@@ -34,7 +34,7 @@ class Event:
     _last_event_id = 0
     _event_id_lock = threading.Lock()
 
-    def __init__(self):
+    def __init__(self) -> None:
         with Event._event_id_lock:
             Event._last_event_id += 1
             self.event_id = Event._last_event_id
@@ -64,7 +64,7 @@ class EventHandler:
         """
         raise NotImplementedError()
 
-    def handle(self, event: Event):
+    def handle(self, event: Event) -> None:
         """
         Take some action in response to an event. This method will almost always be called in a
         fresh thread (different from the one that called "accept").
@@ -79,17 +79,17 @@ class EventNameHandler(EventHandler):
     """
     An abstract subclass of EventHandler for handling events with a specific name. This simplifies
     event handler implementations that only handle a single event.
+
+    To use, subclass this class and specify a class-level or instance-level property named
+    "handled_event_name".
     """
 
-    _accepted_event_name = None
-
-    def __init_subclass__(cls, event: str):
-        cls._accepted_event_name = event
+    handled_event_name = None  # type: Optional[str]
 
     def accept(self, event: Event) -> bool:
-        return event.get_name() == self._accepted_event_name
+        return event.get_name() == self.handled_event_name
 
-    def handle(self, event: Event):
+    def handle(self, event: Event) -> None:
         raise NotImplementedError()
 
 
@@ -103,30 +103,43 @@ class EventManager:
     """
 
     @inject(injector=Injector.CURRENT_INJECTOR)
-    def __init__(self, injector: Injector):
+    def __init__(self, injector: Injector) -> None:
         self.injector = injector
-        self._handlers: List[EventHandler] = []
-        self._event_queue = queue.Queue()
+        self._handlers = []  # type: List[EventHandler]
+        self._event_queue = queue.Queue()  # type: queue.Queue
         threading.Thread(
             name="EventManTh",
             target=self._event_thread_target,
             daemon=True
         ).start()
 
-    def _event_thread_target(self):
+    def _event_thread_target(self) -> None:
         count = itertools.count()
         while True:
             event = self._event_queue.get()
             for handler in self._handlers:
-                if handler.accept(event):
-                    threading.Thread(
-                        name="EventTh-{:02}".format(next(count)),
-                        target=handler.handle,
-                        args=(event,),
-                        daemon=True
-                    ).start()
+                try:
+                    accepted = handler.accept(event)
+                except Exception:
+                    _logger.exception("Exception when calling {}.accept with event {}",
+                                      handler, event)
+                else:
+                    if accepted:
+                        threading.Thread(
+                            name="EventTh-{:02}".format(next(count)),
+                            target=self._event_handle_target,
+                            args=(handler, event),
+                            daemon=True
+                        ).start()
 
-    def register_event_handlers(self, *event_handlers: EventHandler):
+    @staticmethod
+    def _event_handle_target(handler: EventHandler, event: Event) -> None:
+        try:
+            handler.handle(event)
+        except Exception:
+            _logger.exception("Exception when calling {}.handle with event {}", handler, event)
+
+    def register_event_handlers(self, *event_handlers: EventHandler) -> None:
         """
         Register one or more new event handler instances that will be called for any future event
         dispatches.
@@ -135,7 +148,7 @@ class EventManager:
                      ", ".join(str(h) for h in event_handlers))
         self._handlers += event_handlers
 
-    def register_event_handler_classes(self, *event_handler_classes):
+    def register_event_handler_classes(self, *event_handler_classes: Type[EventHandler]) -> None:
         """
         Register one or more new event handler classes that will be called for any future event
         dispatches.
@@ -147,38 +160,38 @@ class EventManager:
                      ", ".join(str(c) for c in event_handler_classes))
         self._handlers += [self.injector.get_instance(cls) for cls in event_handler_classes]
 
-    def register_all_event_handlers(self, module):
+    def register_all_event_handlers(self, mod: Any) -> None:
         """
         Register all the event handler classes exposed in a module.
 
         This method relies on "register_event_handler_classes" to actually create the class
         instances, so see that method's documentation for further details.
         """
-        self.register_event_handler_classes(*list(self._get_classes_in_module(module)))
+        self.register_event_handler_classes(*list(self._get_classes_in_module(mod)))
 
-    def register_all_event_handlers_with_args(self, module, *args, **kwargs):
+    def register_all_event_handlers_with_args(self, mod: Any, *args: Any, **kwargs: Any) -> None:
         """
         Register all the event handler classes exposed in a module, using the provided args and
         kwargs as arguments to the event handler classes' constructors.
         """
         self.register_event_handlers(*list(cls(*args, **kwargs)
-                                           for cls in self._get_classes_in_module(module)))
+                                           for cls in self._get_classes_in_module(mod)))
 
     @staticmethod
-    def _get_classes_in_module(module):
+    def _get_classes_in_module(mod: Any) -> Iterable[Type[EventHandler]]:
         """
         Get all the event handler classes in a module.
         """
-        assert hasattr(module, "__all__")
-        for name in module.__all__:
-            cls = getattr(module, name)
+        assert hasattr(mod, "__all__")
+        for name in mod.__all__:
+            cls = getattr(mod, name)
             try:
                 if issubclass(cls, EventHandler):
                     yield cls
             except TypeError:
                 pass
 
-    def dispatch_event(self, event: Event):
+    def dispatch_event(self, event: Event) -> None:
         """
         Dispatch an event to all event handlers that accept it. This method only enqueues the
         event; the event handling occurs in a different thread, and this method will likely return
@@ -200,7 +213,7 @@ class NewSubmissionListEvent(Event):
     It is assumed that no submission IDs will be repeated, i.e. if this new list contains
     submissions that were not present before, they have new submission IDs.
     """
-    def __init__(self, submissions: List[Submission]):
+    def __init__(self, submissions: List[Submission]) -> None:
         super().__init__()
         self.submissions = submissions
 
@@ -212,7 +225,7 @@ class SubmissionStartedEvent(Event):
     """
     An event representing that a new submission is being graded.
     """
-    def __init__(self, submission_id: int, html_log: MemoryLog, text_log: MemoryLog):
+    def __init__(self, submission_id: int, html_log: MemoryLog, text_log: MemoryLog) -> None:
         super().__init__()
         self.submission_id = submission_id
         self.html_log = html_log
@@ -226,8 +239,6 @@ class EndOfSubmissionsEvent(Event):
     """
     An event representing that all the submissions are done being graded.
     """
-    def __init__(self):
-        super().__init__()
 
 
 class AuthRequestedEvent(Event):
@@ -239,7 +250,7 @@ class AuthRequestedEvent(Event):
     user.
     """
 
-    def __init__(self, request_details: str):
+    def __init__(self, request_details: str) -> None:
         super().__init__()
         self.request_details = request_details
 
@@ -251,7 +262,7 @@ class AuthGrantedEvent(Event):
 
     This is usually dispatched by the Grader to send the successfulness back to the GradeBook.
     """
-    def __init__(self, auth_event_id: int):
+    def __init__(self, auth_event_id: int) -> None:
         super().__init__()
         self.auth_event_id = auth_event_id
 

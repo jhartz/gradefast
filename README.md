@@ -10,11 +10,11 @@ their mistakes. Best of all, it lets you help them without putting much time int
 
 ### Python
 
-GradeFast requires **Python *3.6*** or later! (We use type hints.)
+GradeFast requires **Python *3.5*** or later! (We use type hints.)
 
 > NOTE: All the command line examples below use `python3` as the python executable. Depending on
 > your platform, you may need to use `python` or `python.exe` instead (just make sure it's at least
-> Python version 3.6!)
+> Python version 3.5!)
 
 Additionally, these packages are required:
 
