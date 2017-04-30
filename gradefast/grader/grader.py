@@ -171,38 +171,36 @@ class Grader:
         self.channel.print()
 
         submission_id = 1
-        total = len(self._submissions)
         background_commands = []  # type: List[BackgroundCommand]
         while True:
+            # A quick check in case the list of submissions is modified during grading
+            if submission_id > len(self._submissions):
+                submission_id = len(self._submissions)
+
             submission = self._submissions[submission_id - 1]
 
             self.channel.print()
             self.channel.status_bordered("Next Submission: {} ({}/{})",
-                                         submission.name, submission.id, total)
+                                         submission.name, submission.id, len(self._submissions))
 
             what_to_do = self.channel.prompt(
-                "Press Enter to begin, 'g'oto, 'b'ack, 's'kip, 'l'ist, 'a'dd, 'quit', "
-                "'?' for help",
-                ["", "g", "b", "s", "l", "a", "quit", "?"], show_choices=False)
-            if what_to_do == "?":
+                "Press Enter to begin; (g)oto, (b)ack, (s)kip, (l)ist, (a)dd, (d)rop, (q)uit, "
+                "(h)elp",
+                ["", "g", "goto", "b", "back", "s", "skip", "l", "list", "a", "add", "q", "quit",
+                 "h", "help", "?"],
+                show_choices=False)
+
+            if what_to_do == "?" or what_to_do == "h" or what_to_do == "help":
                 # Print more help
-                self.channel.print("(Enter):  Start the next submission")
-                self.channel.print("g:  Go to a specific submission")
-                self.channel.print("b:  Go to the previous submission (goto -1)")
-                self.channel.print("s:  Skip the next submission (goto +1)")
-                self.channel.print("l:  List all the submissions and corresponding indices")
-                self.channel.print("a:  Add another folder of submissions")
-                self.channel.print("quit:  Give up on grading")
-            elif what_to_do == "quit":
-                # Give up on the rest
-                break
-            elif what_to_do == "b":
-                # Go back to the last-completed submission
-                submission_id = max(submission_id - 1, 1)
-            elif what_to_do == "s":
-                # Skip to the next submission
-                submission_id = min(submission_id + 1, total)
-            elif what_to_do == "g":
+                self.channel.print("(Enter): Start the next submission")
+                self.channel.print("g/goto:  Go to a specific submission")
+                self.channel.print("b/back:  Go to the previous submission (goto -1)")
+                self.channel.print("s/skip:  Skip the next submission (goto +1)")
+                self.channel.print("l/list:  List all the submissions and corresponding indices")
+                self.channel.print("a/add:   Add another folder of submissions")
+                self.channel.print("q/quit:  Give up on grading")
+
+            elif what_to_do == "g" or what_to_do == "goto":
                 # Go to a user-entered submission
                 self.channel.print("Enter index of submission to jump to.")
                 self.channel.print("n   Jump to submission n")
@@ -220,15 +218,32 @@ class Grader:
                             submission_id = int(new_id)
                     except (ValueError, IndexError):
                         self.channel.error("Invalid index!")
+                    if submission_id < 1 or submission_id > len(self._submissions):
+                        self.channel.error("Invalid index: {}", submission_id)
+                    submission_id = min(max(submission_id, 1), len(self._submissions))
 
-                    submission_id = min(max(submission_id, 1), total)
-            elif what_to_do == "l":
+            elif what_to_do == "b" or what_to_do == "back":
+                # Go back to the last-completed submission
+                submission_id = max(submission_id - 1, 1)
+
+            elif what_to_do == "s" or what_to_do == "skip":
+                # Skip to the next submission
+                submission_id = min(submission_id + 1, len(self._submissions))
+
+            elif what_to_do == "l" or what_to_do == "list":
                 # List all the submissions
                 for submission in self._submissions:
                     self.channel.print("{}: {}", submission.id, submission.name)
-            elif what_to_do == "a":
+
+            elif what_to_do == "a" or what_to_do == "add":
                 # Add another folder of submissions
                 self.add_submissions(None)
+
+            elif what_to_do == "q" or what_to_do == "quit":
+                # Give up on the rest
+                if self.channel.prompt("Are you sure you want to quit grading?", ["y", "n"]) == "y":
+                    break
+
             else:
                 # Run the next submission
 
@@ -249,7 +264,7 @@ class Grader:
 
                 background_commands += runner.get_background_commands()
 
-                if submission_id != total:
+                if submission_id != len(self._submissions):
                     # By default, we want to move on to the next submission in the list
                     submission_id += 1
                 else:

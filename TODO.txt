@@ -1,13 +1,6 @@
 TODO
 ====
 
-- BUG: When adding new submissions while grading ("a" at the prompt), the "total" variable isn't
-  updated
-- Add 'd'rop at that prompt to delete that submission from the list (gradebook should be fine...
-  right? ... It might need to trigger a new "initSubmission", which could run into issues if the
-  dropped one was the last one, and that was the one opened in the gradebook...)
-- Change 'quit' to 'q'uit (just make sure to prompt for confirmation)
-
 GradeBook TODOs:
 
 - Write tests for grade structure parser
@@ -15,6 +8,7 @@ GradeBook TODOs:
   anymore)
 - In the gradebook (particularly gradebook.grades and the UI), find something better to call the
   path to the grade item than "path" (it's confusing with the Path model for filesystem paths).
+- Add an option (disabled by default) to skip prompting for authentication
 - For sections, add a "scale" option that takes a ratio to scale the section by (or a string
   representing a fraction)
 - Like entering grades on mycourses, mark background in gradebook when a grade item is modified
@@ -41,6 +35,8 @@ Grader TODOs:
   process.terminate() (for the current foreground process, and for background processes when we're
   in the "waiting" stage). Also test the current functionality on Linux; and this might be useful:
   http://stackoverflow.com/questions/18255730/popen-new-process-group-on-linux
+- Add "(d)rop" at the "Nex Submission" prompt to delete that submission from the list (this may
+  cause issues abound for the gradebook, which relies on submission IDs being constant)
 - Make a section in the YAML commands to take the output of a command (or the last line of output)
   and use that as the grade for a certain grading item (identified by name) -- OR to use the
   output as the comment for a grade item
