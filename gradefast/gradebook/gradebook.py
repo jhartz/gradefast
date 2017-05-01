@@ -91,11 +91,35 @@ class GradeBook:
         # Set up MIME type for JS source map
         mimetypes.add_type("application/json", ".map")
 
-        # Set up Flask app
-        _logger.info("Initializing Flask app")
-        app = flask.Flask(__name__)
-        self._app = app
+    def run(self, debug: bool = False) -> None:
+        """
+        Start the Flask server (using Werkzeug internally).
 
+        :param debug: Whether to start the server in debug mode (includes tracebacks with HTTP 500
+            error pages)
+        """
+        _logger.info("Starting Flask app")
+        app = flask.Flask(__name__)
+
+        # Initialize the routes for the app
+        self._init_routes(app)
+
+        # Start the server
+        kwargs = {
+            "threaded": True,
+            "use_reloader": False
+        }
+        if debug:
+            kwargs["debug"] = True
+            kwargs["use_reloader"] = False
+
+        _logger.info("Running Flask app")
+        app.run(self.settings.host, self.settings.port, **kwargs)
+
+    def _init_routes(self, app: flask.Flask) -> None:
+        """
+        Initialize the routes for the GradeBook Flask app.
+        """
         ###########################################################################################
         # Helper functions for Flask routes
 
@@ -151,7 +175,7 @@ class GradeBook:
         def _gradefast_gradebook_() -> flask.Response:
             return flask.redirect(flask.url_for("_gradefast_gradebook_html"))
 
-        # GradeBook page (yes, the HTM is solely for trolling, teehee)
+        # GradeBook page (yes, the ".HTM" is solely for trolling, teehee)
         @app.route("/gradefast/gradebook.HTM")
         def _gradefast_gradebook_html() -> flask.Response:
             client_id = uuid.uuid4()
@@ -164,35 +188,41 @@ class GradeBook:
                 events_key=utils.to_json(events_key),
                 markdown_msg=utils.to_json("(Markdown-parsed)" if grades.has_markdown else None))
 
-        # Grades CSV file
+        # Grades CSV export
         @app.route("/gradefast/grades.csv")
         def _gradefast_grades_csv() -> flask.Response:
             check_data_key()
             _logger.debug("Generating CSV export")
-            csv_stream = self._get_csv()
 
-            def gen() -> Iterable[str]:
-                try:
-                    while True:
-                        line = csv_stream.readline()
-                        if line == "":
-                            break
-                        yield line
-                except GeneratorExit:
-                    pass
+            csv_stream = io.StringIO()
+            csv_writer = csv.writer(csv_stream)
 
-            resp = flask.Response(gen(), mimetype="text/csv")
-            filename_param = 'filename="{}.csv"'.format(
-                self.settings.project_name.replace("\\", "").replace('"', '\\"'))
-            resp.headers["Content-disposition"] = "attachment; " + filename_param
-            return resp
+            # Make the header row
+            point_titles = grades.get_point_titles(self.settings.grade_structure)
+            csv_writer.writerow(
+                ["Name", "Total Score", "Percentage", "Feedback", ""] +
+                ["({}) {}".format(points, title) for title, points in point_titles])
 
-        # Grades JSON file
+            # Make the value rows
+            for grade in self._get_grades_export():
+                csv_writer.writerow(
+                    [grade["name"], grade["score"], grade["percentage"], grade["feedback"], ""] +
+                    ["" if title not in grade else grade[title] for title, _ in point_titles])
+
+            return flask.Response(csv_stream.getvalue(), mimetype="text/csv", headers={
+                "Content-disposition": "attachment; filename=\"{}.csv\"".format(
+                    # Quick-and-hacky filename escaping; replaces backslashes with forward flashes,
+                    # and escapes double quotes
+                    self.settings.project_name.replace("\\", "/").replace('"', '\\"'))
+            })
+
+        # Grades JSON export
         @app.route("/gradefast/grades.json")
         def _gradefast_grades_json() -> flask.Response:
             check_data_key()
             _logger.debug("Generating JSON export")
-            return flask.Response(self._get_json(), mimetype="application/json")
+            return flask.Response(utils.to_json(self._get_grades_export()),
+                                  mimetype="application/json")
 
         # Log page (HTML)
         @app.route("/gradefast/log/<submission_id>.html")
@@ -328,12 +358,37 @@ class GradeBook:
                         del self._client_update_queues[client_id]
             return flask.Response(gen(), mimetype="text/event-stream")
 
-    def get_submission_list(self) -> List[Dict[str, object]]:
+    def _get_submission_list(self) -> List[Dict[str, object]]:
         """
         Get the current list of submissions, with each submission represented by its "simple data"
         format.
         """
         return [self._grades_by_submission_id[s.id].to_simple_data() for s in self._submission_list]
+
+    def _get_grades_export(self) -> List[OrderedDict]:
+        """
+        Return a list of ordered dicts representing the scores and feedback for each submission.
+        """
+        grade_list = []
+
+        # Make sure that no events are applied while we are generating the grade list, ensuring
+        # that everything is consistent. (For simplicity, we also build up the entire list and then
+        # return it, instead of trying using a generator with the event lock.)
+        with self.event_lock:
+            for grade in self._grades_by_submission_id.values():
+                points_earned, points_possible, individual_points = grade.get_score()
+                grade_details = OrderedDict()  # type: Dict[str, object]
+                grade_details["name"] = grade.submission.name
+                grade_details["score"] = points_earned
+                grade_details["possible_score"] = points_possible
+                grade_details["percentage"] = 0 if points_possible == 0 else \
+                    100 * points_earned / points_possible
+                grade_details["feedback"] = grade.get_feedback()
+                for item_name, item_points in individual_points:
+                    grade_details[item_name] = item_points
+                grade_list.append(grade_details)
+
+        return grade_list
 
     def _send_client_update(self, client_update: clients.ClientUpdate,
                             client_id: uuid.UUID = None) -> None:
@@ -378,7 +433,7 @@ class GradeBook:
         self._send_client_update(clients.ClientUpdate("auth", {
             "data_key": data_key,
             "update_key": self._client_update_keys[client_id],
-            "initial_submission_list": self.get_submission_list(),
+            "initial_submission_list": self._get_submission_list(),
             "initial_submission_id": self._current_submission_id,
             "is_done": self.is_done
         }), client_id)
@@ -397,7 +452,7 @@ class GradeBook:
 
         # Tell GradeBook clients about this new list
         self._send_client_update(clients.ClientUpdate.create_update_event("NEW_SUBMISSION_LIST", {
-            "submissions": self.get_submission_list()
+            "submissions": self._get_submission_list()
         }))
 
     def set_current_submission(self, submission_id: int, html_log: MemoryLog,
@@ -416,7 +471,7 @@ class GradeBook:
         # Tell GradeBook clients about this change in the current submission
         # (include the list of submissions so the clients have an updated idea of who has a log)
         self._send_client_update(clients.ClientUpdate.create_update_event("SUBMISSION_STARTED", {
-            "submissions": self.get_submission_list(),
+            "submissions": self._get_submission_list(),
             "submission_id": submission_id
         }))
 
@@ -451,82 +506,5 @@ class GradeBook:
 
         # Also update the submission list (to get the new scores, etc.)
         self._send_client_update(clients.ClientUpdate.create_update_event("NEW_SUBMISSION_LIST", {
-            "submissions": self.get_submission_list()
+            "submissions": self._get_submission_list()
         }))
-
-    def _get_grades_export(self) -> List[OrderedDict]:
-        """
-        Return a list of ordered dicts representing the scores and feedback for each submission.
-        """
-        grade_list = []
-
-        # Make sure that no events are applied while we are generating the grade list, ensuring
-        # that everything is consistent. (For simplicity, we also build up the entire list and then
-        # return it, instead of trying using a generator with the event lock.)
-        with self.event_lock:
-            for grade in self._grades_by_submission_id.values():
-                points_earned, points_possible, individual_points = grade.get_score()
-                grade_details = OrderedDict()  # type: Dict[str, object]
-                grade_details["name"] = grade.submission.name
-                grade_details["score"] = points_earned
-                grade_details["possible_score"] = points_possible
-                grade_details["percentage"] = 0 if points_possible == 0 else \
-                    100 * points_earned / points_possible
-                grade_details["feedback"] = grade.get_feedback()
-                for item_name, item_points in individual_points:
-                    grade_details[item_name] = item_points
-                grade_list.append(grade_details)
-
-        return grade_list
-
-    def _get_csv(self) -> io.StringIO:
-        """
-        Return a stream representing the grades as a CSV file.
-        """
-        csv_stream = io.StringIO()
-        csv_writer = csv.writer(csv_stream)
-
-        # Make the header row
-        point_titles = grades.get_point_titles(self.settings.grade_structure)
-        row_titles = ["Name", "Total Score", "Percentage", "Feedback", ""] + \
-                     ["({}) {}".format(points, title) for title, points in point_titles]
-        csv_writer.writerow(row_titles)
-
-        # Make the value rows
-        for grade in self._get_grades_export():
-            csv_writer.writerow([
-                grade["name"],
-                grade["score"],
-                grade["percentage"],
-                grade["feedback"],
-                ""
-            ] + ["" if title not in grade else grade[title] for title, _ in point_titles])
-
-        # Return the resulting stream
-        csv_stream.seek(0)
-        return csv_stream
-
-    def _get_json(self) -> str:
-        """
-        Return a string representing the grades as JSON.
-        """
-        return utils.to_json(self._get_grades_export())
-
-    def run(self, debug: bool = False) -> None:
-        """
-        Start the Flask server (using Werkzeug internally).
-
-        :param debug: Whether to start the server in debug mode (includes tracebacks with HTTP 500
-            error pages)
-        """
-        # Start the server
-        kwargs = {
-            "threaded": True,
-            "use_reloader": False
-        }
-        if debug:
-            kwargs["debug"] = True
-            kwargs["use_reloader"] = False
-
-        _logger.info("Running Flask app")
-        self._app.run(self.settings.host, self.settings.port, **kwargs)
