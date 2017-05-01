@@ -527,7 +527,7 @@ class LocalHost(Host):
                 break
             buffer.write(data)
             if output_func:
-                output_func(Msg(end="").print(data))
+                output_func(Msg(end="").print("{}", data))
         if output_func:
             output_func(Msg().print())
             if print_status_when_done.is_set():
