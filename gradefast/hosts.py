@@ -501,10 +501,24 @@ class LocalHost(Host):
                               output_func: Optional[Callable[[Msg], None]],
                               print_status_when_done: threading.Event) -> None:
         LocalHost.logger.debug("Started thread to read from stdout of process {!r}", process.args)
+        stdout_fileno = process.stdout.fileno()
         while True:
             data = None
             try:
-                data = process.stdout.read(1)
+                if output_func:
+                    # Since process.stdout.read(...) is blocking, we used to read the process's
+                    # output one byte at a time, to make sure we could show it as soon as possible.
+                    #data = process.stdout.read(1)
+
+                    # That is terribly inefficient with lots of output. So, this uses os.read(),
+                    # which does a non-blocking read (if fewer bytes are available than requested,
+                    # then it just returns whatever it has).
+                    # TODO: Does this work cross-platform? (Particularly on non-POSIX platforms?)
+                    data = os.read(stdout_fileno, 1024).decode()
+                else:
+                    # Since there's no output function (i.e. nobody wants this output right away),
+                    # it's okay to let it buffer for a bit.
+                    data = process.stdout.read(1024)
             except BrokenPipeError:
                 LocalHost.logger.debug("BrokenPipeError when reading stdout of process {!r}",
                                        process.args)
