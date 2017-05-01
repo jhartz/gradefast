@@ -398,8 +398,7 @@ class CommandRunner:
         :return: A copy of "command" with "name" and "command" changed.
         """
         self.channel.print("Existing command: {}", command.command)
-        new_command = self.channel.input("Enter new command (TAB to input old): ",
-                                         [command.command])
+        new_command = self.channel.input("Enter new command (TAB to input old):", command.command)
         if not new_command:
             self.channel.print("No change :(")
             return command
