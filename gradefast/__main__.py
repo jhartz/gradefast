@@ -297,7 +297,12 @@ def main() -> None:
 
     # Make sure that all of our doors are shut for the winter
     log.shutdown_logging()
-    os._exit(0)
+
+    # Back in the day, for some reason, we had some unruly threads hanging around that would
+    # prevent GradeFast from exiting, hence brutally killing them using os._exit; however, it
+    # doesn't seem like we need this anymore.
+    # TODO: Do we still need this for certain platforms (*cough* Windows)?
+    #os._exit(0)
 
 
 if __name__ == "__main__":
