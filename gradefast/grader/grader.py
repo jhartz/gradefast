@@ -184,8 +184,7 @@ class Grader:
                                          submission.name, submission.id, len(self._submissions))
 
             what_to_do = self.channel.prompt(
-                "Press Enter to begin; (g)oto, (b)ack, (s)kip, (l)ist, (a)dd, (d)rop, (q)uit, "
-                "(h)elp",
+                "Press Enter to begin; (g)oto, (b)ack, (s)kip, (l)ist, (a)dd, (q)uit, (h)elp",
                 ["", "g", "goto", "b", "back", "s", "skip", "l", "list", "a", "add", "q", "quit",
                  "h", "help", "?"],
                 show_choices=False)
@@ -232,8 +231,9 @@ class Grader:
 
             elif what_to_do == "l" or what_to_do == "list":
                 # List all the submissions
+                id_len = len(str(len(self._submissions)))
                 for submission in self._submissions:
-                    self.channel.print("{}: {}", submission.id, submission.name)
+                    self.channel.print("{:{}}: {}", submission.id, id_len, submission.name)
 
             elif what_to_do == "a" or what_to_do == "add":
                 # Add another folder of submissions
