@@ -221,7 +221,7 @@ def parse_grade_structure(lst: List[dict]) -> List[GradeItem]:
 
 
 def _parse_grade_item(item: dict, path: List[int], subject: str) -> GradeItem:
-    _logger = get_logger("grade structure")
+    _logger = get_logger("parsers: grade structure")
     errors = ModelParseError()
 
     name = item.get("name")

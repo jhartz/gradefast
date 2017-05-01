@@ -522,6 +522,10 @@ class LocalHost(Host):
             except BrokenPipeError:
                 LocalHost.logger.debug("BrokenPipeError when reading stdout of process {!r}",
                                        process.args)
+            except Exception:
+                LocalHost.logger.exception("Exception when reading stdout of process {!r}",
+                                           process.args)
+                break
             if not data:
                 LocalHost.logger.debug("No more data from stdout of process {!r}", process.args)
                 break
