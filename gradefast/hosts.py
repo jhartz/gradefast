@@ -434,7 +434,10 @@ class LocalHost(Host):
         args = command  # type: Union[str, List[str]]
         if self.settings.shell_command:
             # Use the user-provided shell
-            args = [self.settings.shell_command, command]
+            args = [self.settings.shell_command]
+            if self.settings.shell_args:
+                args += self.settings.shell_args
+            args.append(command)
         else:
             # Let the platform default shell parse the command
             kwargs["shell"] = True
@@ -663,14 +666,16 @@ class LocalHost(Host):
 
     def open_shell(self, path: Path, environment: Dict[str, str]) -> None:
         if self.settings.terminal_command:
-            local_path = self.gradefast_path_to_local_path(path)
-            _open_in_background([self.settings.terminal_command, local_path.get_local_path()],
-                                environment)
+            args = [self.settings.terminal_command]
+            if self.settings.terminal_args:
+                args += self.settings.terminal_args
+            args.append(self.gradefast_path_to_local_path(path).get_local_path())
+            _open_in_background(args, environment)
         else:
             raise NotImplementedError()
 
 
-def _open_in_background(args: Union[str, List[str]], env: Dict[str, str] = None) -> None:
+def _open_in_background(args: List[str], env: Dict[str, str] = None) -> None:
     subprocess.Popen(args, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                      stderr=subprocess.DEVNULL)
 

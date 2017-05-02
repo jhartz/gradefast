@@ -56,32 +56,45 @@ def get_argument_parser() -> argparse.ArgumentParser:
         usage="python3 -m gradefast [-h|--help] [options] yaml-file",
         description="For GradeFast usage documentation, see: https://github.com/jhartz/gradefast",
         formatter_class=Formatter,
-        epilog="The search path for the \"shell\" or \"terminal\" commands will include the "
-               "folder containing the YAML Configuration File."
+        epilog="The search path for the \"--shell\" or \"--terminal\" commands will include the "
+               "folder containing the YAML Configuration File. Also, if the argument provided to "
+               "\"--shell-arg\" or \"--terminal-arg\" begins with a hyphen, make sure to specify "
+               "it using an equals sign, e.g. --whatever-arg=-c"
     )
     parser.add_argument(
         "--host",
-        help="The hostname to run the gradebook HTTP server on.\nDefault: {}".format(DEFAULT_HOST),
+        help="The hostname to run the gradebook HTTP server on.\n"
+             "DEFAULT: {}".format(DEFAULT_HOST),
         default=DEFAULT_HOST
     )
     parser.add_argument(
         "--port",
-        help="The port to run the gradebook HTTP server on.\nDefault: {}".format(DEFAULT_PORT),
+        help="The port to run the gradebook HTTP server on.\n"
+             "DEFAULT: {}".format(DEFAULT_PORT),
         default=DEFAULT_PORT
     )
     parser.add_argument(
         "--shell", metavar="CMD",
         help="A program used to parse and run the commands in the \"commands\" section of the "
-             "YAML file.\n"
-             "The command to run will be passed as an argument.\n"
-             "Default: the operating system's default shell"
+             "YAML file. The command to run will be passed as the last argument.\n"
+             "DEFAULT: the operating system's default shell"
+    )
+    parser.add_argument(
+        "--shell-arg", metavar="ARG", action="append",
+        help="An argument for the command specified with --shell. This can be specified "
+             "multiple times."
     )
     parser.add_argument(
         "--terminal", metavar="CMD",
-        help="A program used to open a terminal or command prompt window.\n"
-             "The path to the directory to start in will be passed as an argument (and will also "
-             "be the working directory of the process).\n"
-             "Default: the operating system's default terminal"
+        help="A program used to open a terminal or command prompt window. The path to the "
+             "directory to start in will be passed as the last argument (and will also be the "
+             "working directory of the process).\n"
+             "DEFAULT: the operating system's default terminal"
+    )
+    parser.add_argument(
+        "--terminal-arg", metavar="ARG", action="append",
+        help="An argument for the command specified with --terminal. This can be specified "
+             "multiple times."
     )
     parser.add_argument(
         "--no-readline", action="store_true",
@@ -96,33 +109,32 @@ def get_argument_parser() -> argparse.ArgumentParser:
         "--file-chooser", choices=("native", "cli"),
         help="Which file chooser to use when selecting folders. \"native\" attempts to use your "
              "OS's file chooser, while \"cli\" is a command-line-based file chooser.\n"
-             "Default: \"native\" (if available)",
+             "DEFAULT: \"native\" (if available)",
         default="native"
     )
     parser.add_argument(
         "--save-file", metavar="PATH",
         help="A file in which to save the current GradeFast state, allowing GradeFast to recover "
-             "if it crashes. This file is checked on startup; if it already exists, then "
-             "GradeFast reads it to resume from where it left off.\n"
-             "Default: [yaml filename].save.data (in the same directory as the YAML file)"
+             "if you quit and come back later. This file is checked on startup; if it already "
+             "exists, then GradeFast reads it to resume from where it left off.\n"
+             "DEFAULT: [yaml filename].save.data (in the same directory as the YAML file)"
     )
     parser.add_argument(
         "--log-file", metavar="PATH",
-        help="A file to save all output to. This is usually better than using \"tee\" since it "
-             "includes user input (stdin) as well. If a log file already exists at this path, it "
-             "is appended to.\n"
-             "If the filename ends in \".html\" or \".htm\", then the output is logged as HTML.\n"
-             "Default: [yaml filename].log (in the same directory as the YAML file)"
+        help="A file to save all command line output to. If a log file already exists at this "
+             "path, it is appended to. If the filename ends in \".html\" or \".htm\", then the "
+             "output is logged as HTML.\n"
+             "DEFAULT: [yaml filename].log (in the same directory as the YAML file)"
     )
     parser.add_argument(
         "--debug-file", metavar="PATH",
-        help="A file to log debug output to.\nDefault: (none)"
+        help="A file to log debug output to.\n"
+             "DEFAULT: (none)"
     )
     parser.add_argument(
         "-f", "-s", "--submissions", metavar="PATH", action="append",
         help="A folder in which to look for submissions (optional; can be specified multiple "
-             "times).\n"
-             "When GradeFast starts, you will be able to choose more folders if you want."
+             "times). When GradeFast starts, you will be able to choose more folders if you want."
     )
     parser.add_argument(
         "yaml_file", metavar="yaml-file",
@@ -262,7 +274,9 @@ def build_settings(args) -> Settings:
     settings_builder.base_env = base_env
     settings_builder.prefer_cli_file_chooser = args.file_chooser == "cli"
     settings_builder.shell_command = _absolute_path_if_exists(args.shell, yaml_directory)
+    settings_builder.shell_args = args.shell_arg
     settings_builder.terminal_command = _absolute_path_if_exists(args.terminal, yaml_directory)
+    settings_builder.terminal_args = args.terminal_arg
 
     return settings_builder.build()
 
