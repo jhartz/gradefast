@@ -513,10 +513,9 @@ class LocalHost(Host):
                     # output one byte at a time, to make sure we could show it as soon as possible.
                     #data = process.stdout.read(1)
 
-                    # That is terribly inefficient with lots of output. So, this uses os.read(),
-                    # which does a non-blocking read (if fewer bytes are available than requested,
-                    # then it just returns whatever it has).
-                    # TODO: Does this work cross-platform? (Particularly on non-POSIX platforms?)
+                    # Reading byte-by-byte is terribly inefficient with lots of output. So,
+                    # instead, this uses os.read(), which does a non-blocking read (if fewer bytes
+                    # are available than requested, then it just returns whatever it has).
                     data = os.read(stdout_fileno, 1024).decode()
                 else:
                     # Since there's no output function (i.e. nobody wants this output right away),
@@ -711,7 +710,6 @@ class LocalWindowsHost(LocalHost):
         if not start_path:
             start_path = self.get_home_folder()
 
-        # TODO: TEST THIS
         # This is a "hacky af" PowerShell script to show a file selection window that allows folder
         # selection while still showing files. Turns out this isn't built in to Windows (well,
         # except for the horribly ugly "folder selection" dialog that's just a glorified treeview).
