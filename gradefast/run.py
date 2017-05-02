@@ -17,6 +17,7 @@ from pyprovide import Injector
 
 from gradefast.gradebook import GradeBook
 from gradefast.grader import Grader
+from gradefast.log import get_logger
 from gradefast.models import Path, Settings
 
 
@@ -24,11 +25,21 @@ class LazyUserError(Exception):
     pass
 
 
+def _try_run_gradebook(gradebook: GradeBook) -> None:
+    logger = get_logger("run: gradebook")
+    try:
+        gradebook.run(debug=True)
+    except Exception:
+        logger.exception("Exception when running gradebook server")
+
+
 def run_gradefast(injector: Injector, submission_paths: List[Path]) -> None:
     # Create and start the GradeBook WSGI server in a new thread
+    gradebook = injector.get_instance(GradeBook)
     threading.Thread(
         name="GradeBookTh",
-        target=lambda: injector.get_instance(GradeBook).run(debug=True),
+        target=_try_run_gradebook,
+        args=(gradebook,),
         daemon=True
     ).start()
     # Sleep for a bit to give the web server some time to catch up
