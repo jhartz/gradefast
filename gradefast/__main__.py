@@ -74,6 +74,10 @@ def get_argument_parser() -> argparse.ArgumentParser:
         default=DEFAULT_PORT
     )
     parser.add_argument(
+        "--no-gradebook", action="store_true",
+        help="Don't run the gradebook HTTP server."
+    )
+    parser.add_argument(
         "--shell", metavar="CMD",
         help="A program used to parse and run the commands in the \"commands\" section of the "
              "YAML file. The command to run will be passed as the last argument.\n"
@@ -145,7 +149,7 @@ def get_argument_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def parse_yaml_file(yaml_file: TextIO) -> SettingsBuilder:
+def parse_yaml_file(yaml_file: TextIO, gradebook_enabled: bool) -> SettingsBuilder:
     """
     Parse a GradeFast YAML configuration file and convert it to the GradeFast data structures,
     returning them in a partially-populated SettingsBuilder.
@@ -153,6 +157,8 @@ def parse_yaml_file(yaml_file: TextIO) -> SettingsBuilder:
     See https://github.com/jhartz/gradefast/wiki/YAML-Configuration-Format
 
     :param yaml_file: An open stream containing the YAML data.
+    :param gradebook_enabled: Whether the GradeBook is enabled. If this is False, then we won't
+        bother parsing the grade structure.
     """
     errors = ModelParseError()
 
@@ -180,13 +186,16 @@ def parse_yaml_file(yaml_file: TextIO) -> SettingsBuilder:
         errors.add_line("YAML file missing \"commands\" section")
 
     # Parse the "grades" section using parse_grade_structure
-    if "grades" in yaml_data:
-        try:
-            settings_builder.grade_structure = parse_grade_structure(yaml_data["grades"])
-        except ModelParseError as exc:
-            errors.add_all(exc)
+    if gradebook_enabled:
+        if "grades" in yaml_data:
+            try:
+                settings_builder.grade_structure = parse_grade_structure(yaml_data["grades"])
+            except ModelParseError as exc:
+                errors.add_all(exc)
+        else:
+            errors.add_line("YAML file missing \"grades\" section")
     else:
-        errors.add_line("YAML file missing \"grades\" section")
+        settings_builder.grade_structure = None
 
     try:
         settings_builder.update(parse_settings(
@@ -250,7 +259,7 @@ def build_settings(args) -> Settings:
 
     with open(yaml_file_path, encoding="utf-8") as yaml_file:
         try:
-            settings_builder = parse_yaml_file(yaml_file)
+            settings_builder = parse_yaml_file(yaml_file, not args.no_gradebook)
         except ModelParseError as exc:
             print()
             print("Error parsing YAML file:")
@@ -261,18 +270,24 @@ def build_settings(args) -> Settings:
     settings_builder.save_file = save_file
     settings_builder.log_file = log_file
     settings_builder.log_as_html = log_as_html
-    # "grade_structure" filled from YAML file
+
+    settings_builder.gradebook_enabled = not args.no_gradebook
+    # "grade_structure" filled from YAML file (if gradebook is enabled)
     settings_builder.host = args.host
     settings_builder.port = args.port
+
     # "commands" filled from YAML file
     # "submission_regex" filled from YAML file
     # "check_zipfiles" filled from YAML file
     # "check_file_extensions" filled from YAML file
     settings_builder.diff_file_path = yaml_directory
+
     settings_builder.use_readline = not args.no_readline
     settings_builder.use_color = not args.no_color
+
     settings_builder.base_env = base_env
     settings_builder.prefer_cli_file_chooser = args.file_chooser == "cli"
+
     settings_builder.shell_command = _absolute_path_if_exists(args.shell, yaml_directory)
     settings_builder.shell_args = args.shell_arg
     settings_builder.terminal_command = _absolute_path_if_exists(args.terminal, yaml_directory)

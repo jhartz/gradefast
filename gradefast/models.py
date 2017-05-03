@@ -314,6 +314,7 @@ Settings = NamedTuple("Settings", [
     ("log_as_html", Optional[bool]),
 
     # GradeBook settings
+    ("gradebook_enabled", bool),
     ("grade_structure", List[GradeItem]),
     ("host", int),
     ("port", int),
