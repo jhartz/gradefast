@@ -287,15 +287,15 @@ class Grader:
         for background_command in background_commands:
             background_command = background_command
             self.channel.print()
-            self.channel.status("Waiting for background command {} ...",
-                                background_command.get_description())
+            self.channel.output(Msg().status("Waiting for background command")
+                                     .print("{}", background_command.get_description()))
             background_command.wait()
+            self.channel.print()
             if background_command.get_error():
-                self.channel.error("Background command ERROR: {}", background_command.get_error())
-            else:
-                self.channel.print("Background command output:")
+                self.channel.error("ERROR: {}", background_command.get_error())
+            if background_command.get_output():
+                self.channel.status("Background command output:")
                 self.channel.print(background_command.get_output())
-                self.channel.print("__________________________")
 
 
 class CommandRunner:

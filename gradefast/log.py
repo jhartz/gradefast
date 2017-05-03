@@ -61,7 +61,7 @@ def init_logging(log_file: str = None) -> None:
     stream_handler = logging.StreamHandler()
     stream_handler.setLevel(logging.WARNING)
     stream_handler.setFormatter(logging.Formatter(
-        "==> {levelname} ({name}): {message}",
+        "\n==> {levelname} ({name}): {message}",
         style="{"))
     handlers.append(stream_handler)
 
