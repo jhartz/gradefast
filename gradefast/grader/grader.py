@@ -173,9 +173,24 @@ class Grader:
         submission_id = 1
         background_commands = []  # type: List[BackgroundCommand]
         while True:
-            # A quick check in case the list of submissions is modified during grading
+            if len(self._submissions) == 0:
+                # Ideally, this shouldn't ever happen, but...
+                self.channel.error_bordered("No submissions!")
+                break
+
             if submission_id > len(self._submissions):
-                submission_id = len(self._submissions)
+                # Special case: we're at the end
+                self.channel.print()
+                self.channel.status_bordered("End of submissions!")
+                loop = self.channel.prompt(
+                    "Loop back around to the front?", ["y", "n"],
+                    empty_choice_msg="C'mon, you're almost done; you can make a simple choice "
+                                     "between `yes' and `no'")
+                if loop == "y":
+                    submission_id = 1
+                else:
+                    # Well, they said they're done
+                    break
 
             submission = self._submissions[submission_id - 1]
 
@@ -227,7 +242,9 @@ class Grader:
 
             elif what_to_do == "s" or what_to_do == "skip":
                 # Skip to the next submission
-                submission_id = min(submission_id + 1, len(self._submissions))
+                # (skipping the last submission will trigger the "end of submissions" branch at the
+                # beginning of the infinite while loop)
+                submission_id += 1
 
             elif what_to_do == "l" or what_to_do == "list":
                 # List all the submissions
@@ -264,22 +281,8 @@ class Grader:
 
                 background_commands += runner.get_background_commands()
 
-                if submission_id != len(self._submissions):
-                    # By default, we want to move on to the next submission in the list
-                    submission_id += 1
-                else:
-                    # Special case: we're at the end
-                    self.channel.print()
-                    self.channel.status_bordered("End of submissions!")
-                    loop = self.channel.prompt(
-                        "Loop back around to the front?", ["y", "n"],
-                        empty_choice_msg="C'mon, you're almost done; you can make a simple choice "
-                                         "between `yes' and `no'")
-                    if loop == "y":
-                        submission_id = 1
-                    else:
-                        # Well, they said they're done
-                        break
+                # By default, we want to move on to the next submission in the list
+                submission_id += 1
 
         # All done with everything
         self.event_manager.dispatch_event(events.EndOfSubmissionsEvent())
