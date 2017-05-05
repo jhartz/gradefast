@@ -3,12 +3,10 @@ TODO
 
 GradeBook TODOs:
 
-- Write tests for grade structure parser
-- Refactor clients.py (or move its functionality into gradebook.py, since it's not all that big
-  anymore)
+- Write tests for grade structure parser, and grades.py
 - In the gradebook (particularly gradebook.grades and the UI), find something better to call the
   path to the grade item than "path" (it's confusing with the Path model for filesystem paths).
-- Add an option (disabled by default) to skip prompting for authentication
+- Add a command line arg (disabled by default) to skip prompting for authentication
 - For sections, add a "scale" option that takes a ratio to scale the section by (or a string
   representing a fraction)
 - Like entering grades on mycourses, mark background in gradebook when a grade item is modified

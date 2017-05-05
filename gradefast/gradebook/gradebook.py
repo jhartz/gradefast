@@ -14,13 +14,13 @@ import threading
 import time
 import uuid
 from collections import OrderedDict
-from typing import Callable, Dict, Iterable, List, Set, TypeVar
+from typing import Callable, Dict, Iterable, List, Set, TypeVar, cast
 
 from iochannels import MemoryLog
 from pyprovide import inject
 
 from gradefast import events, required_package_error
-from gradefast.gradebook import clients, eventhandlers, grades, utils
+from gradefast.gradebook import eventhandlers, grades, utils
 from gradefast.log import get_logger
 from gradefast.models import Settings, Submission
 
@@ -33,6 +33,66 @@ except ImportError:
 _logger = get_logger("gradebook")
 
 T = TypeVar("T")
+
+
+class ClientUpdate:
+    """
+    Represents an event that the GradeBook server is sending to GradeBook clients.
+    """
+
+    _last_id = 0
+
+    def __init__(self, event: str, data: object = None,
+                 requires_authentication: bool = True) -> None:
+        """
+        Create a new ClientUpdate to send to GradeBook clients.
+
+        :param event: The name of the update
+        :param data: The data associated with this update (will be json-encoded if it's not a
+            string)
+        :param requires_authentication: Whether this update should only be sent to authenticated
+            clients
+        """
+        self._event = event
+        self._data = data if isinstance(data, str) else utils.to_json(data)
+        self._requires_authentication = requires_authentication
+
+        ClientUpdate._last_id += 1
+        self._id = ClientUpdate._last_id
+
+    @staticmethod
+    def create_update_event(update_type: str, update_data: dict = None) -> "ClientUpdate":
+        """
+        Create a new ClientUpdate containing an "update" event to send to GradeBook clients.
+
+        :param update_type: The type of "update" event (see connection.js).
+        :param update_data: Data corresponding with this type.
+        :return: An instance of ClientUpdate
+        """
+        return ClientUpdate("update", {
+            "update_type": update_type,
+            "update_data": update_data or {}
+        })
+
+    def requires_authentication(self) -> bool:
+        return self._requires_authentication
+
+    def encode(self) -> str:
+        """
+        Return the event in the HTML5 Server-Sent Events format.
+
+        https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events
+        """
+        if not self._data:
+            return ""
+
+        result = ""
+        result += "id: " + str(self._id) + "\n"
+        if self._event:
+            result += "event: " + str(self._event) + "\n"
+        result += "data: " + "\ndata:".join(str(self._data).split("\n"))
+        result += "\n\n"
+        return result
 
 
 class GradeBook:
@@ -341,7 +401,7 @@ class GradeBook:
                 update_queue = queue.Queue(999)  # type: queue.Queue
                 self._client_update_queues[client_id] = update_queue
                 # Some browsers need an initial kick to fire the "open" event on the EventSource
-                update_queue.put(clients.ClientUpdate("hello", requires_authentication=False))
+                update_queue.put(ClientUpdate("hello", requires_authentication=False))
                 try:
                     while True:
                         client_update = update_queue.get()
@@ -390,8 +450,7 @@ class GradeBook:
 
         return grade_list
 
-    def _send_client_update(self, client_update: clients.ClientUpdate,
-                            client_id: uuid.UUID = None) -> None:
+    def _send_client_update(self, client_update: ClientUpdate, client_id: uuid.UUID = None) -> None:
         """
         Send a ClientUpdate to either a specific GradeBook client or to all open, authenticated
         GradeBook clients.
@@ -400,7 +459,7 @@ class GradeBook:
         :param client_id: The ID of the client to send to. If this is None, then send to all
             clients.
         """
-        assert isinstance(client_update, clients.ClientUpdate)
+        assert isinstance(client_update, ClientUpdate)
 
         if client_id is None:
             client_ids = self._authenticated_client_ids
@@ -430,7 +489,7 @@ class GradeBook:
         self._client_update_keys[client_id] = uuid.uuid4()
 
         # Send the client its auth keys
-        self._send_client_update(clients.ClientUpdate("auth", {
+        self._send_client_update(ClientUpdate("auth", {
             "data_key": data_key,
             "update_key": self._client_update_keys[client_id],
             "initial_submission_list": self._get_submission_list(),
@@ -451,7 +510,7 @@ class GradeBook:
                     submission, self.settings.grade_structure)
 
         # Tell GradeBook clients about this new list
-        self._send_client_update(clients.ClientUpdate.create_update_event("NEW_SUBMISSION_LIST", {
+        self._send_client_update(ClientUpdate.create_update_event("NEW_SUBMISSION_LIST", {
             "submissions": self._get_submission_list()
         }))
 
@@ -470,7 +529,7 @@ class GradeBook:
 
         # Tell GradeBook clients about this change in the current submission
         # (include the list of submissions so the clients have an updated idea of who has a log)
-        self._send_client_update(clients.ClientUpdate.create_update_event("SUBMISSION_STARTED", {
+        self._send_client_update(ClientUpdate.create_update_event("SUBMISSION_STARTED", {
             "submissions": self._get_submission_list(),
             "submission_id": submission_id
         }))
@@ -482,7 +541,7 @@ class GradeBook:
         self.is_done = is_done
 
         # Tell GradeBook clients that we're done
-        self._send_client_update(clients.ClientUpdate.create_update_event("END_OF_SUBMISSIONS"))
+        self._send_client_update(ClientUpdate.create_update_event("END_OF_SUBMISSIONS"))
 
     def _parse_action(self, submission_id: int, client_id: uuid.UUID, client_seq: int,
                       action: Dict[str, object]) -> None:
@@ -498,13 +557,104 @@ class GradeBook:
             grade = self._grades_by_submission_id[submission_id]
         except IndexError:
             raise utils.GradeBookPublicError("Invalid submission ID: {}".format(submission_id))
+        self._apply_action_to_grade(grade, action)
 
-        client_action = clients.ClientAction(submission_id, client_id, client_seq, grade, action)
-        data = client_action.apply_to_gradebook(self)
-        self._send_client_update(
-            clients.ClientUpdate.create_update_event("SUBMISSION_UPDATED", data))
+        # Recalculate the score, etc., and tell clients
+        data = grade.to_plain_data()
+        data.update({
+            "submission_id": submission_id,
+            "originating_client_id": client_id,
+            "originating_client_seq": client_seq
+        })
+        self._send_client_update(ClientUpdate.create_update_event("SUBMISSION_UPDATED", data))
 
-        # Also update the submission list (to get the new scores, etc.)
-        self._send_client_update(clients.ClientUpdate.create_update_event("NEW_SUBMISSION_LIST", {
+        # Also update the submission list (so clients get the new overall scores)
+        self._send_client_update(ClientUpdate.create_update_event("NEW_SUBMISSION_LIST", {
             "submissions": self._get_submission_list()
         }))
+
+    @staticmethod
+    def _apply_action_to_grade(grade: grades.SubmissionGrade, action: Dict[str, object]) -> None:
+        action_type = action["type"] if "type" in action else None
+
+        # It's possible we have no actual action to take, and that's okay
+        if not action_type:
+            return
+
+        if action_type == "SET_LATE":
+            # Set whether the submission is marked as late
+            if "is_late" in action:
+                grade.set_late(bool(action["is_late"]))
+                return
+
+        if action_type == "SET_OVERALL_COMMENTS":
+            # Set the overall comments of the submission
+            if "overall_comments" in action:
+                grade.set_overall_comments(str(action["overall_comments"]))
+                return
+
+        # All of the other action types have a path
+        if "path" not in action:
+            raise utils.GradeBookPublicError("Action missing a path", action=action)
+        try:
+            path = [int(p) for p in cast(List[int], action["path"])]
+        except (TypeError, ValueError) as ex:
+            raise utils.BadPathError("Error parsing path {}".format(action["path"]), exception=ex)
+
+        if action_type == "ADD_HINT":
+            # Add a hint by changing the grade structure (MUA HA HA HA)
+            if "content" in action and \
+                    "name" in action["content"] and "value" in action["content"]:
+                grade.add_hint_to_all_grades(path,
+                                             action["content"]["name"],
+                                             action["content"]["value"])
+                return
+
+        if action_type == "EDIT_HINT":
+            # Edit a hint by changing the grade structure (MUA HA HA HA)
+            if "index" in action and "content" in action and \
+                    "name" in action["content"] and "value" in action["content"]:
+                try:
+                    index = int(cast(int, action["index"]))
+                except ValueError as ex:
+                    raise utils.BadPathError("Invalid hint index \"{}\" at path {}"
+                                             .format(action["index"], path), exception=ex)
+                grade.replace_hint_for_all_grades(path,
+                                                  index,
+                                                  action["content"]["name"],
+                                                  action["content"]["value"])
+                return
+
+        # All of the rest of the action types operate directly on a grade item
+        grade_item = grade.get_by_path(path)
+
+        # They also all have a value
+        if "value" not in action:
+            raise utils.GradeBookPublicError("Action missing a value", action=action)
+        value = action["value"]
+
+        if action_type == "SET_ENABLED":
+            grade_item.set_enabled(bool(value))
+            return
+
+        if action_type == "SET_SCORE":
+            if isinstance(grade_item, grades.SubmissionGradeScore):
+                grade_item.set_effective_score(str(value))
+                return
+
+        if action_type == "SET_COMMENTS":
+            if isinstance(grade_item, grades.SubmissionGradeScore):
+                grade_item.set_comments(str(value))
+                return
+
+        if action_type == "SET_HINT_ENABLED" and "index" in action:
+            try:
+                index = int(cast(int, action["index"]))
+                grade_item.set_hint_enabled(index, bool(value))
+                return
+            except (ValueError, IndexError) as ex:
+                raise utils.BadPathError("Invalid hint index \"{}\" at path {}"
+                                         .format(action["index"], path), exception=ex)
+
+        # If we're still here, something went wrong...
+        raise utils.GradeBookPublicError("Action does not have a valid type", action=action)
