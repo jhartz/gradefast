@@ -17,8 +17,6 @@ GradeBook TODOs:
 - 3 states for grade structures: enabled, disabled, or collapsed, in which case any sub grades are
   not shown, and we just enter one big point value, one big comment. This probably means
   implementing a custom checkbox, or doing something hacky like: https://jsfiddle.net/urtwh9t7/2/
-- In YAML config, "notes" should be allowed to be a list of MD-parsed strings (which we'll show as
-  a HTML list)
 - Push the "dist/" folder to GitHub, so that people can use GradeFast without needing npm. (But,
   with a big fat notice in the README that, if they modify any of the JS files, they'll need to
   "npm run build" to see the effects)
