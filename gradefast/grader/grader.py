@@ -258,11 +258,11 @@ class Grader:
                                        submission)
                 runner.run()
 
-                # Stop the logs
+                # Stop the logs and clean up
                 html_log.close()
                 text_log.close()
-
                 background_commands += runner.get_background_commands()
+                self.event_manager.dispatch_event(events.SubmissionFinishedEvent(submission_id))
 
                 if submission_id != len(self._submissions):
                     # By default, we want to move on to the next submission in the list

@@ -50,10 +50,10 @@ Grader TODOs:
   diff filename. (same w/ being able to skip stdin)
 - Add ability to specify a max running time for a process (useful for background commands), and
   then some sort of action if it's cut off (like above idea of using program output as comment text)
-- When specifying a folder, add ability to specify "required files" that must be in the folder (and
-  option with it to look thru sub-folders to see if any match the requirement)
-- Keep track of the timestamps of when we start/finish a submission, so at the end we have some
-  interesting stats on how long it took us to grade.
+- For command sets, add ability to specify required files that must be in the folder (we'll do a BFS
+  thru sub-folders to find the first that matches the requirement)
+    - "find subfolder with": ["file1", "file2", ...] (or just a single filename string)
+    - If we can't find one, "error" it and just use the root folder
 - Ability to filter which lines of output are shown based on a regex (w/ "context", i.e. x lines
   before/after)
 

@@ -235,6 +235,18 @@ class SubmissionStartedEvent(Event):
         return "{} (submission ID {})".format(super().__str__(), self.submission_id)
 
 
+class SubmissionFinishedEvent(Event):
+    """
+    An event representing that a submission is done being graded.
+    """
+    def __init__(self, submission_id: int) -> None:
+        super().__init__()
+        self.submission_id = submission_id
+
+    def __str__(self) -> str:
+        return "{} (submission ID {})".format(super().__str__(), self.submission_id)
+
+
 class EndOfSubmissionsEvent(Event):
     """
     An event representing that all the submissions are done being graded.
