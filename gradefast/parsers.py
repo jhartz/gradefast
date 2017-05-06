@@ -8,7 +8,7 @@ Author: Jake Hartz <jake@hartz.io>
 
 from typing import Callable, Dict, List, Optional, Tuple, TypeVar, Union
 
-from gradefast.log import get_logger
+from gradefast.loggingwrapper import get_logger
 from gradefast.models import Command, CommandItem, CommandSet, \
     GradeItem, GradeScore, GradeSection, Hint, ScoreNumber, WeakScoreNumber
 

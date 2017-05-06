@@ -21,7 +21,7 @@ from pyprovide import inject
 
 from gradefast import events, required_package_error
 from gradefast.gradebook import eventhandlers, grades, utils
-from gradefast.log import get_logger
+from gradefast.loggingwrapper import get_logger
 from gradefast.models import Settings, Submission
 
 try:

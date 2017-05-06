@@ -20,7 +20,7 @@ from gradefast import events
 from gradefast.grader import eventhandlers
 from gradefast.grader.banners import BANNERS
 from gradefast.hosts import BackgroundCommand, CommandRunError, CommandStartError, Host
-from gradefast.log import get_logger
+from gradefast.loggingwrapper import get_logger
 from gradefast.models import Command, CommandItem, Path, Settings, Submission
 
 _logger = get_logger("grader")

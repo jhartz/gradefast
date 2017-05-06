@@ -17,7 +17,7 @@ from typing import Any, Iterable, List, Optional, Type
 from iochannels import MemoryLog
 from pyprovide import Injector, inject
 
-from gradefast.log import get_logger
+from gradefast.loggingwrapper import get_logger
 from gradefast.models import Submission
 
 _logger = get_logger("events")

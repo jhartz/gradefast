@@ -17,7 +17,7 @@ from pyprovide import Injector
 
 from gradefast.gradebook import GradeBook
 from gradefast.grader import Grader
-from gradefast.log import get_logger
+from gradefast.loggingwrapper import get_logger
 from gradefast.models import Path, Settings
 
 

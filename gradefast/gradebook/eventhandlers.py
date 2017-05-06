@@ -7,7 +7,7 @@ Author: Jake Hartz <jake@hartz.io>
 """
 
 from gradefast import events
-from gradefast.log import get_logger
+from gradefast.loggingwrapper import get_logger
 
 # All concrete event handlers should be listed here.
 # This is used by the register_all_event_handlers method of EventManager.

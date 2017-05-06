@@ -19,9 +19,10 @@ from typing import List, Optional, TextIO
 
 from pyprovide import Injector
 
-from gradefast import log, required_package_error
+from gradefast import required_package_error
 from gradefast.config.local import GradeFastLocalModule
 from gradefast.hosts import LocalHost
+from gradefast.loggingwrapper import get_logger, init_logging, shutdown_logging
 from gradefast.models import LocalPath, Path, Settings, SettingsBuilder
 from gradefast.parsers import ModelParseError, parse_commands, parse_grade_structure, parse_settings
 from gradefast.run import run_gradefast
@@ -220,7 +221,7 @@ def _absolute_path_if_exists(item: str, base: LocalPath) -> Optional[str]:
 
 
 def build_settings(args) -> Settings:
-    logger = log.get_logger("build_settings")
+    logger = get_logger("build_settings")
 
     yaml_file_path = os.path.abspath(args.yaml_file)
     logger.info("YAML file: {}", yaml_file_path)
@@ -298,7 +299,7 @@ def build_settings(args) -> Settings:
 
 def main() -> None:
     args = get_argument_parser().parse_args()
-    log.init_logging(args.debug_file)
+    init_logging(args.debug_file)
 
     settings = build_settings(args)
 
@@ -325,7 +326,7 @@ def main() -> None:
     run_gradefast(injector, submission_paths)
 
     # Make sure that all of our doors are shut for the winter
-    log.shutdown_logging()
+    shutdown_logging()
 
     # Back in the day, for some reason, we had some unruly threads hanging around that would
     # prevent GradeFast from exiting, hence brutally killing them using os._exit; however, it

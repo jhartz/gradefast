@@ -18,7 +18,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from iochannels import Channel, Msg
 from pyprovide import inject
 
-from gradefast.log import get_logger
+from gradefast.loggingwrapper import get_logger
 from gradefast.models import LocalPath, Path, Settings
 
 
