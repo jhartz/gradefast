@@ -314,6 +314,7 @@ Settings = NamedTuple("Settings", [
     ("log_as_html", Optional[bool]),
 
     # GradeBook settings
+    ("gradebook_enabled", bool),
     ("grade_structure", List[GradeItem]),
     ("host", int),
     ("port", int),
@@ -338,7 +339,9 @@ Settings = NamedTuple("Settings", [
     # just be the string "sh" or something).
     # We'll trust the user to tailor these to whatever Host subclass is in play.
     ("shell_command", Optional[str]),
+    ("shell_args", Optional[List[str]]),
     ("terminal_command", Optional[str]),
+    ("terminal_args", Optional[List[str]]),
 ])
 
 
@@ -367,7 +370,9 @@ class SettingsDefaults:
 
     # LocalHost (hosts.py) settings
     shell_command = None
+    shell_args = None
     terminal_command = None
+    terminal_args = None
 
 
 class SettingsBuilder(collections.MutableMapping):

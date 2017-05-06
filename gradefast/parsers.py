@@ -284,7 +284,9 @@ def _parse_grade_item(item: dict, path: List[int], subject: str) -> GradeItem:
     elif "notes" in item:
         note = item["notes"]
     if isinstance(note, list):
-        note = "- " + "\n- ".join(note)
+        note = "- " + "\n- ".join(str(n) for n in note)
+    elif note is not None:
+        note = str(note)
 
     default_enabled = True
     if "default enabled" in item:

@@ -26,10 +26,6 @@ class BackgroundCommand:
     """
     A command that may or may not have finished running.
     """
-    def __init__(self) -> None:
-        self._output = io.StringIO()
-        self._output_lock = threading.Lock()
-        self._error = None  # type: Optional[str]
 
     def get_description(self) -> str:
         """
@@ -43,46 +39,21 @@ class BackgroundCommand:
         """
         raise NotImplementedError()
 
-    def kill(self) -> None:
-        """
-        Kill the command if it is still running.
-        """
-        raise NotImplementedError()
-
-    def _add_output(self, output: str) -> None:
-        """
-        Add more output to the output that we have seen thus far. This should be called in the
-        wait() and kill() implementations.
-        """
-        with self._output_lock:
-            self._output.write(output)
-
-    def _set_error(self, error_message: str) -> None:
-        """
-        Set an error message. If necessary, this should be called in the wait() and kill()
-        implementations.
-        """
-        self._error = error_message
-
     def get_output(self) -> str:
         """
         Get all the output from the command.
 
-        This method will call wait() to wait until the command is finished.
+        This method's implementation should call wait() to wait until the command is finished.
         """
-        self.wait()
-        with self._output_lock:
-            self._output.seek(0)
-            return self._output.read()
+        raise NotImplementedError()
 
     def get_error(self) -> Optional[str]:
         """
         Get an error message, if the command did not finish successfully.
 
-        This will call wait() to wait until the command is finished.
+        This method's implementation should call wait() to wait until the command is finished.
         """
-        self.wait()
-        return self._error
+        raise NotImplementedError()
 
 
 class CommandStartError(Exception):
@@ -384,11 +355,26 @@ class LocalHost(Host):
 
     logger = get_logger("hosts.LocalHost")
 
+    @staticmethod
+    def _kill_process_gracefully(process: subprocess.Popen) -> None:
+        # Stop the process gracefully (with a "SIGTERM")
+        process.terminate()
+        # We won't leave until the process is actually dead
+        LocalHost.logger.debug("Waiting for process to die")
+        while process.poll() is None:
+            try:
+                process.wait()
+            except (InterruptedError, KeyboardInterrupt):
+                if process.poll() is None:
+                    # We tried being peaceful; this time, go for the "SIGKILL"
+                    process.kill()
+
     class LocalBackgroundCommand(BackgroundCommand):
         logger = get_logger("hosts.LocalBackgroundCommand")
 
         def __init__(self, process: subprocess.Popen, command_str: str, path: Path) -> None:
-            super().__init__()
+            self._output = None  # type: Optional[str]
+            self._error_msg = None  # type: Optional[str]
             self._process = process
             self._done = False
             self._lock = threading.Lock()
@@ -396,45 +382,50 @@ class LocalHost(Host):
             self._path = path
 
         def get_description(self) -> str:
-            return "{} (in {})".format(self._command_str, self._path)
-
-        def _we_are_done(self) -> None:
-            self.logger.debug("Background command DONE: {}", self.get_description())
-            self._done = True
-            output = self._process.communicate()[0]  # type: str
-            self._add_output(output)
-            if self._process.returncode != 0:
-                self._set_error("Command had nonzero return code: {}"
-                                .format(self._process.returncode))
+            return "(in {}):\n{}".format(
+                self._path, "\n".join("    " + line for line in self._command_str.splitlines()))
 
         def wait(self) -> None:
             with self._lock:
                 if self._done:
                     return
-                self.logger.debug("Waiting for background command: {}", self.get_description())
+                self.logger.debug("Waiting for background command {}", self.get_description())
                 try:
-                    self._process.communicate()
+                    self._process.wait()
                 except (InterruptedError, KeyboardInterrupt):
-                    self.logger.debug("Background command interrupted: {}", self.get_description())
-                    self._set_error("Command interrupted")
-                self._we_are_done()
+                    self.logger.debug("Background command interrupted {}", self.get_description())
+                    LocalHost._kill_process_gracefully(self._process)
+                    self._error_msg = "Background command interrupted"
+                self.logger.debug("Background command DONE {}", self.get_description())
+                self._done = True
+                try:
+                    # Since we already closed stdin, but haven't touched stdout, we should be fine
+                    # reading it directly
+                    self._output = self._process.stdout.read()
+                except Exception:
+                    self.logger.exception("Error reading output from background command {}",
+                                          self.get_description())
+                if not self._error_msg and self._process.returncode != 0:
+                    self._error_msg = "Background command had nonzero return code: {}".format(
+                        self._process.returncode)
 
-        def kill(self) -> None:
-            with self._lock:
-                if self._done:
-                    return
-                self.logger.debug("Killing background command: {}", self.get_description())
-                self._process.kill()
-                self.logger.debug("Background command killed: {}", self.get_description())
-                self._set_error("Command killed")
-                self._we_are_done()
+        def get_output(self) -> str:
+            self.wait()
+            return self._output
+
+        def get_error(self) -> Optional[str]:
+            self.wait()
+            return self._error_msg
 
     def _start_process(self, command: str, path: Path, environment: Dict[str, str],
                        **kwargs: Any) -> subprocess.Popen:
         args = command  # type: Union[str, List[str]]
         if self.settings.shell_command:
             # Use the user-provided shell
-            args = [self.settings.shell_command, command]
+            args = [self.settings.shell_command]
+            if self.settings.shell_args:
+                args += self.settings.shell_args
+            args.append(command)
         else:
             # Let the platform default shell parse the command
             kwargs["shell"] = True
@@ -451,19 +442,6 @@ class LocalHost(Host):
                                   **kwargs: Any) -> subprocess.Popen:
         return self._start_process(command, path, environment, stdin=subprocess.PIPE,
                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, **kwargs)
-
-    def _kill_process_gracefully(self, process: subprocess.Popen) -> None:
-        # Stop the process gracefully (with a "SIGTERM")
-        process.terminate()
-        # We won't leave until the process is actually dead
-        self.logger.debug("Waiting for process to die")
-        while process.poll() is None:
-            try:
-                process.wait()
-            except (InterruptedError, KeyboardInterrupt):
-                if process.poll() is None:
-                    # We tried being peaceful; this time, go for the "SIGKILL"
-                    process.kill()
 
     @staticmethod
     def _try_stdin_write(process: subprocess.Popen, stdin: str = None) -> None:
@@ -492,7 +470,9 @@ class LocalHost(Host):
                                    process.args)
         except OSError as e:
             if e.errno == errno.EINVAL and process.poll() is not None:
-                pass
+                # On Windows, stdin.close() fails with EINVAL if the process already exited
+                LocalHost.logger.debug("Errno EINVAL when closing stdin of process {!r}",
+                                       process.args)
             else:
                 raise
 
@@ -510,10 +490,9 @@ class LocalHost(Host):
                     # output one byte at a time, to make sure we could show it as soon as possible.
                     #data = process.stdout.read(1)
 
-                    # That is terribly inefficient with lots of output. So, this uses os.read(),
-                    # which does a non-blocking read (if fewer bytes are available than requested,
-                    # then it just returns whatever it has).
-                    # TODO: Does this work cross-platform? (Particularly on non-POSIX platforms?)
+                    # Reading byte-by-byte is terribly inefficient with lots of output. So,
+                    # instead, this uses os.read(), which does a non-blocking read (if fewer bytes
+                    # are available than requested, then it just returns whatever it has).
                     data = os.read(stdout_fileno, 1024).decode()
                 else:
                     # Since there's no output function (i.e. nobody wants this output right away),
@@ -578,7 +557,7 @@ class LocalHost(Host):
                     process.wait()
             except (InterruptedError, KeyboardInterrupt):
                 print_status_when_done.clear()
-                self._kill_process_gracefully(process)
+                LocalHost._kill_process_gracefully(process)
                 LocalHost._try_stdin_close(process)
             t.join()
 
@@ -594,7 +573,7 @@ class LocalHost(Host):
         try:
             process.wait()
         except (InterruptedError, KeyboardInterrupt):
-            self._kill_process_gracefully(process)
+            LocalHost._kill_process_gracefully(process)
 
         if process.returncode != 0:
             raise CommandRunError("Command had nonzero return code: {}".format(process.returncode))
@@ -667,14 +646,16 @@ class LocalHost(Host):
 
     def open_shell(self, path: Path, environment: Dict[str, str]) -> None:
         if self.settings.terminal_command:
-            local_path = self.gradefast_path_to_local_path(path)
-            _open_in_background([self.settings.terminal_command, local_path.get_local_path()],
-                                environment)
+            args = [self.settings.terminal_command]
+            if self.settings.terminal_args:
+                args += self.settings.terminal_args
+            args.append(self.gradefast_path_to_local_path(path).get_local_path())
+            _open_in_background(args, environment)
         else:
             raise NotImplementedError()
 
 
-def _open_in_background(args: Union[str, List[str]], env: Dict[str, str] = None) -> None:
+def _open_in_background(args: List[str], env: Dict[str, str] = None) -> None:
     subprocess.Popen(args, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                      stderr=subprocess.DEVNULL)
 
@@ -706,7 +687,6 @@ class LocalWindowsHost(LocalHost):
         if not start_path:
             start_path = self.get_home_folder()
 
-        # TODO: TEST THIS
         # This is a "hacky af" PowerShell script to show a file selection window that allows folder
         # selection while still showing files. Turns out this isn't built in to Windows (well,
         # except for the horribly ugly "folder selection" dialog that's just a glorified treeview).

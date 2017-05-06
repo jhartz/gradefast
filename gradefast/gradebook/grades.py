@@ -41,6 +41,11 @@ class FeedbackHTMLTemplates:
 <b>{points:+}:</b> {reason}
 </div>"""
 
+    hint_no_points = """
+<div style="text-indent: -20px; margin-left: 20px;">
+{reason}
+</div>"""
+
     section_header = """
 <p>
 <u>{title}</u><br>
@@ -309,8 +314,12 @@ class SubmissionGradeScore(SubmissionGradeItem):
         # Add hints, if applicable
         for index, hint in enumerate(self._hints):
             if self._hints_set.get(index):
-                feedback += FeedbackHTMLTemplates.hint.format(points=hint.value,
-                                                              reason=self._hints_name_html[index])
+                if hint.value == 0:
+                    feedback += FeedbackHTMLTemplates.hint_no_points.format(
+                        reason=self._hints_name_html[index])
+                else:
+                    feedback += FeedbackHTMLTemplates.hint.format(
+                        points=hint.value, reason=self._hints_name_html[index])
 
         # Now, add any comments
         if self._comments:
@@ -418,8 +427,12 @@ class SubmissionGradeSection(SubmissionGradeItem):
         # Add hint feedback
         for index, hint in enumerate(self._hints):
             if self._hints_set.get(index):
-                feedback += FeedbackHTMLTemplates.hint.format(points=hint.value,
-                                                              reason=self._hints_name_html[index])
+                if hint.value == 0:
+                    feedback += FeedbackHTMLTemplates.hint_no_points.format(
+                        reason=self._hints_name_html[index])
+                else:
+                    feedback += FeedbackHTMLTemplates.hint.format(
+                        points=hint.value, reason=self._hints_name_html[index])
 
         # Add lateness feedback if necessary
         if is_late and self._late_deduction:

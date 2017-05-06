@@ -3,12 +3,10 @@ TODO
 
 GradeBook TODOs:
 
-- Write tests for grade structure parser
-- Refactor clients.py (or move its functionality into gradebook.py, since it's not all that big
-  anymore)
+- Write tests for grade structure parser, and grades.py
 - In the gradebook (particularly gradebook.grades and the UI), find something better to call the
   path to the grade item than "path" (it's confusing with the Path model for filesystem paths).
-- Add an option (disabled by default) to skip prompting for authentication
+- Add a command line arg (disabled by default) to skip prompting for authentication
 - For sections, add a "scale" option that takes a ratio to scale the section by (or a string
   representing a fraction)
 - Like entering grades on mycourses, mark background in gradebook when a grade item is modified
@@ -17,9 +15,6 @@ GradeBook TODOs:
 - 3 states for grade structures: enabled, disabled, or collapsed, in which case any sub grades are
   not shown, and we just enter one big point value, one big comment. This probably means
   implementing a custom checkbox, or doing something hacky like: https://jsfiddle.net/urtwh9t7/2/
-- If a hint is worth 0, then don't include the point number in the feedback.
-- In YAML config, "notes" should be allowed to be a list of MD-parsed strings (which we'll show as
-  a HTML list)
 - Push the "dist/" folder to GitHub, so that people can use GradeFast without needing npm. (But,
   with a big fat notice in the README that, if they modify any of the JS files, they'll need to
   "npm run build" to see the effects)

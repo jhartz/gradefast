@@ -34,16 +34,19 @@ def _try_run_gradebook(gradebook: GradeBook) -> None:
 
 
 def run_gradefast(injector: Injector, submission_paths: List[Path]) -> None:
-    # Create and start the GradeBook WSGI server in a new thread
-    gradebook = injector.get_instance(GradeBook)
-    threading.Thread(
-        name="GradeBookTh",
-        target=_try_run_gradebook,
-        args=(gradebook,),
-        daemon=True
-    ).start()
-    # Sleep for a bit to give the web server some time to catch up
-    time.sleep(0.4)
+    settings = injector.get_instance(Settings)
+
+    if settings.gradebook_enabled:
+        # Create and start the GradeBook WSGI server in a new thread
+        gradebook = injector.get_instance(GradeBook)
+        threading.Thread(
+            name="GradeBookTh",
+            target=_try_run_gradebook,
+            args=(gradebook,),
+            daemon=True
+        ).start()
+        # Sleep for a bit to give the web server some time to catch up
+        time.sleep(0.4)
 
     # Wrap the rest in a `try` so that exceptions in the Grader don't kill everything
     # (i.e. the web server will still be running)
@@ -53,16 +56,16 @@ def run_gradefast(injector: Injector, submission_paths: List[Path]) -> None:
         # away into the void
         grader = injector.get_instance(Grader)
 
-        # Give the user the grade book URL
-        settings = injector.get_instance(Settings)
-        gradebook_url = "http://{host}:{port}/gradefast/gradebook".format(host=settings.host,
-                                                                          port=settings.port)
-        channel.print()
-        channel.print_bordered("Grade Book URL: {}", gradebook_url)
-        channel.print()
-        if channel.prompt("Open in browser?", ["y", "N"], "n") == "y":
-            webbrowser.open_new(gradebook_url)
-        channel.print()
+        if settings.gradebook_enabled:
+            # Give the user the grade book URL
+            gradebook_url = "http://{host}:{port}/gradefast/gradebook".format(host=settings.host,
+                                                                              port=settings.port)
+            channel.print()
+            channel.print_bordered("Grade Book URL: {}", gradebook_url)
+            channel.print()
+            if channel.prompt("Open in browser?", ["y", "N"], "n") == "y":
+                webbrowser.open_new(gradebook_url)
+            channel.print()
 
         # Finally... let's start grading!
         for path in submission_paths:
