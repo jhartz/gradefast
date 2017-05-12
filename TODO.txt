@@ -6,8 +6,6 @@ GradeBook TODOs:
 - Write tests for grade structure parser, and grades.py
 - In the gradebook (particularly gradebook.grades and the UI), find something better to call the
   path to the grade item than "path" (it's confusing with the Path model for filesystem paths).
-- Add a command line arg to skip prompting for authentication; this is enabled by default ONLY if
-  we're running on "localhost"
 - For sections, add a "scale" option that takes a ratio to scale the section by (or a string
   representing a fraction)
 - Like entering grades on mycourses, mark background in gradebook when a grade item is modified

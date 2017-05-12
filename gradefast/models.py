@@ -330,6 +330,7 @@ Settings = NamedTuple("Settings", [
     ("grade_structure", List[GradeItem]),
     ("host", int),
     ("port", int),
+    ("prompt_for_auth", bool),
 
     # Grader settings
     ("commands", List[Command]),
@@ -365,6 +366,9 @@ class SettingsDefaults:
     save_file = None
     log_file = None
     log_as_html = False
+
+    # GradeBook settings
+    prompt_for_auth = True
 
     # Grader settings
     submission_regex = None

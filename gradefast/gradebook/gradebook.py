@@ -337,13 +337,18 @@ class GradeBook:
                 return json_bad_request("Client already authenticated")
 
             device = flask.request.form.get("device", "unknown device")
-            event = events.AuthRequestedEvent("device: " + device)
-            auth_event_id = event.event_id  # type: int
 
-            _logger.debug("Client {} requesting auth (event {}); device: {}",
-                          client_id, auth_event_id, device)
-            self._auth_event_id_to_client_id[auth_event_id] = client_id
-            self.event_manager.dispatch_event(event)
+            if self.settings.prompt_for_auth:
+                event = events.AuthRequestedEvent("device: " + device)
+                auth_event_id = event.event_id  # type: int
+
+                _logger.debug("Client {} requesting auth (event {}); device: {}",
+                              client_id, auth_event_id, device)
+                self._auth_event_id_to_client_id[auth_event_id] = client_id
+                self.event_manager.dispatch_event(event)
+            else:
+                _logger.info("Client {} automatically granted auth; device {}", client_id, device)
+                self._init_client(client_id)
 
             return json_aight()
 
@@ -525,10 +530,16 @@ class GradeBook:
         AuthRequestEvent that was sent out.
         """
         client_id = self._auth_event_id_to_client_id[auth_event_id]
+        _logger.debug("Authentication granted to client {} (event {})", client_id, auth_event_id)
+        self._init_client(client_id)
+
+    def _init_client(self, client_id: uuid.UUID) -> None:
+        """
+        Initialize a new client, giving it the keys it needs to succeed. (This should only be
+        called AFTER a client has been authenticated, and it must only be called ONCE per client.)
+        """
         assert client_id not in self._authenticated_client_ids
         assert client_id not in self._client_update_keys
-        _logger.debug("Authentication granted to client {} (event {})", client_id, auth_event_id)
-
         self._authenticated_client_ids.add(client_id)
         data_key = uuid.uuid4()
         self._data_keys.add(data_key)

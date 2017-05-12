@@ -63,43 +63,9 @@ def get_argument_parser() -> argparse.ArgumentParser:
                "it using an equals sign, e.g. --whatever-arg=-c"
     )
     parser.add_argument(
-        "--host",
-        help="The hostname to run the gradebook HTTP server on.\n"
-             "DEFAULT: {}".format(DEFAULT_HOST),
-        default=DEFAULT_HOST
-    )
-    parser.add_argument(
-        "--port",
-        help="The port to run the gradebook HTTP server on.\n"
-             "DEFAULT: {}".format(DEFAULT_PORT),
-        default=DEFAULT_PORT
-    )
-    parser.add_argument(
-        "--no-gradebook", action="store_true",
-        help="Don't run the gradebook HTTP server."
-    )
-    parser.add_argument(
-        "--shell", metavar="CMD",
-        help="A program used to parse and run the commands in the \"commands\" section of the "
-             "YAML file. The command to run will be passed as the last argument.\n"
-             "DEFAULT: the operating system's default shell"
-    )
-    parser.add_argument(
-        "--shell-arg", metavar="ARG", action="append",
-        help="An argument for the command specified with --shell. This can be specified "
-             "multiple times."
-    )
-    parser.add_argument(
-        "--terminal", metavar="CMD",
-        help="A program used to open a terminal or command prompt window. The path to the "
-             "directory to start in will be passed as the last argument (and will also be the "
-             "working directory of the process).\n"
-             "DEFAULT: the operating system's default terminal"
-    )
-    parser.add_argument(
-        "--terminal-arg", metavar="ARG", action="append",
-        help="An argument for the command specified with --terminal. This can be specified "
-             "multiple times."
+        "-f", "-s", "--submissions", metavar="PATH", action="append",
+        help="A folder in which to look for submissions (optional; can be specified multiple "
+             "times). When GradeFast starts, you will be able to choose more folders if you want."
     )
     parser.add_argument(
         "--no-readline", action="store_true",
@@ -137,9 +103,49 @@ def get_argument_parser() -> argparse.ArgumentParser:
              "DEFAULT: (none)"
     )
     parser.add_argument(
-        "-f", "-s", "--submissions", metavar="PATH", action="append",
-        help="A folder in which to look for submissions (optional; can be specified multiple "
-             "times). When GradeFast starts, you will be able to choose more folders if you want."
+        "--no-gradebook", action="store_true",
+        help="Don't run the gradebook HTTP server."
+    )
+    parser.add_argument(
+        "--no-auth", action="store_true",
+        help="Don't prompt for authentication when a new gradebook client connects.\n"
+             "WARNING: This will allow ALL gradebook clients! NEVER use this option when running "
+             "the gradebook on an external network interface."
+    )
+    parser.add_argument(
+        "--host",
+        help="The hostname to run the gradebook HTTP server on.\n"
+             "DEFAULT: {}".format(DEFAULT_HOST),
+        default=DEFAULT_HOST
+    )
+    parser.add_argument(
+        "--port",
+        help="The port to run the gradebook HTTP server on.\n"
+             "DEFAULT: {}".format(DEFAULT_PORT),
+        default=DEFAULT_PORT
+    )
+    parser.add_argument(
+        "--shell", metavar="CMD",
+        help="A program used to parse and run the commands in the \"commands\" section of the "
+             "YAML file. The command to run will be passed as the last argument.\n"
+             "DEFAULT: the operating system's default shell"
+    )
+    parser.add_argument(
+        "--shell-arg", metavar="ARG", action="append",
+        help="An argument for the command specified with --shell. This can be specified "
+             "multiple times."
+    )
+    parser.add_argument(
+        "--terminal", metavar="CMD",
+        help="A program used to open a terminal or command prompt window. The path to the "
+             "directory to start in will be passed as the last argument (and will also be the "
+             "working directory of the process).\n"
+             "DEFAULT: the operating system's default terminal"
+    )
+    parser.add_argument(
+        "--terminal-arg", metavar="ARG", action="append",
+        help="An argument for the command specified with --terminal. This can be specified "
+             "multiple times."
     )
     parser.add_argument(
         "yaml_file", metavar="yaml-file",
@@ -276,6 +282,7 @@ def build_settings(args) -> Settings:
     # "grade_structure" filled from YAML file (if gradebook is enabled)
     settings_builder.host = args.host
     settings_builder.port = args.port
+    settings_builder.prompt_for_auth = not args.no_auth
 
     # "commands" filled from YAML file
     # "submission_regex" filled from YAML file
