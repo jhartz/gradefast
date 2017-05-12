@@ -1,5 +1,5 @@
 """
-Classes and methods for handling grades and feedback for submissions.
+Classes for handling the calculation of grades and rendering of feedback for submissions.
 
 Licensed under the MIT License. For more, see the LICENSE file.
 
@@ -8,12 +8,9 @@ Author: Jake Hartz <jake@hartz.io>
 
 from typing import Dict, Iterable, List, Optional, Tuple
 
-from iochannels import MemoryLog
-
 from gradefast import required_package_warning
 from gradefast.gradebook import utils
-from gradefast.models import GradeItem, GradeScore, GradeSection, Hint, Submission, \
-    ScoreNumber, WeakScoreNumber
+from gradefast.models import GradeItem, GradeScore, GradeSection, Hint, ScoreNumber, WeakScoreNumber
 from gradefast.parsers import make_score_number
 
 try:
@@ -493,11 +490,8 @@ class SubmissionGrade:
     Represents a submission's grade.
     """
 
-    def __init__(self, submission: Submission, grade_structure: List[GradeItem]) -> None:
-        self.submission = submission
+    def __init__(self, grade_structure: List[GradeItem]) -> None:
         self._grades = _create_tree_from_structure(grade_structure)
-        self._html_logs = []  # type: List[MemoryLog]
-        self._text_logs = []  # type: List[MemoryLog]
 
         self._is_late = False
         self._overall_comments = ""
@@ -572,6 +566,9 @@ class SubmissionGrade:
             raise utils.BadPathError("Invalid hint index {} at path {}".format(index, path),
                                      exception=ex)
 
+    def is_late(self) -> bool:
+        return self._is_late
+
     def get_score(self) -> Tuple[ScoreNumber, ScoreNumber, List[Tuple[str, ScoreNumber]]]:
         """
         Calculate the total score (all points added up) for this submission.
@@ -611,7 +608,6 @@ class SubmissionGrade:
         """
         points_earned, points_possible, _ = self.get_score()
         return {
-            "submission": self.submission,
             "is_late": self._is_late,
             "overall_comments": self._overall_comments,
             "overall_comments_html": self._overall_comments_html,
@@ -620,33 +616,9 @@ class SubmissionGrade:
             "grades": [item.to_plain_data() for item in self._grades]
         }
 
-    def to_simple_data(self) -> Dict[str, object]:
-        """
-        Get simple grade metadata as plain old data.
-        """
-        data = self.submission.to_json()
-        points_earned, points_possible, _ = self.get_score()
-        data.update({
-            "is_late": self._is_late,
-            "points_earned": points_earned,
-            "points_possible": points_possible,
-            "has_log": len(self._html_logs) > 0 or len(self._text_logs) > 0
-        })
-        return data
-
     def set_late(self, is_late: bool) -> None:
         self._is_late = is_late
 
     def set_overall_comments(self, overall_comments: str) -> None:
         self._overall_comments = overall_comments
         self._overall_comments_html = _markdown_to_html(overall_comments)
-
-    def append_logs(self, html_log: MemoryLog, text_log: MemoryLog) -> None:
-        self._html_logs.append(html_log)
-        self._text_logs.append(text_log)
-
-    def get_html_logs(self) -> List[MemoryLog]:
-        return self._html_logs
-
-    def get_text_logs(self) -> List[MemoryLog]:
-        return self._text_logs

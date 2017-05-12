@@ -1,14 +1,16 @@
 import * as Immutable from "immutable";
 
-import {sendUpdate} from "./connection";
+import {sendUpdate, sendRefreshStatsRequest} from "./connection";
 
 // Local state; not propagated to server
 const WAITING_FOR_USER_TO_GET_THEIR_ASS_MOVING = "WAIT_FOR_USER_TO_GET_THEIR_ASS_MOVING";
 const SET_DATA_KEY = "SET_DATA_KEY";
 const LOADING_SUBMISSION = "LOADING_SUBMISSION";
 const INIT_SUBMISSION = "INIT_SUBMISSION";
-const TOGGLE_LIST_VISIBILITY = "TOGGLE_LIST_VISIBILITY";
-const SET_SUBMISSION_LIST = "SET_SUBMISSION_LIST";
+const SHOW_SUBMISSIONS = "SHOW_SUBMISSIONS";
+const HIDE_SUBMISSIONS = "HIDE_SUBMISSIONS";
+const SET_SUBMISSIONS = "SET_SUBMISSIONS";
+const SET_STATS = "SET_STATS";
 
 // These string values are also recognized by the GradeBook server
 // (see GradeBook::_parse_action in gradebook.py)
@@ -34,7 +36,7 @@ function dispatchActionAndTellServer(action) {
         // Send the action to the server, too
         const submission_id = getState().get("submission_id");
         sendUpdate(submission_id, action);
-    }
+    };
 }
 
 export const actions = {
@@ -48,7 +50,7 @@ export const actions = {
         return {
             type: SET_DATA_KEY,
             data_key
-        }
+        };
     },
 
     goToSubmission(submission_id) {
@@ -69,27 +71,49 @@ export const actions = {
         };
     },
 
-    initSubmission(submission_id, submission, is_late, overall_comments, overall_comments_html,
+    initSubmission(submission_id, is_late, overall_comments, overall_comments_html,
                    points_earned, points_possible, grades) {
         return {
             type: INIT_SUBMISSION,
 
-            submission_id, submission: Immutable.fromJS(submission), is_late, overall_comments, overall_comments_html,
+            submission_id, is_late, overall_comments, overall_comments_html,
             points_earned, points_possible, grades: Immutable.fromJS(grades)
-        }
-    },
-
-    toggleListVisibility() {
-        return {
-            type: TOGGLE_LIST_VISIBILITY
         };
     },
 
-    setSubmissionList(list) {
+    showSubmissions() {
+        return (dispatch) => {
+            // Propagate the action locally
+            dispatch({
+                type: SHOW_SUBMISSIONS
+            });
+
+            // Hit the "refresh stats" server endpoint
+            sendRefreshStatsRequest();
+        };
+    },
+
+    hideSubmissions() {
         return {
-            type: SET_SUBMISSION_LIST,
-            list: Immutable.fromJS(list)
-        }
+            type: HIDE_SUBMISSIONS
+        };
+    },
+
+    setSubmissions(list) {
+        let submissions = Immutable.OrderedMap();
+        list.forEach(l => submissions = submissions.set(l.id, Immutable.fromJS(l)));
+        return {
+            type: SET_SUBMISSIONS,
+            submissions
+        };
+    },
+
+    setStats(grading_stats, timing_stats) {
+        return {
+            type: SET_STATS,
+            grading_stats: Immutable.fromJS(grading_stats),
+            timing_stats: Immutable.fromJS(timing_stats)
+        };
     },
 
     setLate(is_late) {
@@ -227,11 +251,13 @@ const initialState = Immutable.Map({
     "loading": true,
     "data_key": null,
 
-    "list_visible": false,
-    "list": Immutable.List(),
+    "submissions_visible": false,
+    "submissions": Immutable.OrderedMap(),
+
+    "grading_stats": Immutable.Map(),
+    "timing_stats": Immutable.Map(),
 
     "submission_id": null,
-    "submission": null,  // akin to the Submission model in models.py
     "submission_is_late": false,
     "submission_overall_comments": "",
     "submission_overall_comments_html": "",
@@ -263,13 +289,13 @@ export function app(state, action) {
                 "submission_id": action.submission_id
             });
             break;
+
         case INIT_SUBMISSION:
             if (action.submission_id === state.get("submission_id")) {
                 state = state.merge({
                     "loading": false,
-                    "list_visible": false,
+                    "submissions_visible": false,
 
-                    "submission": action.submission,
                     "submission_is_late": action.is_late,
                     "submission_overall_comments": action.overall_comments,
                     "submission_overall_comments_html": action.overall_comments_html,
@@ -280,16 +306,29 @@ export function app(state, action) {
             }
             break;
 
-        case TOGGLE_LIST_VISIBILITY:
-            state = state.set("list_visible", !state.get("list_visible"));
+        case SHOW_SUBMISSIONS:
+            state = state.set("submissions_visible", true);
             break;
-        case SET_SUBMISSION_LIST:
-            state = state.set("list", action.list);
+
+        case HIDE_SUBMISSIONS:
+            state = state.set("submissions_visible", false);
+            break;
+
+        case SET_SUBMISSIONS:
+            state = state.set("submissions", action.submissions);
+            break;
+
+        case SET_STATS:
+            state = state.merge({
+                "grading_stats": action.grading_stats,
+                "timing_stats": action.timing_stats
+            });
             break;
 
         case SET_LATE:
             state = state.set("submission_is_late", action.is_late);
             break;
+
         case SET_OVERALL_COMMENTS:
             state = state.set("submission_overall_comments", action.overall_comments);
             break;

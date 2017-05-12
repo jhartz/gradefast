@@ -8,7 +8,7 @@ Author: Jake Hartz <jake@hartz.io>
 
 import collections
 import posixpath
-from typing import Dict, List, NamedTuple, Optional, Union
+from typing import Dict, List, NamedTuple, Optional, Tuple, Union
 
 
 class SlotEqualityMixin:
@@ -121,6 +121,7 @@ Command = Union[CommandSet, CommandItem]
 # https://github.com/jhartz/gradefast/wiki/Grade-Structure
 ###################################################################################################
 
+
 ScoreNumber = Union[int, float]
 # Will usually be passed to "make_score_number" to convert to a ScoreNumber
 WeakScoreNumber = Union[ScoreNumber, str]
@@ -129,7 +130,6 @@ Hint = NamedTuple("Hint", [
     ("name", str),
     ("value", ScoreNumber),
 ])
-
 
 GradeScore = NamedTuple("GradeScore", [
     ("name", str),
@@ -271,40 +271,52 @@ class LocalPath(SlotEqualityMixin):
         return "LocalPath({!r})".format(self._path)
 
 
-class Submission(SlotEqualityMixin):
+class Stats(SlotEqualityMixin):
     """
-    A submission by a particular student.
+    Grading statistics, for timing or grades.
     """
 
-    __slots__ = ("id", "name", "full_name", "path")
+    __slots__ = ("min", "max", "median", "mean", "std_dev", "modes")
 
-    def __init__(self, id: int, name: str, full_name: str, path: Path) -> None:
+    def __init__(self,
+                 min:     Optional[Tuple[float, List[int]]],
+                 max:     Optional[Tuple[float, List[int]]],
+                 median:  Optional[Tuple[float, List[int]]],
+                 mean:    Optional[float],
+                 std_dev: Optional[float],
+                 modes:   List[float]) -> None:
         """
-        Initialize a new Submission.
+        min, max, median: The values of these parameters are one or more data points (i.e. one or
+            more submissions) with a single value, so they're represented by a tuple like:
+            (stat value, [list of submission IDs])
 
-        :param id: The unique ID of the submission.
-        :param name: The name associated with the submission (i.e. the student's name).
-        :param full_name: The full name of the submission (i.e. the full filename of the folder
-            containing the submission).
-        :param path: The path of the root of the submission.
+        mean, std_dev: The population mean and standard deviation.
+
+        modes: The list of all modes (if there are more than one).
         """
-        self.id = id
-        self.name = name
-        self.full_name = full_name
-        self.path = path
-
-    def __str__(self) -> str:
-        if self.name != self.full_name:
-            return "{} ({})".format(self.name, self.full_name)
-        return self.name
+        self.min = min
+        self.max = max
+        self.median = median
+        self.mean = mean
+        self.std_dev = std_dev
+        self.modes = modes
 
     def to_json(self) -> dict:
         return {
-            "id": self.id,
-            "name": self.name,
-            "full_name": self.full_name,
-            "path": str(self.path)
+            "min": self.min,
+            "max": self.max,
+            "median": self.median,
+            "mean": self.mean,
+            "std_dev": self.std_dev,
+            "modes": self.modes
         }
+
+EMPTY_STATS = Stats(min=None, max=None, median=None, mean=None, std_dev=None, modes=[])
+
+
+###################################################################################################
+# Settings model that stores all constant runtime configuration
+###################################################################################################
 
 
 Settings = NamedTuple("Settings", [

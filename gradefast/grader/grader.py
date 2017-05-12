@@ -17,11 +17,11 @@ from iochannels import Channel, HTMLMemoryLog, MemoryLog, Msg
 from pyprovide import Injector, inject
 
 from gradefast import events
-from gradefast.grader import eventhandlers
 from gradefast.grader.banners import BANNERS
 from gradefast.hosts import BackgroundCommand, CommandRunError, CommandStartError, Host
 from gradefast.loggingwrapper import get_logger
-from gradefast.models import Command, CommandItem, Path, Settings, Submission
+from gradefast.models import Command, CommandItem, Path, Settings
+from gradefast.submissions import Submission, SubmissionManager
 
 _logger = get_logger("grader")
 
@@ -33,16 +33,14 @@ class Grader:
 
     @inject(injector=Injector.CURRENT_INJECTOR)
     def __init__(self, injector: Injector, channel: Channel, host: Host,
-                 event_manager: events.EventManager, settings: Settings) -> None:
+                 event_manager: events.EventManager, settings: Settings,
+                 submission_manager: SubmissionManager) -> None:
         self.injector = injector
         self.channel = channel
         self.host = host
         self.event_manager = event_manager
         self.settings = settings
-
-        self._submissions = []  # type: List[Submission]
-
-        event_manager.register_all_event_handlers(eventhandlers)
+        self.submission_manager = submission_manager
 
     def prompt_for_submissions(self) -> bool:
         """
@@ -51,8 +49,8 @@ class Grader:
 
         :return: True if there's some submissions to go on; False if they got nuthin'.
         """
-        if len(self._submissions):
-            # Go each on them
+        if self.submission_manager.has_submissions():
+            # Go easy on them
             while self.channel.prompt("Want to add another folder of submissions?",
                                       ["y", "N"], "n") == "y":
                 self.add_submissions(None)
@@ -64,7 +62,7 @@ class Grader:
                     # They've actually hit "cancel"; I guess we can give up
                     break
 
-                if not len(self._submissions):
+                if not self.submission_manager.has_submissions():
                     self.channel.error("No submissions found")
                     continue
 
@@ -72,7 +70,7 @@ class Grader:
                 if self.channel.prompt("Add another folder?", ["y", "N"], "n") == "n":
                     break
 
-        return len(self._submissions) > 0
+        return self.submission_manager.has_submissions()
 
     def add_submissions(self, base_folder: Path = None) -> bool:
         """
@@ -141,19 +139,20 @@ class Grader:
                         valid_submission = True
 
             if valid_submission:
-                submission_id = len(self._submissions) + 1
                 submission_name = name
                 if regex:
                     for group in submission_match.groups():
                         if group:
                             submission_name = group
                             break
-                self._submissions.append(Submission(
-                    submission_id, submission_name, name, folder_path))
+                # Add the submission, but don't send the event yet
+                # (we'll send one big one at the end)
+                self.submission_manager.add_submission(submission_name, name, folder_path,
+                                                       send_event=False)
 
         # Step 3: Tell the world
-        if len(self._submissions):
-            self.event_manager.dispatch_event(events.NewSubmissionListEvent(self._submissions))
+        if self.submission_manager.has_submissions():
+            self.event_manager.dispatch_event(events.NewSubmissionsEvent())
 
         return True
 
@@ -170,15 +169,15 @@ class Grader:
         self.channel.error_bordered(random.choice(BANNERS))
         self.channel.print()
 
-        submission_id = 1
+        submission_id = self.submission_manager.get_first_submission_id()
         background_commands = []  # type: List[BackgroundCommand]
         while True:
-            if len(self._submissions) == 0:
+            if not self.submission_manager.has_submissions():
                 # Ideally, this shouldn't ever happen, but...
                 self.channel.error_bordered("No submissions!")
                 break
 
-            if submission_id > len(self._submissions):
+            if submission_id is None:
                 # Special case: we're at the end
                 self.channel.print()
                 self.channel.status_bordered("End of submissions!")
@@ -187,21 +186,23 @@ class Grader:
                     empty_choice_msg="C'mon, you're almost done; you can make a simple choice "
                                      "between `yes' and `no'")
                 if loop == "y":
-                    submission_id = 1
+                    submission_id = self.submission_manager.get_first_submission_id()
                 else:
                     # Well, they said they're done
                     break
 
-            submission = self._submissions[submission_id - 1]
+            submission = self.submission_manager.get_submission(submission_id)
 
             self.channel.print()
             self.channel.status_bordered("Next Submission: {} ({}/{})",
-                                         submission.name, submission.id, len(self._submissions))
+                                         submission.get_name(), submission.get_id(),
+                                         self.submission_manager.get_last_submission_id())
 
             what_to_do = self.channel.prompt(
-                "Press Enter to begin; (g)oto, (b)ack, (s)kip, (l)ist, (a)dd, (q)uit, (h)elp",
-                ["", "g", "goto", "b", "back", "s", "skip", "l", "list", "a", "add", "q", "quit",
-                 "h", "help", "?"],
+                "Press Enter to begin; (g)oto, (b)ack, (s)kip, (l)ist, (a)dd, (d)rop, "
+                "(q)uit, (h)elp",
+                ["", "g", "goto", "b", "back", "s", "skip", "l", "list", "a", "add", "d", "drop",
+                 "q", "quit", "h", "help", "?"],
                 show_choices=False)
 
             if what_to_do == "?" or what_to_do == "h" or what_to_do == "help":
@@ -212,6 +213,7 @@ class Grader:
                 self.channel.print("s/skip:  Skip the next submission (goto +1)")
                 self.channel.print("l/list:  List all the submissions and corresponding indices")
                 self.channel.print("a/add:   Add another folder of submissions")
+                self.channel.print("d/drop:  Drop the next submission from the list of submissions")
                 self.channel.print("q/quit:  Give up on grading")
 
             elif what_to_do == "g" or what_to_do == "goto":
@@ -225,36 +227,50 @@ class Grader:
                 if new_id:
                     try:
                         if new_id[0] == "+":
-                            submission_id += int(new_id[1:])
+                            new_submission_id = submission_id + int(new_id[1:])
                         elif new_id[0] == "-":
-                            submission_id -= int(new_id[1:])
+                            new_submission_id = submission_id - int(new_id[1:])
                         else:
-                            submission_id = int(new_id)
+                            new_submission_id = int(new_id)
                     except (ValueError, IndexError):
                         self.channel.error("Invalid index!")
-                    if submission_id < 1 or submission_id > len(self._submissions):
+                    if new_submission_id not in self.submission_manager.get_all_submission_ids():
                         self.channel.error("Invalid index: {}", submission_id)
-                    submission_id = min(max(submission_id, 1), len(self._submissions))
+                    else:
+                        submission_id = new_submission_id
 
             elif what_to_do == "b" or what_to_do == "back":
                 # Go back to the last-completed submission
-                submission_id = max(submission_id - 1, 1)
+                new_submission_id = self.submission_manager.get_previous_submission_id(
+                    submission_id)
+                if new_submission_id is not None:
+                    submission_id = new_submission_id
 
             elif what_to_do == "s" or what_to_do == "skip":
                 # Skip to the next submission
                 # (skipping the last submission will trigger the "end of submissions" branch at the
                 # beginning of the infinite while loop)
-                submission_id += 1
+                submission_id = self.submission_manager.get_next_submission_id(submission_id)
 
             elif what_to_do == "l" or what_to_do == "list":
                 # List all the submissions
-                id_len = len(str(len(self._submissions)))
-                for submission in self._submissions:
-                    self.channel.print("{:{}}: {}", submission.id, id_len, submission.name)
+                id_len = len(str(self.submission_manager.get_last_submission_id()))
+                for submission in self.submission_manager.get_all_submissions():
+                    self.channel.print("{:{}}: {}",
+                                       submission.get_id(), id_len, submission.get_name())
 
             elif what_to_do == "a" or what_to_do == "add":
                 # Add another folder of submissions
                 self.add_submissions(None)
+
+            elif what_to_do == "d" or what_to_do == "drop":
+                # Drop the next submission, moving on to the one after it
+                if self.channel.prompt("Are you sure you want to drop " + submission.get_name() +
+                                       "?", ["y", "n"]) == "y":
+                    new_submission_id = self.submission_manager.get_next_submission_id(
+                        submission_id)
+                    self.submission_manager.drop_submission(submission_id)
+                    submission_id = new_submission_id
 
             elif what_to_do == "q" or what_to_do == "quit":
                 # Give up on the rest
@@ -268,8 +284,10 @@ class Grader:
                 html_log = HTMLMemoryLog()
                 text_log = MemoryLog()
                 self.channel.add_delegate(html_log, text_log)
-                self.event_manager.dispatch_event(events.SubmissionStartedEvent(
-                    submission_id, html_log, text_log))
+                submission.add_logs(html_log, text_log)
+
+                timer_context = submission.start_timer()
+                self.event_manager.dispatch_event(events.SubmissionStartedEvent(submission_id))
 
                 runner = CommandRunner(self.injector, self.channel, self.host, self.settings,
                                        submission)
@@ -279,10 +297,12 @@ class Grader:
                 html_log.close()
                 text_log.close()
                 background_commands += runner.get_background_commands()
+
+                submission.stop_timer(timer_context)
                 self.event_manager.dispatch_event(events.SubmissionFinishedEvent(submission_id))
 
                 # By default, we want to move on to the next submission in the list
-                submission_id += 1
+                submission_id = self.submission_manager.get_next_submission_id(submission_id)
 
         # All done with everything
         self.event_manager.dispatch_event(events.EndOfSubmissionsEvent())
@@ -329,7 +349,7 @@ class CommandRunner:
             choice, or None if they're feeling particularly unagreeable today.
         """
         self.channel.print()
-        self.host.print_folder(path, self._submission.path)
+        self.host.print_folder(path, self._submission.get_path())
         choice = self.channel.prompt("Does this folder satisfy your innate human needs?",
                                      ["Y", "n"], "y")
         if choice == "y":
@@ -358,7 +378,7 @@ class CommandRunner:
             folder = matches[0]
         elif len(matches) > 1:
             self.channel.status("Multiple folders found when looking for {} in {}:", folder_regex,
-                                base_path.relative_str(self._submission.path))
+                                base_path.relative_str(self._submission.get_path()))
             for name in matches:
                 self.channel.print("   ", name)
             choice = self.channel.input("Make a choice:", matches)
@@ -413,7 +433,7 @@ class CommandRunner:
         """
         _logger.info("Running commands for: {}", self._submission)
         try:
-            base_path = self._check_folder(self._submission.path)
+            base_path = self._check_folder(self._submission.get_path())
             if base_path is None:
                 _logger.info("Skipping submission because user didn't pick a folder")
                 self.channel.error("Skipping submission")
@@ -514,7 +534,7 @@ class CommandRunner:
         _logger.debug("_do_command: {}", command)
 
         msg = Msg(sep="\n").print()
-        status_title = ("-" * 3) + " " + self._submission.name
+        status_title = ("-" * 3) + " " + self._submission.get_name()
         if len(status_title) < 56:
             status_title += " "
             status_title += "-" * (56 - len(status_title))
@@ -533,7 +553,7 @@ class CommandRunner:
         env = environment.copy()
         env.update(command.environment)
         env.update({
-            "SUBMISSION_NAME": self._submission.name
+            "SUBMISSION_NAME": self._submission.get_name()
         })
 
         # Before starting, ask the user what they want to do

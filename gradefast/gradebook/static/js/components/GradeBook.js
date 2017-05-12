@@ -33,24 +33,24 @@ const GradeBook = React.createClass({
                 sectionContent = <h2>Waiting...</h2>;
             }
 
-        } else if (this.props.list_visible) {
+        } else if (this.props.submissions_visible) {
             // List of submissions
             headerContent = <span>Submissions</span>;
-            if (this.props.list.size) {
-                sectionContent = <SubmissionList submissions={this.props.list}
-                                                 data_key={this.props.data_key}/>;
+            if (this.props.submissions.size) {
+                sectionContent = <SubmissionList />;
             } else {
                 sectionContent = this.getInspiration();
             }
 
         } else if (this.props.submission_id !== null) {
             // An actual submission! It's almost like this is what we're actually here for
-            pageTitle = this.props.submission_id + ": " + this.props.submission.get("name") + " - GradeFast";
+            const submission = this.props.submissions.get(this.props.submission_id);
+            pageTitle = this.props.submission_id + ": " + submission.get("name") + " - GradeFast";
             showScore = true;
 
             headerContent = (
-                <span title={this.props.submission.get("full_name") + " (" + this.props.submission.get("path") + ")"}>
-                    {this.props.submission_id}: <em>{this.props.submission.get("name") || <strong>[[ NO NAME ]]</strong>}</em>
+                <span title={submission.get("full_name") + " (" + submission.get("path") + ")"}>
+                    {this.props.submission_id}: <em>{submission.get("name") || <strong>[[ NO NAME ]]</strong>}</em>
                 </span>
             );
             sectionContent = <GradeList path={Immutable.List()} grades={this.props.grades} />;
@@ -115,13 +115,11 @@ const GradeBook = React.createClass({
 function mapStateToProps(state) {
     return {
         loading: state.get("loading"),
-        data_key: state.get("data_key"),
 
-        list_visible: state.get("list_visible"),
-        list: state.get("list"),
+        submissions_visible: state.get("submissions_visible"),
+        submissions: state.get("submissions"),
 
         submission_id: state.get("submission_id"),
-        submission: state.get("submission"),
         overall_comments: state.get("submission_overall_comments"),
         overall_comments_html: state.get("submission_overall_comments_html"),
         grades: state.get("submission_grades")

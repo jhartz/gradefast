@@ -19,9 +19,10 @@ function authKeysReceived(new_data_key, new_update_key, initial_submission_list,
     store.dispatch(actions.setDataKey(new_data_key));
 
     // Now that we are authenticated, move on from the "Loading" screen
-    store.dispatch(actions.setSubmissionList(initial_submission_list));
+    store.dispatch(actions.setSubmissions(initial_submission_list));
     if (is_done) {
-        // TODO: Show the user a summary or some shit
+        // Show the submission list and statistics
+        store.dispatch(actions.showSubmissions());
     } else if (typeof initial_submission_id === "number") {
         store.dispatch(actions.goToSubmission(initial_submission_id));
     } else {
@@ -39,15 +40,19 @@ export function sendUpdate(submission_id, action = {}) {
     });
 }
 
+export function sendRefreshStatsRequest() {
+    post(CONFIG.BASE + "_refresh_stats", {
+        client_id: CONFIG.CLIENT_ID
+    });
+}
+
 const updateTypeHandlers = {
-    NEW_SUBMISSION_LIST(data) {
+    NEW_SUBMISSIONS(data) {
         // Update our list of submissions
-        store.dispatch(actions.setSubmissionList(data.submissions));
+        store.dispatch(actions.setSubmissions(data.submissions));
     },
 
     SUBMISSION_STARTED(data) {
-        // Update our list of submissions
-        store.dispatch(actions.setSubmissionList(data.submissions));
         // Tell the forces at large to go to this submission
         store.dispatch(actions.goToSubmission(data.submission_id));
     },
@@ -72,7 +77,6 @@ const updateTypeHandlers = {
 
         store.dispatch(actions.initSubmission(
             data.submission_id,
-            data.submission,
             data.is_late,
             data.overall_comments,
             data.overall_comments_html,
@@ -83,7 +87,12 @@ const updateTypeHandlers = {
     },
 
     END_OF_SUBMISSIONS(data) {
-        // TODO: Show the user a summary or some shit
+        // Show the submission list and statistics
+        store.dispatch(actions.showSubmissions());
+    },
+
+    UPDATED_STATS(data) {
+        store.dispatch(actions.setStats(data.grading_stats, data.timing_stats));
     }
 };
 

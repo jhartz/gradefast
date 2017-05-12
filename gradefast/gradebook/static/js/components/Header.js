@@ -11,7 +11,11 @@ const Header = React.createClass({
 
     titleClickHandler(event) {
         event.preventDefault();
-        store.dispatch(actions.toggleListVisibility());
+        if (this.props.submissions_visible) {
+            store.dispatch(actions.hideSubmissions());
+        } else {
+            store.dispatch(actions.showSubmissions());
+        }
     },
 
     render() {
@@ -54,7 +58,7 @@ const Header = React.createClass({
                 </h2>
                 <h1>
                     <a href="#poundsign" className="no-underline" onClick={this.titleClickHandler}>
-                        {this.props.list_visible ? <small>&#x25B2;</small> : <small>&#x25BC;</small>}
+                        {this.props.submissions_visible ? <small>&#x25B2;</small> : <small>&#x25BC;</small>}
                         &nbsp;&nbsp;
                         {this.props.children}
                     </a>
@@ -67,7 +71,7 @@ const Header = React.createClass({
 function mapStateToProps(state) {
     return {
         data_key: state.get("data_key"),
-        list_visible: state.get("list_visible"),
+        submissions_visible: state.get("submissions_visible"),
 
         points_earned: state.get("submission_points_earned"),
         points_possible: state.get("submission_points_possible"),

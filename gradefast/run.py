@@ -65,6 +65,8 @@ def run_gradefast(injector: Injector, submission_paths: List[Path]) -> None:
             channel.print()
             if channel.prompt("Open in browser?", ["y", "N"], "n") == "y":
                 webbrowser.open_new(gradebook_url)
+                # Sleep for a tad to allow for the auth prompt to come up
+                time.sleep(0.8)
             channel.print()
 
         # Finally... let's start grading!

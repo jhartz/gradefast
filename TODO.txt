@@ -6,7 +6,8 @@ GradeBook TODOs:
 - Write tests for grade structure parser, and grades.py
 - In the gradebook (particularly gradebook.grades and the UI), find something better to call the
   path to the grade item than "path" (it's confusing with the Path model for filesystem paths).
-- Add a command line arg (disabled by default) to skip prompting for authentication
+- Add a command line arg to skip prompting for authentication; this is enabled by default ONLY if
+  we're running on "localhost"
 - For sections, add a "scale" option that takes a ratio to scale the section by (or a string
   representing a fraction)
 - Like entering grades on mycourses, mark background in gradebook when a grade item is modified
@@ -18,6 +19,11 @@ GradeBook TODOs:
 - Push the "dist/" folder to GitHub, so that people can use GradeFast without needing npm. (But,
   with a big fat notice in the README that, if they modify any of the JS files, they'll need to
   "npm run build" to see the effects)
+- Bar charts for the statistics in the submissions dropdown
+    - For timing: show "stacked" bars if we revisited a submission multiple times in the grader
+    - If we generate server-side: it's easier to save
+    - If we generate client-side: we can provide more info on mouseover, like the actual start/end
+      times, and can sort differently, etc.
 
 Grader TODOs:
 

@@ -16,13 +16,13 @@ import uuid
 from collections import OrderedDict
 from typing import Callable, Dict, Iterable, List, Set, TypeVar, cast
 
-from iochannels import MemoryLog
 from pyprovide import inject
 
-from gradefast import events, required_package_error
-from gradefast.gradebook import eventhandlers, grades, utils
+from gradefast import events, grades, required_package_error
+from gradefast.gradebook import eventhandlers, utils
 from gradefast.loggingwrapper import get_logger
-from gradefast.models import Settings, Submission
+from gradefast.models import Settings
+from gradefast.submissions import SubmissionManager
 
 try:
     import flask
@@ -61,12 +61,12 @@ class ClientUpdate:
         self._id = ClientUpdate._last_id
 
     @staticmethod
-    def create_update_event(update_type: str, update_data: dict = None) -> "ClientUpdate":
+    def create_update_event(update_type: str, update_data: object = None) -> "ClientUpdate":
         """
         Create a new ClientUpdate containing an "update" event to send to GradeBook clients.
 
         :param update_type: The type of "update" event (see connection.js).
-        :param update_data: Data corresponding with this type.
+        :param update_data: Data corresponding with this type (must be JSON-encodable).
         :return: An instance of ClientUpdate
         """
         return ClientUpdate("update", {
@@ -86,39 +86,33 @@ class ClientUpdate:
         if not self._data:
             return ""
 
-        result = ""
-        result += "id: " + str(self._id) + "\n"
+        result = "id: " + str(self._id) + "\n"
         if self._event:
             result += "event: " + str(self._event) + "\n"
-        result += "data: " + "\ndata:".join(str(self._data).split("\n"))
-        result += "\n\n"
+        for line in str(self._data).splitlines():
+            result += "data: " + line + "\n"
+        result += "\n"
         return result
 
 
 class GradeBook:
     """
-    Represents a grade book with submissions and grade structures.
+    Represents a grade book, with a WSGI web app.
     """
 
     @inject()
-    def __init__(self, event_manager: events.EventManager, settings: Settings) -> None:
-        """
-        Create a WSGI app representing a grade book.
-
-        A grade structure is a list of grade items (grade scores and grade sections). For more, see
-        the GradeFast wiki: https://github.com/jhartz/gradefast/wiki/Grade-Structure
-        """
+    def __init__(self, event_manager: events.EventManager, settings: Settings,
+                 submission_manager: SubmissionManager) -> None:
         self.settings = settings
+        self.submission_manager = submission_manager
 
         # Register our event handlers with the event manager
         self.event_lock = threading.Lock()
         self.event_manager = event_manager
-        event_manager.register_all_event_handlers_with_args(eventhandlers, gradebook_instance=self)
+        event_manager.register_all_event_handlers(eventhandlers)
 
-        self._grades_by_submission_id = {}  # type: Dict[int, grades.SubmissionGrade]
         self._current_submission_id = None  # type: int
-        self._submission_list = []  # type: List[Submission]
-        self.is_done = False
+        self._is_done = False
 
         # Each instance of the GradeBook client is given its own unique ID (a UUID).
         # They are stored in these sets.
@@ -289,7 +283,7 @@ class GradeBook:
         def _gradefast_log_html(submission_id: str) -> flask.Response:
             check_data_key()
             try:
-                grade = self._grades_by_submission_id[int(submission_id)]
+                submission = self.submission_manager.get_submission(int(submission_id))
             except (ValueError, IndexError):
                 raise flask.abort(404)
 
@@ -300,11 +294,11 @@ class GradeBook:
                     "Finished: " + time.asctime(time.localtime(log.close_timestamp))
                     if log.close_timestamp else "..."
                 )
-                for log in grade.get_html_logs()
+                for log in submission.get_html_logs()
             )
             return flask.render_template(
                 "log.html",
-                title="Log for {}".format(grade.submission.name),
+                title="Log for {}".format(submission.get_name()),
                 content_html=content_html
             )
 
@@ -313,13 +307,13 @@ class GradeBook:
         def _gradefast_log_txt(submission_id: str) -> flask.Response:
             check_data_key()
             try:
-                grade = self._grades_by_submission_id[int(submission_id)]
+                submission = self.submission_manager.get_submission(int(submission_id))
             except (ValueError, IndexError):
                 raise flask.abort(404)
 
             def gen() -> Iterable[str]:
-                yield "Log for {}\n".format(grade.submission.name)
-                for log in grade.get_text_logs():
+                yield "Log for {}\n".format(submission.get_name())
+                for log in submission.get_text_logs():
                     yield "\n" + "=" * 79 + "\n"
                     yield time.asctime(time.localtime(log.open_timestamp))
                     if log.close_timestamp:
@@ -385,6 +379,19 @@ class GradeBook:
                 return json_bad_request(
                     "Look what you did... (seriously, look in the server error console)")
 
+        # AJAX endpoint to trigger a ClientUpdate with refreshed stats
+        @app.route("/gradefast/_refresh_stats", methods=["POST"])
+        def _gradefast_refresh_stats() -> flask.Response:
+            client_id = get_uuid_from_form("client_id")
+            if client_id not in self._client_ids:
+                return json_bad_request("Unknown client ID")
+            if client_id not in self._authenticated_client_ids:
+                return json_bad_request("Client not authenticated")
+
+            _logger.debug("Client {} requested stats", client_id)
+            self.send_updated_stats(client_id)
+            return json_aight()
+
         # Event stream
         @app.route("/gradefast/_events")
         def _gradefast_events() -> flask.Response:
@@ -418,16 +425,10 @@ class GradeBook:
                         del self._client_update_queues[client_id]
             return flask.Response(gen(), mimetype="text/event-stream")
 
-    def _get_submission_list(self) -> List[Dict[str, object]]:
-        """
-        Get the current list of submissions, with each submission represented by its "simple data"
-        format.
-        """
-        return [self._grades_by_submission_id[s.id].to_simple_data() for s in self._submission_list]
-
     def _get_grades_export(self) -> List[OrderedDict]:
         """
-        Return a list of ordered dicts representing the scores and feedback for each submission.
+        Return a list of ordered dicts representing the scores, feedback, and timing for each
+        submission.
         """
         grade_list = []
 
@@ -435,17 +436,30 @@ class GradeBook:
         # that everything is consistent. (For simplicity, we also build up the entire list and then
         # return it, instead of trying using a generator with the event lock.)
         with self.event_lock:
-            for grade in self._grades_by_submission_id.values():
-                points_earned, points_possible, individual_points = grade.get_score()
+            for submission in self.submission_manager.get_all_submissions():
+                points_earned, points_possible, individual_points = \
+                    submission.get_grade().get_score()
                 grade_details = OrderedDict()  # type: Dict[str, object]
-                grade_details["name"] = grade.submission.name
+                grade_details["name"] = submission.get_name()
                 grade_details["score"] = points_earned
                 grade_details["possible_score"] = points_possible
                 grade_details["percentage"] = 0 if points_possible == 0 else \
                     100 * points_earned / points_possible
-                grade_details["feedback"] = grade.get_feedback()
+                grade_details["feedback"] = submission.get_grade().get_feedback()
+
                 for item_name, item_points in individual_points:
                     grade_details[item_name] = item_points
+
+                times = submission.get_times()
+                if len(times) == 1:
+                    grade_details["Started Grading"] = time.asctime(time.localtime(times[0][0]))
+                    grade_details["Finished Grading"] = time.asctime(time.localtime(times[0][1]))
+                elif len(times) > 1:
+                    for index, (start, end) in enumerate(times, start=1):
+                        grade_details["Started Grading #" + str(index)] = \
+                            time.asctime(time.localtime(start))
+                        grade_details["Finished Grading #" + str(index)] = \
+                            time.asctime(time.localtime(end))
                 grade_list.append(grade_details)
 
         return grade_list
@@ -473,6 +487,38 @@ class GradeBook:
                 except queue.Full:
                     _logger.warning("Client {} event queue is full", client_id)
 
+    def send_submission_list(self) -> None:
+        """
+        Send the latest submission list to GradeBook clients.
+        """
+        self._send_client_update(ClientUpdate.create_update_event("NEW_SUBMISSIONS", {
+            "submissions": list(self.submission_manager.get_all_submissions())
+        }))
+
+    def send_submission_updated(self, submission_id: int, originating_client_id: uuid.UUID = None,
+                                originating_client_seq: int = None) -> None:
+        """
+        Send a submission's latest grades, comments, etc. after it has been updated to any
+        interested GradeBook clients.
+        """
+        submission = self.submission_manager.get_submission(submission_id)
+        data = submission.get_grade().to_plain_data()
+        data.update({
+            "submission_id": submission_id,
+            "originating_client_id": originating_client_id,
+            "originating_client_seq": originating_client_seq
+        })
+        self._send_client_update(ClientUpdate.create_update_event("SUBMISSION_UPDATED", data))
+
+    def send_updated_stats(self, client_id: uuid.UUID = None) -> None:
+        """
+        Generate and send the latest grading and timing stats to an interested client.
+        """
+        self._send_client_update(ClientUpdate.create_update_event("UPDATED_STATS", {
+            "grading_stats": self.submission_manager.get_grading_stats(),
+            "timing_stats": self.submission_manager.get_timing_stats()
+        }), client_id)
+
     def auth_granted(self, auth_event_id: int) -> None:
         """
         Indicate that a client ID is now authenticated, identified by the event ID of the original
@@ -492,53 +538,27 @@ class GradeBook:
         self._send_client_update(ClientUpdate("auth", {
             "data_key": data_key,
             "update_key": self._client_update_keys[client_id],
-            "initial_submission_list": self._get_submission_list(),
+            "initial_submission_list": list(self.submission_manager.get_all_submissions()),
             "initial_submission_id": self._current_submission_id,
-            "is_done": self.is_done
+            "is_done": self._is_done
         }), client_id)
 
-    def set_submission_list(self, submission_list: List[Submission]) -> None:
+    def set_current_submission(self, submission_id: int) -> None:
         """
-        Set a new submission list.
+        Set a submission ID to be the current submission ID.
         """
-        self._submission_list = submission_list
-
-        # Make new SubmissionGrade objects for any submissions that we haven't seen before
-        for submission in submission_list:
-            if submission.id not in self._grades_by_submission_id:
-                self._grades_by_submission_id[submission.id] = grades.SubmissionGrade(
-                    submission, self.settings.grade_structure)
-
-        # Tell GradeBook clients about this new list
-        self._send_client_update(ClientUpdate.create_update_event("NEW_SUBMISSION_LIST", {
-            "submissions": self._get_submission_list()
-        }))
-
-    def set_current_submission(self, submission_id: int, html_log: MemoryLog,
-                               text_log: MemoryLog) -> None:
-        """
-        Set a submission ID to be the current submission ID, and add new html/text logs for it.
-
-        :param submission_id: The ID of the submission.
-        :param html_log: A new HTMLMemoryLog that will be written to as the submission is graded.
-        :param text_log: A new MemoryLog that will be written to as the submission is graded.
-        """
-        assert submission_id in self._grades_by_submission_id
         self._current_submission_id = submission_id
-        self._grades_by_submission_id[submission_id].append_logs(html_log, text_log)
 
         # Tell GradeBook clients about this change in the current submission
-        # (include the list of submissions so the clients have an updated idea of who has a log)
         self._send_client_update(ClientUpdate.create_update_event("SUBMISSION_STARTED", {
-            "submissions": self._get_submission_list(),
             "submission_id": submission_id
         }))
 
-    def set_done(self, is_done: bool) -> None:
+    def set_done(self) -> None:
         """
-        Set whether we are done grading.
+        Set that we are done grading.
         """
-        self.is_done = is_done
+        self._is_done = True
 
         # Tell GradeBook clients that we're done
         self._send_client_update(ClientUpdate.create_update_event("END_OF_SUBMISSIONS"))
@@ -554,24 +574,20 @@ class GradeBook:
         :param action: The action, directly from the GradeBook client that submitted it.
         """
         try:
-            grade = self._grades_by_submission_id[submission_id]
+            submission = self.submission_manager.get_submission(submission_id)
         except IndexError:
             raise utils.GradeBookPublicError("Invalid submission ID: {}".format(submission_id))
-        self._apply_action_to_grade(grade, action)
+        old_score_tuple = submission.get_grade().get_score()
+        self._apply_action_to_grade(submission.get_grade(), action)
+        new_score_tuple = submission.get_grade().get_score()
 
         # Recalculate the score, etc., and tell clients
-        data = grade.to_plain_data()
-        data.update({
-            "submission_id": submission_id,
-            "originating_client_id": client_id,
-            "originating_client_seq": client_seq
-        })
-        self._send_client_update(ClientUpdate.create_update_event("SUBMISSION_UPDATED", data))
+        self.send_submission_updated(submission_id, client_id, client_seq)
 
-        # Also update the submission list (so clients get the new overall scores)
-        self._send_client_update(ClientUpdate.create_update_event("NEW_SUBMISSION_LIST", {
-            "submissions": self._get_submission_list()
-        }))
+        # If the overall scores changed, update the submission list
+        # (so clients get the new overall scores to show in the submission list)
+        if old_score_tuple != new_score_tuple:
+            self.send_submission_list()
 
     @staticmethod
     def _apply_action_to_grade(grade: grades.SubmissionGrade, action: Dict[str, object]) -> None:

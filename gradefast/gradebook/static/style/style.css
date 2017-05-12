@@ -229,25 +229,38 @@ table.row-grade-table > tbody > tr > td {
     padding: 3px;
 }
 
-table.submission-list {
+table.submission-list, table.stats-list {
     margin: 30px auto;
 }
 
-table.submission-list td {
-    padding-left: 30px;
-}
-
-table.submission-list td {
+table.submission-list td, table.stats-list td,
+table.submission-list th, table.stats-list th {
     margin-top: 10px;
     font-size: 130%;
     color: #565656;
+    cursor: default;
 }
 
-table.submission-list a {
+table.submission-list td {
+    padding-left: 15px;
+    padding-top: 10px;
+}
+
+table.stats-list td {
+    padding-left: 10px;
+    text-align: left;
+}
+
+table.stats-list th, table.stats-list td.stats-number {
+    text-align: right;
+}
+
+table.submission-list a, table.stats-list a {
     color: #000000;
     text-decoration: none;
+    cursor: pointer;
 }
 
-table.submission-list a:hover {
+table.submission-list a:hover, table.stats-list a:hover {
     text-decoration: underline;
 }
