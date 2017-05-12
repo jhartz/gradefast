@@ -62,10 +62,17 @@ def get_argument_parser() -> argparse.ArgumentParser:
                "\"--shell-arg\" or \"--terminal-arg\" begins with a hyphen, make sure to specify "
                "it using an equals sign, e.g. --whatever-arg=-c"
     )
+
+    parser.add_argument(
+        "yaml_file", metavar="yaml-file",
+        help="The GradeFast YAML Configuration File that contains the structure of the grading "
+             "and the commands to run (see the GradeFast wiki at the link above)"
+    )
+
     parser.add_argument(
         "-f", "-s", "--submissions", metavar="PATH", action="append",
-        help="A folder in which to look for submissions (optional; can be specified multiple "
-             "times). When GradeFast starts, you will be able to choose more folders if you want."
+        help="A folder in which to look for submissions (can be specified multiple times).\n"
+             "When GradeFast starts, you will be able to choose more folders."
     )
     parser.add_argument(
         "--no-readline", action="store_true",
@@ -146,11 +153,6 @@ def get_argument_parser() -> argparse.ArgumentParser:
         "--terminal-arg", metavar="ARG", action="append",
         help="An argument for the command specified with --terminal. This can be specified "
              "multiple times."
-    )
-    parser.add_argument(
-        "yaml_file", metavar="yaml-file",
-        help="The GradeFast YAML Configuration File that contains the structure of the grading "
-             "and the commands to run (see the GradeFast wiki at the link above)"
     )
 
     return parser
