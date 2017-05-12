@@ -32,6 +32,10 @@ You can install all these dependencies with:
 
     python3 -m pip install pyyaml flask colorama mistune
 
+> It's recommended that you do this in a
+> [virtualenv](http://python-guide-pt-br.readthedocs.io/en/latest/dev/virtualenvs/), especially if
+> you don't have root privileges.
+
 Additionally, some Python dependencies are included in the repository as git submodules. To get
 these, after cloning, run:
 
