@@ -103,6 +103,7 @@ class TestParseCommands(unittest.TestCase):
             {
                 "name": "Sub-commands",
                 "folder": "abc",
+                "confirm folder": False,
                 "environment": {
                     "ABC": "ghi"
                 },
@@ -136,6 +137,7 @@ class TestParseCommands(unittest.TestCase):
             CommandSet(
                 name="Sub-commands",
                 folder="abc",
+                confirm_folder=False,
                 environment={
                     "ABC": "ghi"
                 },

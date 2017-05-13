@@ -411,7 +411,7 @@ class CommandRunner:
         if not self.host.folder_exists(path):
             self.channel.error("Folder not found: {}", path.relative_str(base_path))
             path = base_path
-        return self._check_folder(path)
+        return path
 
     def _get_modified_command(self, command: CommandItem) -> CommandItem:
         """
@@ -480,14 +480,14 @@ class CommandRunner:
                 if command.name:
                     msg.status(": {}", command.name)
                 if command.folder:
-                    msg.status(": ")
-                    msg.print("{}", command.folder)
+                    msg.print(" ({})", command.folder)
                 self.channel.output(msg)
 
+                new_path = path
                 if command.folder:
                     new_path = self._find_folder(path, command.folder)
-                else:
-                    new_path = self._check_folder(path)
+                if command.confirm_folder:
+                    new_path = self._check_folder(new_path)
 
                 if new_path is None:
                     # The user didn't let us get a path; cancel this bit

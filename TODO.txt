@@ -34,8 +34,6 @@ Grader TODOs:
   process.terminate() (for the current foreground process, and for background processes when we're
   in the "waiting" stage). Also test the current functionality on Linux; and this might be useful:
   http://stackoverflow.com/questions/18255730/popen-new-process-group-on-linux
-- Add "(d)rop" at the "Nex Submission" prompt to delete that submission from the list (this may
-  cause issues abound for the gradebook, which relies on submission IDs being constant)
 - Make a section in the YAML commands to take the output of a command (or the last line of output)
   and use that as the grade for a certain grading item (identified by name) -- OR to use the
   output as the comment for a grade item
@@ -43,8 +41,6 @@ Grader TODOs:
   any grading, and after all the grading is complete. (Store that the pre-run was run so that it'll
   store in the savefile)
 - Option to "steal back" terminal/cmd window focus after running a command
-- For "folder"s in the command section of the YAML file, add "confirm" option that defaults to true,
-  but if set to false, skips the "Does this folder satisfy your innate human needs?" prompt
 - When running a command, ask the user if they want to skip doing the diff, or to enter a different
   diff filename. (same w/ being able to skip stdin)
 - Add ability to specify a max running time for a process (useful for background commands), and

@@ -103,13 +103,15 @@ class CommandSet(SlotEqualityMixin):
     See https://github.com/jhartz/gradefast/wiki/Command-Structure#command-sets
     """
 
-    __slots__ = ("name", "commands", "folder", "environment")
+    __slots__ = ("name", "commands", "folder", "confirm_folder", "environment")
 
     def __init__(self, commands: List[Union[CommandItem, "CommandSet"]], name: str = None,
-                 folder: Union[str, List[str]] = None, environment: Dict[str, str] = None) -> None:
+                 folder: Union[str, List[str]] = None, confirm_folder: bool = True,
+                 environment: Dict[str, str] = None) -> None:
         self.name = name
         self.commands = commands
         self.folder = folder
+        self.confirm_folder = confirm_folder
         self.environment = environment or {}
 
 

@@ -117,7 +117,7 @@ def _parse_command(command_dict: dict, path: List[int], subject: str) -> Command
         errors = ModelParseError()
 
         for key in command_dict.keys():
-            if key not in ["name", "folder", "environment", "commands"]:
+            if key not in ["name", "folder", "confirm folder", "environment", "commands"]:
                 errors.add("Command set", subject, "has an invalid property: \"{}\"".format(key))
 
         try:
@@ -130,6 +130,7 @@ def _parse_command(command_dict: dict, path: List[int], subject: str) -> Command
             commands,
             command_dict.get("name"),
             command_dict.get("folder"),
+            command_dict.get("confirm folder", "folder" in command_dict),
             command_dict.get("environment")
         )
     else:
