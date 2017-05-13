@@ -63,10 +63,12 @@ Big TODOs:
 - Add "shortcut" command to open a list of files in a given editor (or maybe just another option on
   a command to append this list to the end of the parameters). Then we can have an order for the
   files, and any extra other files in the dir can be appended to the end of the list.
-- Make separate shell script or something to parse the index.html from Desire2Learn platforms to
-  add "pre-data" into the YAML file somehow (so we can take the comments they wrote when uploading,
-  and also possibly whether it was late, and put it in the YAML beforehand)
+- Make separate python script to parse the index.html from Desire2Learn platforms to add metadata
+  for submissions (so we can take the comments they wrote when uploading, and also possibly whether
+  it was late)
     - Also in this script if we have multiple submissions by the same person, run a checksum on
       them to make sure they're different and, if not, delete the earlier one
     - Actually, in general, delete the earlier one for any submissions that have multiple
       submissions (unless one is on time and other is late)
+    - FUN PART: How can we set a "default late" and "overall notes" for submissions on a
+      per-submission basis? Maybe a file in the root of the submission called "GRADEFAST.META.YAML"
