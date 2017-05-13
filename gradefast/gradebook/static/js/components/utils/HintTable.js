@@ -17,6 +17,14 @@ const HintTable = React.createClass({
         };
     },
 
+    formatValue(value) {
+        if (value > 0) {
+            return "+" + value;
+        } else {
+            return "" + value;
+        }
+    },
+
     handleAddHintClick(event) {
         event.preventDefault();
 
@@ -76,9 +84,10 @@ const HintTable = React.createClass({
         } else {
             if (value !== this.state.oldValue) {
                 if (!confirm(
-                        "You changed the value for this hint from " + this.state.oldValue + " " +
-                        "to " + value + ". This will affect ALL submissions that have this " +
-                        "hint enabled, including ones that have already been graded. \n" +
+                        "You changed the value for this hint from " +
+                        this.formatValue(this.state.oldValue) + " to " +
+                        this.formatValue(value) + ". This will affect ALL submissions that have " +
+                        "this hint enabled, including ones that have already been graded. \n" +
                         "Are you sure you want to continue?"
                     )) {
                     return;
@@ -108,12 +117,7 @@ const HintTable = React.createClass({
                 {this.props.hints.map((hint, index) => {
                     let hintValueLabel = undefined;
                     if (hint.get("value")) {
-                        if (hint.get("value") > 0) {
-                            hintValueLabel = "+" + hint.get("value");
-                        } else {
-                            hintValueLabel = "" + hint.get("value");
-                        }
-                        hintValueLabel = hintValueLabel + ":";
+                        hintValueLabel = this.formatValue(hint.get("value")) + ":";
                     }
                     if (this.state.currentlyEditing === index) return (
                         <tr key={"editing-" + index}>

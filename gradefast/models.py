@@ -131,6 +131,7 @@ WeakScoreNumber = Union[ScoreNumber, str]
 Hint = NamedTuple("Hint", [
     ("name", str),
     ("value", ScoreNumber),
+    ("default_enabled", bool),
 ])
 
 GradeScore = NamedTuple("GradeScore", [

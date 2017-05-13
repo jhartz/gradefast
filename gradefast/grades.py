@@ -211,7 +211,7 @@ class SubmissionGradeItem:
                     "name": hint.name,
                     "name_html": self._hints_name_html[index],
                     "value": hint.value,
-                    "enabled": self._hints_set.get(index, False)
+                    "enabled": self.is_hint_enabled(index)
                 }
                 for index, hint in enumerate(self._hints)
             ],
@@ -224,6 +224,12 @@ class SubmissionGradeItem:
         Set whether this grade item is enabled.
         """
         self._enabled = is_enabled
+
+    def is_hint_enabled(self, index: int) -> bool:
+        """
+        Determine whether a particular hint is enabled, given its index in self._hints.
+        """
+        return self._hints_set.get(index, self._hints[index].default_enabled)
 
     def set_hint_enabled(self, index: int, is_enabled: bool) -> None:
         """
@@ -242,7 +248,7 @@ class SubmissionGradeItem:
         :param name: The name of the hint to add
         :param value: The point value of the hint to add
         """
-        self._hints.append(Hint(name=name, value=make_score_number(value)))
+        self._hints.append(Hint(name=name, value=make_score_number(value), default_enabled=False))
         self._hints_name_html.append(_markdown_to_html_inline(name))
 
     def replace_hint(self, index: int, name: str, value: WeakScoreNumber) -> None:
@@ -257,7 +263,9 @@ class SubmissionGradeItem:
         :param value: The new point value of the hint
         """
         index = int(index)
-        self._hints[index] = Hint(name=name, value=make_score_number(value))
+        old_hint = self._hints[index]
+        self._hints[index] = Hint(name=name, value=make_score_number(value),
+                                  default_enabled=old_hint.default_enabled)
         self._hints_name_html[index] = _markdown_to_html_inline(name)
 
 
@@ -274,6 +282,9 @@ class SubmissionGradeScore(SubmissionGradeItem):
         self._comments = None       # type: str
         self._comments_html = None  # type: str
 
+        self._default_score = grade_score.default_score
+        self._default_comments = grade_score.default_comments
+
         self.set_base_score(grade_score.default_score)
         self.set_comments(grade_score.default_comments)
 
@@ -285,7 +296,7 @@ class SubmissionGradeScore(SubmissionGradeItem):
                                                 List[Tuple[str, ScoreNumber]]]:
         points_earned = self._base_score
         for index, hint in enumerate(self._hints):
-            if self._hints_set.get(index):
+            if self.is_hint_enabled(index):
                 points_earned += hint.value
         return points_earned, self._points, [(self._name, points_earned)]
 
@@ -310,7 +321,7 @@ class SubmissionGradeScore(SubmissionGradeItem):
 
         # Add hints, if applicable
         for index, hint in enumerate(self._hints):
-            if self._hints_set.get(index):
+            if self.is_hint_enabled(index):
                 if hint.value == 0:
                     feedback += FeedbackHTMLTemplates.hint_no_points.format(
                         reason=self._hints_name_html[index])
@@ -324,6 +335,18 @@ class SubmissionGradeScore(SubmissionGradeItem):
 
         return feedback
 
+    def is_touched(self) -> bool:
+        """
+        Determine whether this grade score has been modified from its defaults, and is affecting
+        the overall score or feedback.
+        """
+        return self._enabled and (
+            self._base_score != self._default_score or
+            self._comments != self._default_comments or
+            any(self.is_hint_enabled(index) != hint.default_enabled
+                for index, hint in enumerate(self._hints))
+        )
+
     def to_plain_data(self) -> Dict[str, object]:
         data = super().to_plain_data()
         points_earned, points_possible, _ = self.get_score(False)
@@ -331,7 +354,8 @@ class SubmissionGradeScore(SubmissionGradeItem):
             "score": points_earned,
             "points": points_possible,
             "comments": self._comments,
-            "comments_html": self._comments_html
+            "comments_html": self._comments_html,
+            "touched": self.is_touched()
         })
         return data
 
@@ -348,7 +372,7 @@ class SubmissionGradeScore(SubmissionGradeItem):
         score = make_score_number(score)
         # To get the base score, we need to "undo" the effects of hints
         for index, hint in enumerate(self._hints):
-            if self._hints_set.get(index):
+            if self.is_hint_enabled(index):
                 score -= hint.value
         self._base_score = score
 
@@ -400,7 +424,7 @@ class SubmissionGradeSection(SubmissionGradeItem):
 
         # Account for any hints
         for index, hint in enumerate(self._hints):
-            if self._hints_set.get(index):
+            if self.is_hint_enabled(index):
                 points_earned += hint.value
 
         # Check if it's late
@@ -423,7 +447,7 @@ class SubmissionGradeSection(SubmissionGradeItem):
 
         # Add hint feedback
         for index, hint in enumerate(self._hints):
-            if self._hints_set.get(index):
+            if self.is_hint_enabled(index):
                 if hint.value == 0:
                     feedback += FeedbackHTMLTemplates.hint_no_points.format(
                         reason=self._hints_name_html[index])

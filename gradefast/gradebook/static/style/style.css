@@ -202,6 +202,11 @@ div.inset {
 
 div.row-grade {
     border-top: 1px solid #03658C;
+    border-radius: 4px;
+}
+
+div.row-grade-touched {
+    background-color: rgba(0, 0, 0, 0.05);
 }
 
 section > div > div.row-grade:first-child {

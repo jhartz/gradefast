@@ -28,8 +28,12 @@ const GradeScore = React.createClass({
     },
 
     render() {
+        let className = "row-grade";
+        if (this.props.grade.get("touched")) {
+            className += " row-grade-touched";
+        }
         return (
-            <div className="row-grade">
+            <div className={className}>
                 <table className="row-grade-table"><tbody><tr>
                     <td>
                         <GradeTitle path={this.props.path}

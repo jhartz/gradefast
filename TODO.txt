@@ -8,9 +8,8 @@ GradeBook TODOs:
   path to the grade item than "path" (it's confusing with the Path model for filesystem paths).
 - For sections, add a "scale" option that takes a ratio to scale the section by (or a string
   representing a fraction)
-- Like entering grades on mycourses, mark background in gradebook when a grade item is modified
-- For grade structures, add "collapsible" option to collapse the structure if it's either 0 or 100
-  (and with no comments/point hints/section deductions, and all grade items are exactly full points)
+- For grade structures, add "collapsible" option to collapse the structure if it's either 0 or 100%
+  (and with no hints/comments, and all grade items are exactly full points)
 - 3 states for grade structures: enabled, disabled, or collapsed, in which case any sub grades are
   not shown, and we just enter one big point value, one big comment. This probably means
   implementing a custom checkbox, or doing something hacky like: https://jsfiddle.net/urtwh9t7/2/

@@ -257,7 +257,8 @@ def _parse_grade_item(item: dict, path: List[int], subject: str) -> GradeItem:
                             title, subject, old_hints_prop)
             hint_dicts += map(lambda old_hint: {
                 "name": old_hint.get("name"),
-                "value": old_hint.get("value", 0) or (-1 * old_hint.get("minus", 0))
+                "value": old_hint.get("value", 0) or (-1 * old_hint.get("minus", 0)),
+                "default enabled": old_hint.get("default enabled", False)
             }, item[old_hints_prop])
 
     hints = []  # type: List[Hint]
@@ -276,8 +277,13 @@ def _parse_grade_item(item: dict, path: List[int], subject: str) -> GradeItem:
                 except ValueError:
                     error("value for hint \"{}\" (\"{}\") is not a number".format(
                         hint_name, hint_dict["value"]))
+
+            for key in hint_dict.keys():
+                if key not in ["name", "value", "default enabled"]:
+                    error("hint \"{}\" has an invalid property: \"{}\"".format(hint_name, key))
+
             # noinspection PyTypeChecker
-            hints.append(Hint(hint_name, hint_value))
+            hints.append(Hint(hint_name, hint_value, hint_dict.get("default enabled", False)))
 
     note = None
     if "note" in item:
