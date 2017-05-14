@@ -53,13 +53,9 @@ class GradeBookJSONEncoder(json.JSONEncoder):
         if isinstance(o, uuid.UUID):
             return str(o)
 
-        try:
-            # If the object has a to_json method, use that
+        # If the object has a to_json method, use that
+        if hasattr(o, "to_json") and callable(o.to_json):
             return o.to_json()
-        except AttributeError:
-            # I guess it doesn't :(
-            # Hopefully it's already json-encodable
-            pass
 
         return super().default(o)
 
@@ -67,14 +63,18 @@ class GradeBookJSONEncoder(json.JSONEncoder):
 _json_encoder_instance = None
 
 
-def to_json(o: object) -> str:
+def to_json(o: object, **kwargs: Any) -> str:
     """
     Convert an object to a JSON string. For usage, see json.dumps(...).
     """
-    global _json_encoder_instance
-    if _json_encoder_instance is None:
-        _json_encoder_instance = GradeBookJSONEncoder()
-    return _json_encoder_instance.encode(o)
+    if kwargs:
+        encoder = GradeBookJSONEncoder(**kwargs)
+    else:
+        global _json_encoder_instance
+        if _json_encoder_instance is None:
+            _json_encoder_instance = GradeBookJSONEncoder()
+        encoder = _json_encoder_instance
+    return encoder.encode(o)
 
 
 def from_json(s: str, **kwargs: Any) -> object:
