@@ -45,7 +45,7 @@ class GradeBookEventHandler(events.EventHandler):
         self.injector = injector
 
     def handle(self, event: events.Event) -> None:
-        from gradefast.gradebook import GradeBook
+        from gradefast.gradebook.gradebook import GradeBook
         gradebook_instance = self.injector.get_instance(GradeBook)
 
         _logger.debug("{} got event {}", self.__class__.__name__, event)

@@ -15,8 +15,8 @@ from typing import List
 import iochannels
 from pyprovide import Injector
 
-from gradefast.gradebook import GradeBook
-from gradefast.grader import Grader
+from gradefast.gradebook.gradebook import GradeBook
+from gradefast.grader.grader import Grader
 from gradefast.loggingwrapper import get_logger
 from gradefast.models import Path, Settings
 
