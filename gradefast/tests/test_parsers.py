@@ -84,6 +84,7 @@ class TestParseCommands(unittest.TestCase):
         ])
         self.assertListEqual(commands, [
             CommandSet(
+                confirm_folder=False,
                 commands=[]
             )
         ])
@@ -147,6 +148,7 @@ class TestParseCommands(unittest.TestCase):
                         command="rm -rf /"
                     ),
                     CommandSet(
+                        confirm_folder=False,
                         commands=[
                             CommandItem(
                                 name="Third-level command",

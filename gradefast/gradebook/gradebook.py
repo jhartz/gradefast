@@ -18,7 +18,7 @@ from typing import Callable, Dict, Iterable, List, Set, TypeVar, cast
 
 from pyprovide import inject
 
-from gradefast import events, grades, required_package_error
+from gradefast import events, exceptions, grades, required_package_error
 from gradefast.gradebook import eventhandlers, utils
 from gradefast.loggingwrapper import get_logger
 from gradefast.models import Settings
@@ -376,7 +376,7 @@ class GradeBook:
                 # If nothing threw, return that we processed everything successfully
                 return json_aight()
 
-            except utils.GradeBookPublicError as err:
+            except exceptions.GradeBookPublicError as err:
                 return json_bad_request("GradeBook Error", **err.get_details())
 
             except:
@@ -587,7 +587,7 @@ class GradeBook:
         try:
             submission = self.submission_manager.get_submission(submission_id)
         except IndexError:
-            raise utils.GradeBookPublicError("Invalid submission ID: {}".format(submission_id))
+            raise exceptions.GradeBookPublicError("Invalid submission ID: {}".format(submission_id))
         old_score_tuple = submission.get_grade().get_score()
         self._apply_action_to_grade(submission.get_grade(), action)
         new_score_tuple = submission.get_grade().get_score()
@@ -595,14 +595,17 @@ class GradeBook:
         # Recalculate the score, etc., and tell clients
         self.send_submission_updated(submission_id, client_id, client_seq)
 
-        # If the overall scores changed, update the submission list
-        # (so clients get the new overall scores to show in the submission list)
-        if old_score_tuple != new_score_tuple:
+        # If the overall scores changed, update the submission list (so clients get the new overall
+        # scores to show in the submission list).
+        # NOTE: If a hint was changed, that could affect other submissions' scores, even if it
+        # didn't affect us.
+        # TODO: Clean this up
+        if old_score_tuple != new_score_tuple or action.get("type") == "EDIT_HINT":
             self.send_submission_list()
 
     @staticmethod
     def _apply_action_to_grade(grade: grades.SubmissionGrade, action: Dict[str, object]) -> None:
-        action_type = action["type"] if "type" in action else None
+        action_type = action.get("type")
 
         # It's possible we have no actual action to take, and that's okay
         if not action_type:
@@ -622,11 +625,12 @@ class GradeBook:
 
         # All of the other action types have a path
         if "path" not in action:
-            raise utils.GradeBookPublicError("Action missing a path", action=action)
+            raise exceptions.GradeBookPublicError("Action missing a path", action=action)
         try:
             path = [int(p) for p in cast(List[int], action["path"])]
         except (TypeError, ValueError) as ex:
-            raise utils.BadPathError("Error parsing path {}".format(action["path"]), exception=ex)
+            raise exceptions.BadPathError("Error parsing path {}".format(action["path"]),
+                                          exception=ex)
 
         if action_type == "ADD_HINT":
             # Add a hint by changing the grade structure (MUA HA HA HA)
@@ -644,8 +648,8 @@ class GradeBook:
                 try:
                     index = int(cast(int, action["index"]))
                 except ValueError as ex:
-                    raise utils.BadPathError("Invalid hint index \"{}\" at path {}"
-                                             .format(action["index"], path), exception=ex)
+                    raise exceptions.BadPathError("Invalid hint index \"{}\" at path {}"
+                                                  .format(action["index"], path), exception=ex)
                 grade.replace_hint_for_all_grades(path,
                                                   index,
                                                   action["content"]["name"],
@@ -657,7 +661,7 @@ class GradeBook:
 
         # They also all have a value
         if "value" not in action:
-            raise utils.GradeBookPublicError("Action missing a value", action=action)
+            raise exceptions.GradeBookPublicError("Action missing a value", action=action)
         value = action["value"]
 
         if action_type == "SET_ENABLED":
@@ -680,8 +684,8 @@ class GradeBook:
                 grade_item.set_hint_enabled(index, bool(value))
                 return
             except (ValueError, IndexError) as ex:
-                raise utils.BadPathError("Invalid hint index \"{}\" at path {}"
-                                         .format(action["index"], path), exception=ex)
+                raise exceptions.BadPathError("Invalid hint index \"{}\" at path {}"
+                                              .format(action["index"], path), exception=ex)
 
         # If we're still here, something went wrong...
-        raise utils.GradeBookPublicError("Action does not have a valid type", action=action)
+        raise exceptions.GradeBookPublicError("Action does not have a valid type", action=action)

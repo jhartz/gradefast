@@ -9,15 +9,17 @@ Author: Jake Hartz <jake@hartz.io>
 import statistics
 import time
 from collections import OrderedDict
-from typing import Dict, Iterable, List, NewType, Optional, Tuple
+from typing import Callable, Dict, Iterable, List, NewType, Optional, Tuple
 
-from iochannels import MemoryLog
+from iochannels import Channel, MemoryLog
 from pyprovide import inject
 
 from gradefast import events
 from gradefast.grades import SubmissionGrade
+from gradefast.hosts import Host
 from gradefast.loggingwrapper import get_logger
 from gradefast.models import EMPTY_STATS, Path, Settings, Stats
+from gradefast.persister import Persister
 
 _logger = get_logger("submissions")
 TimerContext = NewType("TimerContext", int)
@@ -90,7 +92,11 @@ class Submission:
         :param full_name: The full name of the submission (i.e. the full filename of the folder
             containing the submission).
         :param path: The path of the root of the submission.
+        :param submission_grade: A SubmissionGrade instance to store the submission's scores and
+            feedback.
         """
+        self._change_handler = None
+
         self._submission_id = submission_id
         self._name = name
         self._full_name = full_name
@@ -100,6 +106,45 @@ class Submission:
         self._html_logs = []  # type: List[MemoryLog]
         self._text_logs = []  # type: List[MemoryLog]
         self._start_and_end_times = []  # type: List[Tuple[float, Optional[float]]]
+
+    def get_state(self) -> dict:
+        """
+        Return state that should be persisted to the GradeFast save file (serialized via pickle).
+        See Persister in persister.py for details.
+
+        This doesn't include this submission's SubmissionGrade; that is persisted separately.
+        """
+        return {
+            "id": self._submission_id,
+            "name": self._name,
+            "full_name": self._full_name,
+            "path": self._path,
+
+            "html_logs": self._html_logs,
+            "text_logs": self._text_logs,
+            "start_and_end_times": self._start_and_end_times
+        }
+
+    @staticmethod
+    def from_state(state: dict, submission_grade: SubmissionGrade) -> "Submission":
+        """
+        Create a new Submission based on state persisted from the get_state() method and a
+        SubmissionGrade object for the submission.
+        """
+        submission = Submission(state["id"], state["name"], state["full_name"], state["path"],
+                                submission_grade)
+        submission._html_logs = state["html_logs"]
+        submission._text_logs = state["text_logs"]
+        submission._start_and_end_times = state["start_and_end_times"]
+        return submission
+
+    def set_change_handler(self, change_handler: Callable[[], None]) -> None:
+        self._change_handler = change_handler
+        self._submission_grade.set_change_handler(change_handler)
+
+    def changed(self) -> None:
+        if self._change_handler:
+            self._change_handler()
 
     def get_id(self) -> int:
         return self._submission_id
@@ -124,6 +169,7 @@ class Submission:
     def add_logs(self, html_log: MemoryLog, text_log: MemoryLog) -> None:
         self._html_logs.append(html_log)
         self._text_logs.append(text_log)
+        self.changed()
 
     def get_html_logs(self) -> List[MemoryLog]:
         return self._html_logs
@@ -134,12 +180,14 @@ class Submission:
     def start_timer(self) -> TimerContext:
         context = len(self._start_and_end_times)
         self._start_and_end_times.append((time.time(), None))
+        self.changed()
         return context
 
     def stop_timer(self, context: TimerContext) -> None:
         times = self._start_and_end_times[context]
         assert times[1] is None
         self._start_and_end_times[context] = (times[0], time.time())
+        self.changed()
 
     def __str__(self) -> str:
         if self._name != self._full_name:
@@ -166,13 +214,115 @@ class SubmissionManager:
     Manages the GradeFast list of submissions, related stats.
     """
 
+    @staticmethod
+    def _get_submission_key(submission_id: int) -> str:
+        return "submission-" + str(submission_id)
+
+    @staticmethod
+    def _get_submission_grade_key(submission_id: int) -> str:
+        return "submission_grade-" + str(submission_id)
+
     @inject()
-    def __init__(self, event_manager: events.EventManager, settings: Settings) -> None:
+    def __init__(self, channel: Channel, host: Host, persister: Persister,
+                 event_manager: events.EventManager, settings: Settings) -> None:
+        self.channel = channel
+        self.host = host
+        self.persister = persister
         self.event_manager = event_manager
-        self.settings = settings
+
+        # This could be set to something else when restoring from the save file
+        self._grade_structure = settings.grade_structure
 
         self._submissions_by_id = OrderedDict()  # type: Dict[int, Submission]
         self._last_id = 0
+
+        # Only restore the grades for persisted submissions if we're keeping the same grade
+        # structure
+        restore_grades = False
+
+        # The save file contains 2 copies of the grade structure:
+        #   - "persisted_original_grade_structure" (exactly what was in the YAML file when
+        #     GradeFast ran); and
+        #   - "persisted_grade_structure" (the original one, plus any modifications like added or
+        #     edited hints). This is what we restore from if we decide to use the grade structure
+        #     stored in the save file instead of the one in the YAML file.
+
+        # These are NOT necessarily the same. We store both to use when checking if the grade
+        # structure in the YAML file has actually changed, so we don't bother the user if they
+        # changed the grade structure in GradeFast (e.g. added or edited a hint) but didn't
+        # actually change the YAML file.
+
+        # If the save file has a persisted grade structure ("persisted_grade_structure"), to check
+        # if we should use it without prompting the user, we check that EITHER:
+        #   - settings.grade_structure == persisted_original_grade_structure, indicating that the
+        #     structure in the YAML file hasn't changed since the last time we ran GradeFast; OR
+        #   - settings.grade_structure == persisted_grade_structure (i.e. the actual grade
+        #     structure from the YAML file matches the one stored in the save file, possibly after
+        #     modifications like adding or editing hints). If this is true but the above statement
+        #     isn't, then this could mean that the user added or edited hints in GradeFast, but
+        #     also updated the YAML file to match.
+
+        # This will be written to the save file as the "original_grade_structure" property.
+        # If we decide to use the grade structure in the save file, we'll update both
+        # self._grade_structure and this guy.
+        original_grade_structure = self._grade_structure
+
+        persisted_grade_structure = self.persister.get("submissions", "grade_structure")
+        persisted_original_grade_structure = self.persister.get("submissions",
+                                                                "original_grade_structure")
+        if persisted_grade_structure:
+            self.channel.print("Reading data from save file")
+
+            if self._grade_structure == persisted_original_grade_structure or \
+                    self._grade_structure == persisted_grade_structure:
+                restore_grades = True
+            else:
+                while True:
+                    self.channel.error("The grade structure in the save file is different from "
+                                       "the one in the YAML file.")
+                    choice = self.channel.prompt(
+                        "Do you want to restore the one from the save file?", ["Y", "n"], "y")
+                    if choice == "y":
+                        restore_grades = True
+                        break
+
+                    # Double-confirm (switching the semantics of "y" and "n" to be extra confusing)
+                    choice = self.channel.prompt(
+                        "This will discard all grade data (scores, comments, etc.) that was stored "
+                        "in the save file! Are you sure you want to do this?", ["Y", "n"], "y")
+                    if choice == "y":
+                        # I guess they're sure; we'll leave restore_grades as False
+                        break
+
+            if restore_grades:
+                # We're using the persisted grade structure from the save file
+                self._grade_structure = persisted_grade_structure
+                original_grade_structure = persisted_original_grade_structure
+
+        # Read any persisted submissions from the save file
+        persisted_submissions_ids = self.persister.get("submissions", "ids")
+        if persisted_submissions_ids:
+            for submission_id in persisted_submissions_ids:
+                if submission_id in self._submissions_by_id:
+                    _logger.warning("Duplicate submission ID {} found in saved data", submission_id)
+                else:
+                    self._restore_persisted_submission(submission_id, restore_grades=restore_grades)
+
+        # Re-persist everything we got. This will also persist the list of submissions and the
+        # grade structure.
+        self._persist_all_submissions()
+        # Persist the original grade structure (see the wall of comment text above). We only want
+        # to do this once, so that if the user makes changes to the grade structure (adding or
+        # editing hints), we'll still have the original grade structure stored. If we're using a
+        # grade structure that we got out of the save file, then this statement will just set
+        # "original_grade_structure" back to what it was before.
+        self.persister.set("submissions", "original_grade_structure", original_grade_structure)
+
+        # Phew, all done; tell the world
+        self.event_manager.dispatch_event(events.NewSubmissionsEvent())
+
+    def _get_change_handler(self, submission_id: int) -> Callable[[], None]:
+        return lambda: self._persist_submission(submission_id)
 
     def has_submissions(self) -> bool:
         return len(self._submissions_by_id) > 0
@@ -181,22 +331,85 @@ class SubmissionManager:
                        send_event: bool = True) -> Submission:
         self._last_id += 1
         new_submission_id = self._last_id
-        new_submission_grade = SubmissionGrade(self.settings.grade_structure)
+        assert new_submission_id not in self._submissions_by_id
 
+        new_submission_grade = SubmissionGrade(self._grade_structure)
         self._submissions_by_id[new_submission_id] = Submission(
             new_submission_id, name, full_name, path, new_submission_grade)
+        self._submissions_by_id[new_submission_id].set_change_handler(
+            self._get_change_handler(new_submission_id))
 
+        self._persist_submission(new_submission_id)
         if send_event:
             self.event_manager.dispatch_event(events.NewSubmissionsEvent())
+
         return self._submissions_by_id[new_submission_id]
 
     def get_submission(self, submission_id: int) -> Submission:
         return self._submissions_by_id[submission_id]
 
-    def drop_submission(self, submission_id: int, send_event: bool = True) -> None:
+    def drop_submission(self, submission_id: int) -> None:
+        assert submission_id in self._submissions_by_id
         del self._submissions_by_id[submission_id]
-        if send_event:
-            self.event_manager.dispatch_event(events.NewSubmissionsEvent())
+        self._clear_persisted_submission(submission_id)
+        self.event_manager.dispatch_event(events.NewSubmissionsEvent())
+
+    def _restore_persisted_submission(self, submission_id: int, restore_grades: bool) -> None:
+        assert submission_id not in self._submissions_by_id
+        try:
+            submission_state = self.persister.get(
+                "submissions", self._get_submission_key(submission_id))
+            if not submission_state:
+                _logger.warning("Couldn't find saved submission (ID {})", submission_id)
+                return
+
+            submission_grade = SubmissionGrade(self._grade_structure)
+            submission_grade_state = self.persister.get(
+                "submissions", self._get_submission_grade_key(submission_id))
+            submission_grade.set_state(submission_grade_state, restore_grades=restore_grades)
+
+            submission = Submission.from_state(submission_state, submission_grade)
+        except:
+            _logger.exception("Error restoring saved submission (ID {})", submission_id)
+            return
+
+        if not self.host.folder_exists(submission.get_path()):
+            _logger.warning("Previously saved submission {} (ID {}) no longer exists at {}",
+                            submission, submission_id, submission.get_path())
+            return
+
+        submission.set_change_handler(self._get_change_handler(submission_id))
+        self._last_id = max(self._last_id, submission_id)
+        self._submissions_by_id[submission.get_id()] = submission
+
+    def _clear_persisted_submission(self, submission_id: int) -> None:
+        self._persist_metadata()
+
+        self.persister.clear("submissions", self._get_submission_key(submission_id))
+        self.persister.clear("submissions", self._get_submission_grade_key(submission_id))
+
+    def _persist_submission(self, submission_id: int) -> None:
+        assert submission_id in self._submissions_by_id
+        self._persist_metadata()
+
+        self.persister.set("submissions", self._get_submission_key(submission_id),
+                           self._submissions_by_id[submission_id].get_state())
+        self.persister.set("submissions", self._get_submission_grade_key(submission_id),
+                           self._submissions_by_id[submission_id].get_grade().get_state())
+
+    def _persist_all_submissions(self) -> None:
+        self.persister.clear_all("submissions")
+        self._persist_metadata()
+
+        for submission_id, submission in self._submissions_by_id.items():
+            self.persister.set("submissions", self._get_submission_key(submission_id),
+                               submission.get_state())
+            self.persister.set("submissions", self._get_submission_grade_key(submission_id),
+                               submission.get_grade().get_state())
+
+    def _persist_metadata(self) -> None:
+        self.persister.set("submissions", "ids", list(self._submissions_by_id.keys()))
+        self.persister.set("submissions", "grade_structure", self._grade_structure)
 
     def get_first_submission_id(self) -> Optional[int]:
         for submission_id in self._submissions_by_id.keys():

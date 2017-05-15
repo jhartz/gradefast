@@ -6,10 +6,9 @@ Licensed under the MIT License. For more, see the LICENSE file.
 Author: Jake Hartz <jake@hartz.io>
 """
 
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Callable, Dict, Iterable, List, Optional, Tuple
 
-from gradefast import required_package_warning
-from gradefast.gradebook import utils
+from gradefast import exceptions, required_package_warning
 from gradefast.models import GradeItem, GradeScore, GradeSection, Hint, ScoreNumber, WeakScoreNumber
 from gradefast.parsers import make_score_number
 
@@ -73,6 +72,17 @@ Section Score: {points_earned} / {points_possible}
 
 
 def _markdown_to_html(text: str, inline_only: bool = False) -> str:
+    """
+    Convert a string (possibly containing Markdown syntax) to an HTML string. If a Markdown parser
+    is not available, then just HTML-escape the string.
+
+    WARNING: This does NOT properly escape all HTML! It is valid to have normal HTML in Markdown,
+    so don't rely on this function to escape possibly malicious user input for you.
+
+    :param text: The Markdown text to convert.
+    :param inline_only: If True, then we will replace paragraph elements with simple line breaks.
+    :return: HTML equivalent of the text parameter.
+    """
     text = text.rstrip()
     if not has_markdown:
         html = text.replace("&", "&amp;")   \
@@ -130,31 +140,76 @@ class SubmissionGradeItem:
     """
     Superclass for SubmissionGradeScore and SubmissionGradeSection.
     """
+
     def __init__(self, grade_item: Optional[GradeItem]) -> None:
         """
-        Initialize the basic components of a SubmissionGradeItem from a base GradeItem.
+        Initialize the state of a SubmissionGradeItem from a base GradeItem.
         """
+        self._change_handler = None
+
         self._name = None       # type: str
         self._name_html = None  # type: str
         self._enabled = True
+        self._note = None       # type: str
+        self._note_html = None  # type: str
+
         self._hints = []        # type: List[Hint]
         self._hints_name_html = []  # type: List[str]
         self._hints_set = {}    # type: Dict[int, bool]
-        self._note = None       # type: str
-        self._note_html = None  # type: str
-        self._children = None   # type: List["SubmissionGradeItem"]
 
         if grade_item:
-            self._name = grade_item.name
-            self._name_html = _markdown_to_html_inline(self._name)
+            self.set_name(grade_item.name)
             self.set_enabled(grade_item.default_enabled)
-            self._note = grade_item.note
-            if self._note is not None:
-                self._note_html = _markdown_to_html(self._note)
+            self.set_note(grade_item.note)
+
             # NOTE: This needs to stay the same reference to the original grade structure's hints
             # list so that add_hint and replace_hint work!
             self._hints = grade_item.hints
             self._hints_name_html = [_markdown_to_html_inline(hint.name) for hint in self._hints]
+
+    def get_state(self) -> dict:
+        """
+        Return state that should be persisted to the GradeFast save file (serialized via pickle).
+        This should include state specific to the submission, but not anything that's part of the
+        grade structure itself (unless it is something that can be modified on a per-submission
+        basis).
+
+        This method should be extended in subclasses.
+        """
+        return {
+            "name": self._name,
+            "enabled": self._enabled,
+            "note": self._note,
+            "hints_set": self._hints_set
+        }
+
+    def set_state(self, state: dict) -> None:
+        """
+        Set state that was previously persisted with get_state().
+
+        This method should be extended in subclasses.
+        """
+        self.set_name(state["name"])
+        self.set_enabled(state["enabled"])
+        self.set_note(state["note"])
+        self._hints_set = state["hints_set"]
+
+    def set_change_handler(self, change_handler: Callable[[], None]) -> None:
+        """
+        Set a handler that should be called whenever this grade item's state has changed. This will
+        overwrite a previously set handler.
+
+        This method is usually called as a result of the SubmissionManager calling
+        set_change_handler() on a SubmissionGrade instance.
+        """
+        self._change_handler = change_handler
+
+    def changed(self) -> None:
+        """
+        Tell the world (or at least someone who cares to listen) that our state has changed.
+        """
+        if self._change_handler:
+            self._change_handler()
 
     def enumerate_all(self, include_disabled: bool = False) -> Iterable["SubmissionGradeItem"]:
         """
@@ -219,11 +274,30 @@ class SubmissionGradeItem:
             "note_html": self._note_html
         }
 
+    def set_name(self, name: str) -> None:
+        """
+        Set the name of this grade item. This changes the name only for this submission; other
+        submissions will still have the original name.
+        """
+        self._name = name
+        self._name_html = _markdown_to_html_inline(name)
+        self.changed()
+
     def set_enabled(self, is_enabled: bool) -> None:
         """
         Set whether this grade item is enabled.
         """
         self._enabled = is_enabled
+        self.changed()
+
+    def set_note(self, note: str) -> None:
+        """
+        Set this grade item's note. This changes the note only for this submission; other
+        submissions will still have the original note.
+        """
+        self._note = note
+        self._note_html = _markdown_to_html(note)
+        self.changed()
 
     def is_hint_enabled(self, index: int) -> bool:
         """
@@ -239,6 +313,7 @@ class SubmissionGradeItem:
         :param is_enabled: Whether the hint should be set to enabled
         """
         self._hints_set[index] = is_enabled
+        self.changed()
 
     def add_hint(self, name: str, value: WeakScoreNumber) -> None:
         """
@@ -250,6 +325,7 @@ class SubmissionGradeItem:
         """
         self._hints.append(Hint(name=name, value=make_score_number(value), default_enabled=False))
         self._hints_name_html.append(_markdown_to_html_inline(name))
+        self.changed()
 
     def replace_hint(self, index: int, name: str, value: WeakScoreNumber) -> None:
         """
@@ -267,13 +343,16 @@ class SubmissionGradeItem:
         self._hints[index] = Hint(name=name, value=make_score_number(value),
                                   default_enabled=old_hint.default_enabled)
         self._hints_name_html[index] = _markdown_to_html_inline(name)
+        self.changed()
 
 
 class SubmissionGradeScore(SubmissionGradeItem):
     """
-    Represents an individual grade item with a point value and score.
-    This is a leaf node in the grade structure tree.
+    Represents an individual grade item with a point value and score. This is a leaf node in the
+    grade structure tree; it's the equivalent to a GradeScore, but with state for a particular
+    submission.
     """
+
     def __init__(self, grade_score: GradeScore) -> None:
         super().__init__(grade_score)
 
@@ -287,6 +366,19 @@ class SubmissionGradeScore(SubmissionGradeItem):
 
         self.set_base_score(grade_score.default_score)
         self.set_comments(grade_score.default_comments)
+
+    def get_state(self) -> dict:
+        state = super().get_state()
+        state.update({
+            "base_score": self._base_score,
+            "comments": self._comments
+        })
+        return state
+
+    def set_state(self, state: dict) -> None:
+        super().set_state(state)
+        self._base_score = state["base_score"]
+        self.set_comments(state["comments"])
 
     def enumerate_all(self, include_disabled: bool = False) -> Iterable[SubmissionGradeItem]:
         if self._enabled or include_disabled:
@@ -364,6 +456,7 @@ class SubmissionGradeScore(SubmissionGradeItem):
         Set the score for this grade item, excluding the effects of enabled hints.
         """
         self._base_score = make_score_number(score)
+        self.changed()
 
     def set_effective_score(self, score: WeakScoreNumber) -> None:
         """
@@ -375,6 +468,7 @@ class SubmissionGradeScore(SubmissionGradeItem):
             if self.is_hint_enabled(index):
                 score -= hint.value
         self._base_score = score
+        self.changed()
 
     def set_comments(self, comments: str) -> None:
         """
@@ -382,6 +476,7 @@ class SubmissionGradeScore(SubmissionGradeItem):
         """
         self._comments = comments
         self._comments_html = _markdown_to_html(comments)
+        self.changed()
 
 
 class SubmissionGradeSection(SubmissionGradeItem):
@@ -394,6 +489,20 @@ class SubmissionGradeSection(SubmissionGradeItem):
 
         self._late_deduction = grade_section.deduct_percent_if_late
         self._children = _create_tree_from_structure(grade_section.grades)
+
+    def get_state(self) -> dict:
+        state = super().get_state()
+        state.update({
+            "late_deduction": self._late_deduction,
+            "children": [child.get_state() for child in self._children]
+        })
+        return state
+
+    def set_state(self, state: dict) -> None:
+        super().set_state(state)
+        self.set_late_deduction(state["late_deduction"])
+        for index, child_state in enumerate(state["children"]):
+            self._children[index].set_state(child_state)
 
     def enumerate_all(self, include_disabled: bool = False) -> Iterable[SubmissionGradeItem]:
         if self._enabled or include_disabled:
@@ -475,6 +584,14 @@ class SubmissionGradeSection(SubmissionGradeItem):
         })
         return data
 
+    def set_late_deduction(self, late_deduction: ScoreNumber) -> None:
+        """
+        Set the late deduction for this submission. This changes the late deduction only for this
+        submission; other submissions will still have the original late deduction.
+        """
+        self._late_deduction = late_deduction
+        self.changed()
+
 
 def _create_tree_from_structure(structure: List[GradeItem]) -> List[SubmissionGradeItem]:
     """
@@ -511,15 +628,46 @@ def get_point_titles(structure: List[GradeItem]) -> List[Tuple[str, ScoreNumber]
 
 class SubmissionGrade:
     """
-    Represents a submission's grade.
+    Represents a submission's grade, including the grade structure tree with state (scores,
+    comments, hints enabled, etc.) for a particular submission.
+
+    Many of the undocumented methods are equivalents to a similar method in the SubmissionGradeItem
+    class.
     """
 
     def __init__(self, grade_structure: List[GradeItem]) -> None:
+        self._change_handler = None
+
         self._grades = _create_tree_from_structure(grade_structure)
 
         self._is_late = False
         self._overall_comments = ""
         self._overall_comments_html = ""
+
+    def get_state(self) -> dict:
+        return {
+            "grades": [grade_item.get_state() for grade_item in self._grades],
+
+            "is_late": self._is_late,
+            "overall_comments": self._overall_comments
+        }
+
+    def set_state(self, state: dict, restore_grades: bool) -> None:
+        if restore_grades:
+            for index, grade_item_state in enumerate(state["grades"]):
+                self._grades[index].set_state(grade_item_state)
+
+        self.set_late(state["is_late"])
+        self.set_overall_comments(state["overall_comments"])
+
+    def set_change_handler(self, change_handler: Callable[[], None]) -> None:
+        self._change_handler = change_handler
+        for item in self.enumerate_all(include_disabled=True):
+            item.set_change_handler(change_handler)
+
+    def changed(self) -> None:
+        if self._change_handler:
+            self._change_handler()
 
     def enumerate_all(self, include_disabled: bool = False) -> Iterable[SubmissionGradeItem]:
         for item in self._grades:
@@ -527,24 +675,24 @@ class SubmissionGrade:
 
     def get_by_path(self, path: List[int]) -> SubmissionGradeItem:
         """
-        Find a path in the grade structure.
+        Find a SubmissionGradeItem in this submission's grade structure by its path.
 
         :param path: A list of ints that acts as a path of indices representing a location within
             the grade item tree
-        :return: A SubmissionGradeItem subclass instance
         """
         try:
             item = self._grades[path[0]]
             for index in path[1:]:
                 item = item._children[index]
         except (ValueError, IndexError) as ex:
-            raise utils.BadPathError("Error parsing path {}".format(path), exception=ex)
+            raise exceptions.BadPathError("Error parsing path {}".format(path), exception=ex)
         return item
 
     def get_by_name(self, name: str, include_disabled: bool = False) \
             -> Iterable[SubmissionGradeItem]:
         """
-        Find all the grade items in the grade structure that have this name.
+        Find all the SubmissionGradeItems in this submission's grade structure that have a certain
+        name.
 
         :param name: The name to look for
         :param include_disabled: Whether to include disabled grade items
@@ -556,8 +704,8 @@ class SubmissionGrade:
 
     def add_hint_to_all_grades(self, path: List[int], name: str, value: ScoreNumber) -> None:
         """
-        Add a new possible hint to ALL grade structures (by modifying a list still tied into the
-        original grade_structure).
+        Add a new possible hint to the grade structures FOR ALL SUBMISSIONS (by modifying a list
+        still tied into the original grade_structure).
 
         :param path: A list of ints that acts as a path of indices representing a location within
             the grade item tree
@@ -565,15 +713,15 @@ class SubmissionGrade:
         :param value: The point value of the hint to add
         """
         if len(path) == 0:
-            raise utils.BadPathError("Path is empty")
+            raise exceptions.BadPathError("Path is empty")
 
         self.get_by_path(path).add_hint(name, value)
 
     def replace_hint_for_all_grades(self, path: List[int], index: int, name: str,
                                     value: ScoreNumber) -> None:
         """
-        Replace an existing hint for ALL grade structures (by modifying a list still tied into the
-        original grade_structure).
+        Replace an existing hint in the grade structures FOR ALL SUBMISSIONS (by modifying a list
+        still tied into the original grade_structure).
 
         :param path: A list of ints that acts as a path of indices representing a location within
             the grade item tree
@@ -582,13 +730,13 @@ class SubmissionGrade:
         :param value: The new point value of the hint
         """
         if len(path) == 0:
-            raise utils.BadPathError("Path is empty")
+            raise exceptions.BadPathError("Path is empty")
 
         try:
             self.get_by_path(path).replace_hint(index, name, value)
         except (ValueError, IndexError) as ex:
-            raise utils.BadPathError("Invalid hint index {} at path {}".format(index, path),
-                                     exception=ex)
+            raise exceptions.BadPathError("Invalid hint index {} at path {}".format(index, path),
+                                          exception=ex)
 
     def is_late(self) -> bool:
         return self._is_late
@@ -642,7 +790,9 @@ class SubmissionGrade:
 
     def set_late(self, is_late: bool) -> None:
         self._is_late = is_late
+        self.changed()
 
     def set_overall_comments(self, overall_comments: str) -> None:
         self._overall_comments = overall_comments
         self._overall_comments_html = _markdown_to_html(overall_comments)
+        self.changed()

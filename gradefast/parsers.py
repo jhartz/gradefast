@@ -60,7 +60,7 @@ def make_score_number(val: WeakScoreNumber) -> ScoreNumber:
     """
     try:
         num_val = float(val)
-    except:
+    except Exception:
         raise ValueError("Not a number: " + str(val))
 
     # Make it an int if we can
@@ -285,14 +285,14 @@ def _parse_grade_item(item: dict, path: List[int], subject: str) -> GradeItem:
             # noinspection PyTypeChecker
             hints.append(Hint(hint_name, hint_value, hint_dict.get("default enabled", False)))
 
-    note = None
+    note = ""
     if "note" in item:
         note = item["note"]
     elif "notes" in item:
         note = item["notes"]
     if isinstance(note, list):
         note = "- " + "\n- ".join(str(n) for n in note)
-    elif note is not None:
+    else:
         note = str(note)
 
     default_enabled = True

@@ -1,3 +1,5 @@
+import * as React from "react";
+
 /*************************************************************************************************
 
                             _______
@@ -88,17 +90,72 @@ export const SONGS = [
     },
     {
         // Beck
-        snippet: "Got a couple of couches, sleep on the love seat.\n" +
-            "Someone keeps saying' I'm insane to complain, about a shotgun wedding and a stain on my shirt.\n" +
-            "Don't believe everything that you breathe; you get a parking violation and a maggot on your sleeve.\n" +
-            "So shave your face, with some mace in the dark;\n" +
-            "Saving' all your food stamps, and burning' down the trailer park.\n" +
-            "Yo. ... Cut it.",
+        snippet: <span>
+            Got a couple of couches, sleep on the love seat.<br />
+            Someone keeps saying' I'm insane to complain, about a shotgun wedding and a stain on my shirt.<br />
+            Don't believe everything that you breathe; you get a parking violation and a maggot on your sleeve.<br />
+            So shave your face, with some mace in the dark;<br />
+            Saving' all your food stamps, and burning' down the trailer park.<br />
+            Yo. ... Cut it.
+        </span>,
         link: "https://www.youtube.com/watch?v=6xHh8bSX-zc"
     },
     {
         // In This Moment
         snippet: "I heard I don't belong in this scene; Sex Metal Barbie, Homicidal Queen",
         link: "https://www.youtube.com/watch?v=vzFUESHaDJk"
-    }
+    },
+    {
+        // Halestorm
+        snippet: "Let's toast 'cause things got better",
+        link: "https://www.youtube.com/watch?v=pdEmsYOOQjU"
+    },
+    {
+        // The Kingston Trio
+        // (some good Boston culture here)
+        snippet: <span>
+            Get poor Charlie off the&nbsp;
+            <abbr title="Metropolitan Transit Authority (predecessor to the MBTA)">M.T.A.</abbr>
+        </span>,
+        link: "https://www.youtube.com/watch?v=S7Jw_v3F_Q0"
+    },
+    {
+        // Silverson Pickups
+        snippet: "Made of our cozy decomposing wires",
+        link: "https://www.youtube.com/watch?v=kL2r82X0SCI"
+    },
+    {
+        // Imogen Heap
+        snippet: "Trains and sewing machines",
+        link: "https://www.youtube.com/watch?v=McDgDlnDX0Y"
+    },
+    {
+        // Noah and the Whale
+        snippet: "Some people wear their history like a map on their face",
+        link: "https://www.youtube.com/watch?v=JE4-5kDHFUE"
+    },
+    {
+        // Conor Oberst
+        snippet: "Life's an odd job that she don't got the nerve to quit",
+        link: "https://www.youtube.com/watch?v=Y_Cy2pxqCRo"
+    },
+    {
+        // Bright Eyes
+        snippet: <span>
+            And she looks at the man and says "Where are we going?" and he looks at her and he says "We're going to a party.<br />
+            It's a birthday party. It's your birthday party.<br />
+            Happy birthday darling. We love you very, very, very, very, very, very, very much.
+        </span>,
+        link: "https://www.youtube.com/watch?v=qikRcAiCtKM"
+    },
+    {
+        // Dolly Parton
+        // (I first heard this one on 8-track)
+        snippet: <span>
+            While standin' here on the edge of this bridge,<br />
+            Lookin' down I see:<br />
+            The face of Joe and Gypsy, lookin' up at me
+        </span>,
+        link: "https://www.youtube.com/watch?v=_AVv9Yg1XL0"
+    },
 ];

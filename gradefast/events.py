@@ -105,7 +105,7 @@ class EventManager:
             for handler in self._handlers:
                 try:
                     accepted = handler.accept(event)
-                except Exception:
+                except:
                     _logger.exception("Exception when calling {}.accept with event {}",
                                       handler, event)
                 else:
@@ -121,7 +121,7 @@ class EventManager:
     def _event_handle_target(handler: EventHandler, event: Event) -> None:
         try:
             handler.handle(event)
-        except Exception:
+        except:
             _logger.exception("Exception when calling {}.handle with event {}", handler, event)
 
     def register_event_handler(self, event_class: Type[T], handler: Callable[[T], None]) -> None:

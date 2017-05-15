@@ -3,6 +3,13 @@ TODO
 
 GradeBook TODOs:
 
+- Allow changing the name of a grade item by clicking on the title in the gradebook (this will only
+  change it for that submission)
+- Allow changing the submission name ("SET_SUBMISSION_NAME", so it's distinct from "GRADE_SET_NAME")
+- Allow changing the late deduction for a particular submission.
+    - When you check the "Late" checkbox, show "-xx%" next to it, which you can click on to change.
+- Allow editing notes for a grade item (this will only change it for that submission)
+- Checkbox in submissions dropdown to hide submission names throughout the gradebook
 - Write tests for grade structure parser, and grades.py
 - In the gradebook (particularly gradebook.grades and the UI), find something better to call the
   path to the grade item than "path" (it's confusing with the Path model for filesystem paths).
@@ -53,7 +60,6 @@ Grader TODOs:
 
 Big TODOs:
 
-- SAVE FILES
 - In grade book, make a "note book" where we store commonly used notes, and we can access it by
   right-clicking in any of the comment boxes and it brings it up, and we can click on something to
   insert it at that point, or add a new one. It would show at the top the ones that were created on
@@ -72,3 +78,9 @@ Big TODOs:
       submissions (unless one is on time and other is late)
     - FUN PART: How can we set a "default late" and "overall notes" for submissions on a
       per-submission basis? Maybe a file in the root of the submission called "GRADEFAST.META.YAML"
+- Macros in YAML file (that's just a blanket string-replace)
+    - Wherever a string is provided in the YAML file, we could instead say "_parse: ...str..."
+    - Anywhere in the file, we can say "_define: {NAME: VALUE, ...}"
+    - Use str.format
+    - The parsing all happens right when the YAML file is read in, before it hits up anything in
+      parsers.py

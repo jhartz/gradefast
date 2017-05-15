@@ -8,7 +8,7 @@ Author: Jake Hartz <jake@hartz.io>
 
 import collections
 import posixpath
-from typing import Dict, List, NamedTuple, Optional, Tuple, Union
+from typing import List, Mapping, NamedTuple, Optional, Sequence, Tuple, Union
 
 
 class SlotEqualityMixin:
@@ -45,10 +45,6 @@ class SlotEqualityMixin:
 
 
 class CommandItem(SlotEqualityMixin):
-    """
-    See https://github.com/jhartz/gradefast/wiki/Command-Structure#command-items
-    """
-
     __slots__ = ("name", "command", "environment", "is_background", "is_passthrough", "stdin",
                  "diff", "version")
 
@@ -71,7 +67,7 @@ class CommandItem(SlotEqualityMixin):
 
             self.collapse_whitespace = collapse_whitespace
 
-    def __init__(self, name: str, command: str, environment: Dict[str, str] = None,
+    def __init__(self, name: str, command: str, environment: Mapping[str, str] = None,
                  is_background: Optional[bool] = False, is_passthrough: Optional[bool] = False,
                  stdin: str = None, diff: "Diff" = None) -> None:
         self.name = name
@@ -99,15 +95,11 @@ class CommandItem(SlotEqualityMixin):
 
 
 class CommandSet(SlotEqualityMixin):
-    """
-    See https://github.com/jhartz/gradefast/wiki/Command-Structure#command-sets
-    """
-
     __slots__ = ("name", "commands", "folder", "confirm_folder", "environment")
 
-    def __init__(self, commands: List[Union[CommandItem, "CommandSet"]], name: str = None,
-                 folder: Union[str, List[str]] = None, confirm_folder: bool = True,
-                 environment: Dict[str, str] = None) -> None:
+    def __init__(self, commands: Sequence[Union[CommandItem, "CommandSet"]], name: str = None,
+                 folder: Union[str, Sequence[str]] = None, confirm_folder: bool = True,
+                 environment: Mapping[str, str] = None) -> None:
         self.name = name
         self.commands = commands
         self.folder = folder
@@ -128,6 +120,10 @@ ScoreNumber = Union[int, float]
 # Will usually be passed to "make_score_number" to convert to a ScoreNumber
 WeakScoreNumber = Union[ScoreNumber, str]
 
+# NOTE: The named tuples below are serialized and stored in GradeFast save files! Be *very careful*
+# when changing them. (For breaking changes, you'll probably want to bump _PERSISTER_VERSION in
+# persister.py, and provide an upgrade path.)
+
 Hint = NamedTuple("Hint", [
     ("name", str),
     ("value", ScoreNumber),
@@ -146,7 +142,7 @@ GradeScore = NamedTuple("GradeScore", [
 
 GradeSection = NamedTuple("GradeSection", [
     ("name", str),
-    ("grades", List[Union[GradeScore, "GradeSection"]]),
+    ("grades", Sequence[Union[GradeScore, "GradeSection"]]),
     ("hints", List[Hint]),
     ("default_enabled", bool),
     ("deduct_percent_if_late", ScoreNumber),
@@ -282,12 +278,12 @@ class Stats(SlotEqualityMixin):
     __slots__ = ("min", "max", "median", "mean", "std_dev", "modes")
 
     def __init__(self,
-                 min:     Optional[Tuple[float, List[int]]],
-                 max:     Optional[Tuple[float, List[int]]],
-                 median:  Optional[Tuple[float, List[int]]],
+                 min:     Optional[Tuple[float, Sequence[int]]],
+                 max:     Optional[Tuple[float, Sequence[int]]],
+                 median:  Optional[Tuple[float, Sequence[int]]],
                  mean:    Optional[float],
                  std_dev: Optional[float],
-                 modes:   List[float]) -> None:
+                 modes:   Sequence[float]) -> None:
         """
         min, max, median: The values of these parameters are one or more data points (i.e. one or
             more submissions) with a single value, so they're represented by a tuple like:
@@ -330,16 +326,16 @@ Settings = NamedTuple("Settings", [
 
     # GradeBook settings
     ("gradebook_enabled", bool),
-    ("grade_structure", List[GradeItem]),
+    ("grade_structure", Sequence[GradeItem]),
     ("host", int),
     ("port", int),
     ("prompt_for_auth", bool),
 
     # Grader settings
-    ("commands", List[Command]),
+    ("commands", Sequence[Command]),
     ("submission_regex", Optional[str]),
     ("check_zipfiles", bool),
-    ("check_file_extensions", Optional[List[str]]),
+    ("check_file_extensions", Optional[Sequence[str]]),
     ("diff_file_path", Optional[LocalPath]),
 
     # {Color,}CLIChannel (iochannels.py) settings
@@ -347,7 +343,7 @@ Settings = NamedTuple("Settings", [
     ("use_color", bool),
 
     # Host (hosts.py) settings
-    ("base_env", Optional[Dict[str, str]]),
+    ("base_env", Optional[Mapping[str, str]]),
     ("prefer_cli_file_chooser", bool),
 
     # LocalHost (hosts.py) settings
@@ -355,9 +351,9 @@ Settings = NamedTuple("Settings", [
     # just be the string "sh" or something).
     # We'll trust the user to tailor these to whatever Host subclass is in play.
     ("shell_command", Optional[str]),
-    ("shell_args", Optional[List[str]]),
+    ("shell_args", Optional[Sequence[str]]),
     ("terminal_command", Optional[str]),
-    ("terminal_args", Optional[List[str]]),
+    ("terminal_args", Optional[Sequence[str]]),
 ])
 
 

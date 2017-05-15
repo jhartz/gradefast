@@ -402,7 +402,7 @@ class LocalHost(Host):
                     # Since we already closed stdin, but haven't touched stdout, we should be fine
                     # reading it directly
                     self._output = self._process.stdout.read()
-                except Exception:
+                except:
                     self.logger.exception("Error reading output from background command {}",
                                           self.get_description())
                 if not self._error_msg and self._process.returncode != 0:
@@ -501,7 +501,7 @@ class LocalHost(Host):
             except BrokenPipeError:
                 LocalHost.logger.debug("BrokenPipeError when reading stdout of process {!r}",
                                        process.args)
-            except Exception:
+            except:
                 LocalHost.logger.exception("Exception when reading stdout of process {!r}",
                                            process.args)
                 break
