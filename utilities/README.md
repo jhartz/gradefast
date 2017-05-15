@@ -1,5 +1,15 @@
 # GradeFast utilities
 
+## `dump-save-file.py`
+
+Dump the contents of a GradeFast save file as one of:
+- JSON
+- YAML
+- Tagged YAML
+
+See https://github.com/jhartz/gradefast/wiki/Save-Files for more information about GradeFast save
+files.
+
 ## `GradeFast to myCourses.user.js`
 
 A userscript to put GradeFast grades into RIT myCourses. This requires that the GradeFast server be
