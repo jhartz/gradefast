@@ -53,12 +53,7 @@ def main():
                         help="The output format")
     parser.add_argument("save_file", metavar="save-file",
                         help="The path to a GradeFast save file")
-
     args = parser.parse_args()
-
-    if not os.path.exists(args.save_file):
-        print("File not found:", args.save_file)
-        sys.exit(1)
 
     with shelve.open(args.save_file, flag="c", protocol=4) as shelf:
         d = OrderedDict()
