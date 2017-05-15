@@ -1,5 +1,6 @@
 """
-GradeFast is a Python and JavaScript program to grade lots of programming labs or similar projects.
+GradeFast is a Python and JavaScript program to speed up your grading of programming projects.
+See README.md for more information.
 
 Licensed under the MIT License. For more, see the LICENSE file.
 
