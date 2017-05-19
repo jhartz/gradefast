@@ -19,7 +19,7 @@ from typing import List, Optional, TextIO
 
 from pyprovide import Injector
 
-from gradefast import required_package_error
+from gradefast import utils
 from gradefast.config.local import GradeFastLocalModule
 from gradefast.hosts import LocalHost
 from gradefast.loggingwrapper import get_logger, init_logging, shutdown_logging
@@ -31,7 +31,7 @@ try:
     import yaml
 except ImportError:
     yaml = None
-    required_package_error("yaml", "PyYAML")
+    utils.required_package_error("yaml", "PyYAML")
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8051

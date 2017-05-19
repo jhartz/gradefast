@@ -9,7 +9,7 @@ Author: Jake Hartz <jake@hartz.io>
 import threading
 import time
 import webbrowser
-from typing import List
+from typing import Sequence
 
 from iochannels import Channel, Msg
 from pyprovide import Injector
@@ -35,7 +35,7 @@ def _try_run_gradebook(gradebook: GradeBook) -> None:
         logger.exception("Exception when running gradebook server")
 
 
-def run_gradefast(injector: Injector, submission_paths: List[Path]) -> None:
+def run_gradefast(injector: Injector, submission_paths: Sequence[Path]) -> None:
     # Initialize the Channel used to communicate via the CLI (if we haven't already)
     channel = injector.get_instance(Channel)
 
@@ -54,7 +54,7 @@ def run_gradefast(injector: Injector, submission_paths: List[Path]) -> None:
         channel.close()
 
 
-def _run_gradefast_internal(injector: Injector, submission_paths: List[Path]) -> None:
+def _run_gradefast_internal(injector: Injector, submission_paths: Sequence[Path]) -> None:
     settings = injector.get_instance(Settings)
     channel = injector.get_instance(Channel)
 

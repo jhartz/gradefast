@@ -65,7 +65,7 @@ const GradeScore = React.createClass({
                     </td>
                     <td>
                         {!this.props.grade.get("enabled") ? undefined :
-                            <em dangerouslySetInnerHTML={{__html: this.props.grade.get("note_html")}}/>
+                            <em dangerouslySetInnerHTML={{__html: this.props.grade.get("notes_html")}}/>
                         }
                         {!this.props.grade.get("enabled") ? undefined :
                             <CommentsTextarea onChange={this.handleCommentsChange}

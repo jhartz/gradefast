@@ -11,7 +11,7 @@ import os
 import random
 import re
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 from iochannels import Channel, HTMLMemoryLog, MemoryLog, Msg
 from pyprovide import Injector, inject
@@ -388,7 +388,7 @@ class CommandRunner:
             return None
         return base_path.append(folder)
 
-    def _find_folder(self, base_path: Path, subfolder: Union[str, List[str]]) -> Optional[Path]:
+    def _find_folder(self, base_path: Path, subfolder: Union[str, Sequence[str]]) -> Optional[Path]:
         """
         Find a new path to a folder based on a current folder and either a subfolder or a list of
         regular expressions representing subfolders. Prompts the user for validation.
@@ -399,14 +399,14 @@ class CommandRunner:
         :return: The path to a valid (sub)*folder, or None if none was found.
         """
         path = base_path
-        if isinstance(subfolder, list):
+        if isinstance(subfolder, str):
+            path = path.append(subfolder)
+        else:
             for folder_regex in subfolder:
                 new_path = self._find_folder_from_regex(path, folder_regex)
                 if new_path is None:
                     break
                 path = new_path
-        else:
-            path = path.append(subfolder)
 
         if not self.host.folder_exists(path):
             self.channel.error("Folder not found: {}", path.relative_str(base_path))
@@ -451,8 +451,8 @@ class CommandRunner:
         """
         return self._background_commands
 
-    def _do_command_set(self, commands: List[Command], path: Path,
-                        environment: Dict[str, str]) -> bool:
+    def _do_command_set(self, commands: Sequence[Command], path: Path,
+                        environment: Mapping[str, str]) -> bool:
         """
         Run a group of commands on the submission.
 
@@ -498,7 +498,7 @@ class CommandRunner:
                     self.channel.input("Press Enter to continue...")
                     continue
 
-                new_environment = environment.copy()
+                new_environment = dict(environment)
                 new_environment.update(command.environment)
 
                 # Run the command set
@@ -522,7 +522,7 @@ class CommandRunner:
         # Everything went well!
         return True
 
-    def _do_command(self, command: CommandItem, path: Path, environment: Dict[str, str]) -> bool:
+    def _do_command(self, command: CommandItem, path: Path, environment: Mapping[str, str]) -> bool:
         """
         Run an individual command on the submission.
 
@@ -550,7 +550,7 @@ class CommandRunner:
 
         # Set up the command environment dictionary
         # (This is used for running the command, and if we open a shell)
-        env = environment.copy()
+        env = dict(environment)
         env.update(command.environment)
         env.update({
             "SUBMISSION_NAME": self._submission.get_name()
@@ -610,7 +610,7 @@ class CommandRunner:
                 return True
 
     def _run_background_command(self, command: CommandItem, path: Path,
-                                environment: Dict[str, str]) -> None:
+                                environment: Mapping[str, str]) -> None:
         """
         Actually run an individual background command.
 
@@ -629,7 +629,7 @@ class CommandRunner:
             self.channel.status("Background command started.")
 
     def _run_foreground_command(self, command: CommandItem, path: Path,
-                                environment: Dict[str, str]) -> None:
+                                environment: Mapping[str, str]) -> None:
         """
         Actually run an individual foreground command.
 
@@ -699,7 +699,7 @@ class CommandRunner:
             self._print_diff(output, diff_reference, command.diff)
 
     @staticmethod
-    def _clean_lines(lines: List[str], collapse_whitespace: bool = False) \
+    def _clean_lines(lines: Sequence[str], collapse_whitespace: bool = False) \
             -> Tuple[List[str], Dict[str, List[str]]]:
         """
         Clean up some lines of output to make diffing work better. In particular, make an

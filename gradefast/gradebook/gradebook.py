@@ -11,15 +11,14 @@ import io
 import mimetypes
 import queue
 import threading
-import time
 import uuid
 from collections import OrderedDict
-from typing import Callable, Dict, Iterable, List, Set, TypeVar, cast
+from typing import Callable, Dict, Iterable, List, Mapping, Set, TypeVar, cast
 
 from pyprovide import inject
 
-from gradefast import events, exceptions, grades, required_package_error
-from gradefast.gradebook import eventhandlers, utils
+from gradefast import events, exceptions, grades, utils
+from gradefast.gradebook import eventhandlers
 from gradefast.loggingwrapper import get_logger
 from gradefast.models import Settings
 from gradefast.submissions import SubmissionManager
@@ -28,7 +27,7 @@ try:
     import flask
 except ImportError:
     flask = None
-    required_package_error("flask")
+    utils.required_package_error("flask")
 
 _logger = get_logger("gradebook")
 
@@ -185,9 +184,9 @@ class GradeBook:
             except ValueError:
                 flask.abort(400)
 
-        def json_response(flask_response_args: Dict[str, object] = None,
+        def json_response(flask_response_args: Mapping[str, object] = None,
                           **data: object) -> flask.Response:
-            kwargs = flask_response_args or {}  # type: Dict[str, object]
+            kwargs = flask_response_args or {}  # type: Mapping[str, object]
             return flask.Response(utils.to_json(data),
                                   mimetype="application/json",
                                   **kwargs)
@@ -240,7 +239,7 @@ class GradeBook:
                 "gradebook.html",
                 client_id=utils.to_json(client_id),
                 events_key=utils.to_json(events_key),
-                markdown_msg=utils.to_json("(Markdown-parsed)" if grades.has_markdown else None))
+                markdown_msg=utils.to_json("(Markdown-parsed)" if utils.has_markdown else None))
 
         # Grades CSV export
         @app.route("/gradefast/grades.csv")
@@ -252,16 +251,18 @@ class GradeBook:
             csv_writer = csv.writer(csv_stream)
 
             # Make the header row
-            point_titles = grades.get_point_titles(self.settings.grade_structure)
             csv_writer.writerow(
-                ["Name", "Total Score", "Percentage", "Feedback", ""] +
-                ["({}) {}".format(points, title) for title, points in point_titles])
+                ["Name", "Total Score", "Possible Score", "Percentage", "Feedback"])
 
             # Make the value rows
-            for grade in self._get_grades_export():
-                csv_writer.writerow(
-                    [grade["name"], grade["score"], grade["percentage"], grade["feedback"], ""] +
-                    ["" if title not in grade else grade[title] for title, _ in point_titles])
+            for grade in self._get_grades_export(include_all=False):
+                csv_writer.writerow([
+                    grade["name"],
+                    grade["score"],
+                    grade["possible_score"],
+                    grade["percentage"],
+                    grade["feedback"]
+                ])
 
             return flask.Response(csv_stream.getvalue(), mimetype="text/csv", headers={
                 "Content-disposition": "attachment; filename=\"{}.csv\"".format(
@@ -275,7 +276,7 @@ class GradeBook:
         def _gradefast_grades_json() -> flask.Response:
             check_data_key()
             _logger.debug("Generating JSON export")
-            return flask.Response(utils.to_json(self._get_grades_export()),
+            return flask.Response(utils.to_json(self._get_grades_export(include_all=True)),
                                   mimetype="application/json")
 
         # Log page (HTML)
@@ -289,9 +290,9 @@ class GradeBook:
 
             content_html = "\n\n\n<hr>\n\n\n\n".join(
                 "{}\n\n{}\n\n{}\n\n".format(
-                    "Started: " + time.asctime(time.localtime(log.open_timestamp)),
+                    "Started: " + utils.timestamp_to_str(log.open_timestamp),
                     log.get_content(),
-                    "Finished: " + time.asctime(time.localtime(log.close_timestamp))
+                    "Finished: " + utils.timestamp_to_str(log.close_timestamp)
                     if log.close_timestamp else "..."
                 )
                 for log in submission.get_html_logs()
@@ -315,10 +316,10 @@ class GradeBook:
                 yield "Log for {}\n".format(submission.get_name())
                 for log in submission.get_text_logs():
                     yield "\n" + "=" * 79 + "\n"
-                    yield time.asctime(time.localtime(log.open_timestamp))
+                    yield utils.timestamp_to_str(log.open_timestamp)
                     if log.close_timestamp:
                         yield " - "
-                        yield time.asctime(time.localtime(log.close_timestamp))
+                        yield utils.timestamp_to_str(log.close_timestamp)
                     yield "\n\n"
                     yield log.get_content()
                     yield "\n"
@@ -430,10 +431,13 @@ class GradeBook:
                         del self._client_update_queues[client_id]
             return flask.Response(gen(), mimetype="text/event-stream")
 
-    def _get_grades_export(self) -> List[OrderedDict]:
+    def _get_grades_export(self, include_all: bool) -> List[OrderedDict]:
         """
         Return a list of ordered dicts representing the scores, feedback, and timing for each
         submission.
+
+        :param include_all: Whether to include extra information (in addition to "name", "score",
+            "possible_score", "percentage", and "feedback")
         """
         grade_list = []
 
@@ -452,19 +456,21 @@ class GradeBook:
                     100 * points_earned / points_possible
                 grade_details["feedback"] = submission.get_grade().get_feedback()
 
-                for item_name, item_points in individual_points:
-                    grade_details[item_name] = item_points
+                if include_all:
+                    for item_name, item_points in individual_points:
+                        grade_details[item_name] = item_points
 
-                times = submission.get_times()
-                if len(times) == 1:
-                    grade_details["Started Grading"] = time.asctime(time.localtime(times[0][0]))
-                    grade_details["Finished Grading"] = time.asctime(time.localtime(times[0][1]))
-                elif len(times) > 1:
-                    for index, (start, end) in enumerate(times, start=1):
-                        grade_details["Started Grading #" + str(index)] = \
-                            time.asctime(time.localtime(start))
-                        grade_details["Finished Grading #" + str(index)] = \
-                            time.asctime(time.localtime(end))
+                    times = submission.get_times()
+                    if len(times) == 1:
+                        grade_details["Started Grading"] = utils.timestamp_to_str(times[0][0])
+                        grade_details["Finished Grading"] = utils.timestamp_to_str(times[0][1])
+                    elif len(times) > 1:
+                        for index, (start, end) in enumerate(times, start=1):
+                            grade_details["Started Grading #" + str(index)] = \
+                                utils.timestamp_to_str(start)
+                            grade_details["Finished Grading #" + str(index)] = \
+                                utils.timestamp_to_str(end)
+
                 grade_list.append(grade_details)
 
         return grade_list
@@ -575,7 +581,7 @@ class GradeBook:
         self._send_client_update(ClientUpdate.create_update_event("END_OF_SUBMISSIONS"))
 
     def _parse_action(self, submission_id: int, client_id: uuid.UUID, client_seq: int,
-                      action: Dict[str, object]) -> None:
+                      action: Mapping[str, object]) -> None:
         """
         Parse and apply an action received from a GradeBook client.
 
@@ -604,7 +610,7 @@ class GradeBook:
             self.send_submission_list()
 
     @staticmethod
-    def _apply_action_to_grade(grade: grades.SubmissionGrade, action: Dict[str, object]) -> None:
+    def _apply_action_to_grade(grade: grades.SubmissionGrade, action: Mapping[str, object]) -> None:
         action_type = action.get("type")
 
         # It's possible we have no actual action to take, and that's okay

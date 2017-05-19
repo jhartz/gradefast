@@ -188,14 +188,12 @@ function cloneGradeChildren(children, action) {
 }
 
 const initialGradeState = Immutable.Map({
-    name: null,
-    name_html: "",
-    enabled: true
-
-    // We could also have the following things...
+    //name: string
+    //name_html: string
+    //notes: string
+    //notes_html: string
+    //enabled: boolean
     //hints: Immutable.List()
-    //note: string
-    //note_html: string
 
     // If it's a SubmissionGradeScore...
     //score: number

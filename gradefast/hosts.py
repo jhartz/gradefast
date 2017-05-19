@@ -13,7 +13,7 @@ import shutil
 import subprocess
 import threading
 import zipfile
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, List, Mapping, Optional, Sequence, Tuple, Union
 
 from iochannels import Channel, Msg
 from pyprovide import inject
@@ -85,7 +85,7 @@ class Host:
         self.channel = channel
         self.settings = settings
 
-    def run_command(self, command: str, path: Path, environment: Dict[str, str],
+    def run_command(self, command: str, path: Path, environment: Mapping[str, str],
                     stdin: str = None, print_output: bool = True) -> str:
         """
         Execute a command on this host.
@@ -109,7 +109,7 @@ class Host:
         raise NotImplementedError()
 
     def run_command_passthrough(self, command: str, path: Path,
-                                environment: Dict[str, str]) -> None:
+                                environment: Mapping[str, str]) -> None:
         """
         Execute a command on this host, without wrapping any input/output pipes or file
         descriptors. If possible, this should let the child command talk directly to the terminal.
@@ -124,7 +124,7 @@ class Host:
         """
         raise NotImplementedError()
 
-    def start_background_command(self, command: str, path: Path, environment: Dict[str, str],
+    def start_background_command(self, command: str, path: Path, environment: Mapping[str, str],
                                  stdin: str = None) -> BackgroundCommand:
         """
         Start a command executing in the background.
@@ -312,7 +312,7 @@ class Host:
         """
         raise NotImplementedError()
 
-    def open_shell(self, path: Path, environment: Dict[str, str]) -> None:
+    def open_shell(self, path: Path, environment: Mapping[str, str]) -> None:
         """
         Open a shell or terminal window, initialized to the provided path. This method should
         return immediately after opening the shell; it should not wait for the shell window to be
@@ -417,7 +417,7 @@ class LocalHost(Host):
             self.wait()
             return self._error_msg
 
-    def _start_process(self, command: str, path: Path, environment: Dict[str, str],
+    def _start_process(self, command: str, path: Path, environment: Mapping[str, str],
                        **kwargs: Any) -> subprocess.Popen:
         args = command  # type: Union[str, List[str]]
         if self.settings.shell_command:
@@ -438,7 +438,7 @@ class LocalHost(Host):
         except (NotADirectoryError, FileNotFoundError) as ex:
             raise CommandStartError("File or directory not found: " + str(ex))
 
-    def _start_process_with_pipes(self, command: str, path: Path, environment: Dict[str, str],
+    def _start_process_with_pipes(self, command: str, path: Path, environment: Mapping[str, str],
                                   **kwargs: Any) -> subprocess.Popen:
         return self._start_process(command, path, environment, stdin=subprocess.PIPE,
                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, **kwargs)
@@ -516,7 +516,7 @@ class LocalHost(Host):
             if print_status_when_done.is_set():
                 output_func(Msg(end="").status("Press Enter to continue..."))
 
-    def run_command(self, command: str, path: Path, environment: Dict[str, str],
+    def run_command(self, command: str, path: Path, environment: Mapping[str, str],
                     stdin: str = None, print_output: bool = True) -> str:
         self.logger.info("Running command {!r}", command)
 
@@ -567,7 +567,7 @@ class LocalHost(Host):
         return output.read()
 
     def run_command_passthrough(self, command: str, path: Path,
-                                environment: Dict[str, str]) -> None:
+                                environment: Mapping[str, str]) -> None:
         self.logger.info("Running command without I/O wrapping: {!r}", command)
         process = self._start_process(command, path, environment)
         try:
@@ -578,7 +578,7 @@ class LocalHost(Host):
         if process.returncode != 0:
             raise CommandRunError("Command had nonzero return code: {}".format(process.returncode))
 
-    def start_background_command(self, command: str, path: Path, environment: Dict[str, str],
+    def start_background_command(self, command: str, path: Path, environment: Mapping[str, str],
                                  stdin: str = None) -> BackgroundCommand:
         self.logger.info("Starting background command {!r}", command)
         process = self._start_process_with_pipes(command, path, environment, bufsize=0)
@@ -644,7 +644,7 @@ class LocalHost(Host):
         with open(self.gradefast_path_to_local_path(path).get_local_path()) as f:
             return f.read()
 
-    def open_shell(self, path: Path, environment: Dict[str, str]) -> None:
+    def open_shell(self, path: Path, environment: Mapping[str, str]) -> None:
         if self.settings.terminal_command:
             args = [self.settings.terminal_command]
             if self.settings.terminal_args:
@@ -655,7 +655,7 @@ class LocalHost(Host):
             raise NotImplementedError()
 
 
-def _open_in_background(args: List[str], env: Dict[str, str] = None) -> None:
+def _open_in_background(args: Sequence[str], env: Mapping[str, str] = None) -> None:
     subprocess.Popen(args, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                      stderr=subprocess.DEVNULL)
 
@@ -725,7 +725,7 @@ class LocalWindowsHost(LocalHost):
                 return self.local_path_to_gradefast_path(LocalPath(local_path_str))
         return None
 
-    def open_shell(self, path: Path, environment: Dict[str, str]) -> None:
+    def open_shell(self, path: Path, environment: Mapping[str, str]) -> None:
         if self.settings.terminal_command:
             super().open_shell(path, environment)
             return
@@ -774,7 +774,7 @@ class LocalMacHost(LocalHost):
         else:
             return None
 
-    def open_shell(self, path: Path, environment: Dict[str, str]) -> None:
+    def open_shell(self, path: Path, environment: Mapping[str, str]) -> None:
         if self.settings.terminal_command:
             super().open_shell(path, environment)
             return
@@ -794,7 +794,7 @@ class LocalLinuxHost(LocalHost):
     Extension of LocalHost for Linux.
     """
 
-    def open_shell(self, path: Path, environment: Dict[str, str]) -> None:
+    def open_shell(self, path: Path, environment: Mapping[str, str]) -> None:
         if self.settings.terminal_command:
             super().open_shell(path, environment)
             return

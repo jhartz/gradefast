@@ -8,7 +8,12 @@ Author: Jake Hartz <jake@hartz.io>
 
 import collections
 import posixpath
-from typing import List, Mapping, NamedTuple, Optional, Sequence, Tuple, Union
+from typing import Callable, Dict, Mapping, NamedTuple, Optional, Sequence, Tuple, TypeVar, Union
+
+from gradefast import utils
+
+T = TypeVar("T")
+U = TypeVar("U")
 
 
 class SlotEqualityMixin:
@@ -36,6 +41,21 @@ class SlotEqualityMixin:
 
     def __str__(self):
         return repr(self)
+
+
+def memoize(func: Callable[[T], U]) -> Callable[[T], U]:
+    """
+    A lighter-weight version of functools.lru_cache() for methods with no additional arguments
+    other than "self".
+    """
+    values = {}  # type: Dict[int, U]
+
+    def wrapper(self):
+        if id(self) not in values:
+            values[id(self)] = func(self)
+        return values[id(self)]
+
+    return wrapper
 
 
 ###################################################################################################
@@ -120,34 +140,75 @@ ScoreNumber = Union[int, float]
 # Will usually be passed to "make_score_number" to convert to a ScoreNumber
 WeakScoreNumber = Union[ScoreNumber, str]
 
-# NOTE: The named tuples below are serialized and stored in GradeFast save files! Be *very careful*
-# when changing them. (For breaking changes, you'll probably want to bump _PERSISTER_VERSION in
+# NOTE: The classes below are serialized and stored in GradeFast save files! Be *very careful* when
+# changing them. (For breaking changes, you'll probably want to bump _PERSISTER_VERSION in
 # persister.py, and provide an upgrade path.)
 
-Hint = NamedTuple("Hint", [
-    ("name", str),
-    ("value", ScoreNumber),
-    ("default_enabled", bool),
-])
 
-GradeScore = NamedTuple("GradeScore", [
-    ("name", str),
-    ("points", ScoreNumber),
-    ("hints", List[Hint]),
-    ("default_enabled", bool),
-    ("default_score", ScoreNumber),
-    ("default_comments", str),
-    ("note", str),
-])
+class Hint(SlotEqualityMixin):
+    __slots__ = ("name", "value", "default_enabled")
 
-GradeSection = NamedTuple("GradeSection", [
-    ("name", str),
-    ("grades", Sequence[Union[GradeScore, "GradeSection"]]),
-    ("hints", List[Hint]),
-    ("default_enabled", bool),
-    ("deduct_percent_if_late", ScoreNumber),
-    ("note", str),
-])
+    def __init__(self, name: str, value: ScoreNumber, default_enabled: bool) -> None:
+        self.name = name
+        self.value = value
+        self.default_enabled = default_enabled
+
+    @memoize
+    def get_name_html(self) -> str:
+        return utils.markdown_to_html_inline(self.name)
+
+
+class GradeItemBase:
+    __slots__ = ("default_name", "default_notes", "default_enabled", "hints")
+
+    def __init__(self, default_name: str, default_notes: str, default_enabled: bool,
+                 hints: Sequence[Hint]) -> None:
+        self.default_name = default_name
+        self.default_notes = default_notes
+        self.default_enabled = default_enabled
+        self.hints = list(hints)
+
+    @memoize
+    def get_default_name_html(self) -> str:
+        return utils.markdown_to_html_inline(self.default_name)
+
+    @memoize
+    def get_default_notes_html(self) -> str:
+        return utils.markdown_to_html(self.default_notes)
+
+    def add_hint(self, hint: Hint) -> None:
+        self.hints.append(hint)
+
+    def replace_hint(self, index: int, hint: Hint) -> None:
+        self.hints[index] = hint
+
+
+class GradeScore(GradeItemBase, SlotEqualityMixin):
+    __slots__ = ("points", "default_score", "default_comments")
+
+    def __init__(self, default_name: str, default_notes: str, default_enabled: bool,
+                 hints: Sequence[Hint], points: ScoreNumber, default_score: ScoreNumber,
+                 default_comments: str) -> None:
+        super().__init__(default_name, default_notes, default_enabled, hints)
+        self.points = points
+        self.default_score = default_score
+        self.default_comments = default_comments
+
+    @memoize
+    def get_default_comments_html(self) -> str:
+        return utils.markdown_to_html(self.default_comments)
+
+
+class GradeSection(GradeItemBase, SlotEqualityMixin):
+    __slots__ = ("grades", "default_late_deduction")
+
+    def __init__(self, default_name: str, default_notes: str, default_enabled: bool,
+                 hints: Sequence[Hint], grades: Sequence[Union[GradeScore, "GradeSection"]],
+                 default_late_deduction: ScoreNumber) -> None:
+        super().__init__(default_name, default_notes, default_enabled, hints)
+        self.grades = grades
+        self.default_late_deduction = default_late_deduction
+
 
 GradeItem = Union[GradeScore, GradeSection]
 

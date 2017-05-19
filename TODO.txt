@@ -3,6 +3,10 @@ TODO
 
 GradeBook TODOs:
 
+- [grades.py]: Have a new method, separate from get_score(), to get the individual_points list.
+  This new method can return something better than a List[Tuple[str, ScoreNumber]], like nested
+  dicts that look more like the grade structure itself. This would then be used in the json export.
+- Use more specific exceptions all over instead of creating a GradeBookPublicException manually
 - Allow changing the name of a grade item by clicking on the title in the gradebook (this will only
   change it for that submission)
 - Allow changing the submission name ("SET_SUBMISSION_NAME", so it's distinct from "GRADE_SET_NAME")
@@ -31,6 +35,14 @@ GradeBook TODOs:
 
 Grader TODOs:
 
+- Look into the process group stuff, and try to get it to where we want it (where Ctrl+C kills, and
+  another Ctrl+C terminates, but neither affects any background commands).
+    - NOTE: If we have subprocesses be in their own group, then they might not die if GradeFast
+      crashes! So, this might not be what we want.
+    - Look at the Popen.send_signal docs: https://docs.python.org/3/library/subprocess.html#subprocess.Popen.send_signal
+    - Test on Windows, Mac, and Linux.
+- Don't re-add duplicate submissions (when adding a new submission, check if it's "in" the dict
+  already, i.e. check equality on "path")
 - Add a diff config option for whether to show the raw output as it comes in (since we need to wait
   for the process to end before we do the diff).
   - Pros: you get to see that the command is running, and provide input if needed.

@@ -282,18 +282,17 @@ def _parse_grade_item(item: dict, path: List[int], subject: str) -> GradeItem:
                 if key not in ["name", "value", "default enabled"]:
                     error("hint \"{}\" has an invalid property: \"{}\"".format(hint_name, key))
 
-            # noinspection PyTypeChecker
             hints.append(Hint(hint_name, hint_value, hint_dict.get("default enabled", False)))
 
-    note = ""
-    if "note" in item:
-        note = item["note"]
-    elif "notes" in item:
-        note = item["notes"]
-    if isinstance(note, list):
-        note = "- " + "\n- ".join(str(n) for n in note)
+    notes = ""
+    if "notes" in item:
+        notes = item["notes"]
+    elif "note" in item:
+        notes = item["note"]
+    if isinstance(notes, list):
+        notes = "- " + "\n- ".join(str(n) for n in notes)
     else:
-        note = str(note)
+        notes = str(notes)
 
     default_enabled = True
     if "default enabled" in item:
@@ -327,7 +326,7 @@ def _parse_grade_item(item: dict, path: List[int], subject: str) -> GradeItem:
         for key in item.keys():
             if key not in ["name", "grades", "hints", "point hints", "section deductions",
                            "deductions", "default enabled", "disabled",
-                           "deduct percent if late", "deductPercentIfLate", "note", "notes"]:
+                           "deduct percent if late", "deductPercentIfLate", "notes", "note"]:
                 error("has an invalid property: \"{}\"".format(key))
 
         try:
@@ -336,14 +335,13 @@ def _parse_grade_item(item: dict, path: List[int], subject: str) -> GradeItem:
             errors.add_all(exc)
 
         errors.raise_if_errors()
-        # noinspection PyArgumentList
         return GradeSection(
-            name=name,
-            grades=grades,
-            hints=hints,
+            default_name=name,
+            default_notes=notes,
             default_enabled=default_enabled,
-            deduct_percent_if_late=deduct_percent_if_late,
-            note=note
+            hints=hints,
+            grades=grades,
+            default_late_deduction=deduct_percent_if_late
         )
 
     # Check stuff specific to grade scores
@@ -376,19 +374,18 @@ def _parse_grade_item(item: dict, path: List[int], subject: str) -> GradeItem:
         for key in item.keys():
             if key not in ["name", "points", "hints", "point hints", "section deductions",
                            "deductions", "default enabled", "disabled", "default score",
-                           "default points", "default comments", "note", "notes"]:
+                           "default points", "default comments", "notes", "note"]:
                 error("has an invalid property: \"{}\"".format(key))
 
         errors.raise_if_errors()
-        # noinspection PyArgumentList
         return GradeScore(
-            name=name,
-            points=points,
-            hints=hints,
+            default_name=name,
+            default_notes=notes,
             default_enabled=default_enabled,
+            hints=hints,
+            points=points,
             default_score=default_score,
             default_comments=item.get("default comments", ""),
-            note=note
         )
 
 
