@@ -261,16 +261,13 @@ class SubmissionGradeItem:
                                                   default_enabled=old_hint.default_enabled))
         self.changed()
 
-    def get_score(self, is_late: bool) -> Tuple[ScoreNumber, ScoreNumber,
-                                                List[Tuple[str, ScoreNumber]]]:
+    def get_score(self, is_late: bool) -> Tuple[ScoreNumber, ScoreNumber]:
         """
-        Get the current point values for this grade item. The third item in each returned tuple
-        matches the format used by the get_point_titles function.
+        Get the current point values and total possible points for this grade item.
 
         :param is_late: Whether the parent submission is marked as late
-        :return: A tuple with the points earned for this item/section (int or float), the total
-            points possible for this item/section (int or float), and the individual point scores
-            for this item/section (list of (str, int or float) tuples).
+        :return: A tuple with the points earned for this item/section (int or float) and the total
+            points possible for this item/section (int or float).
         """
         raise NotImplementedError("get_score must be implemented by subclass")
 
@@ -284,9 +281,10 @@ class SubmissionGradeItem:
         """
         raise NotImplementedError("get_feedback must be implemented by subclass")
 
-    def to_plain_data(self) -> Dict[str, object]:
+    def get_data(self) -> Dict[str, object]:
         """
-        Get a representation of this grade item as plain data (just lists, dicts, etc.)
+        Get a representation of this grade item as plain data (just lists, dicts, etc.), mostly
+        for use by the gradebook.
         This should be overridden in subclasses to extend the dict returned here, or replace it
         with a more appropriate representation.
         """
@@ -306,6 +304,36 @@ class SubmissionGradeItem:
                 for index, hint in enumerate(self._grade_item.hints)
             ]
         }
+
+    def get_export_data(self, is_late: bool) -> Dict[str, object]:
+        """
+        Get export data for this grade item. This is similar to "get_data()", but includes
+        data that is more useful for other applications rather than the gradebook.
+        This should be overridden in subclasses to extend the dict returned here, or replace it
+        with a more appropriate representation.
+
+        :param is_late: Whether the parent submission is marked as late
+        """
+        if self.is_enabled():
+            points_earned, points_possible = self.get_score(is_late)
+            return {
+                "name": self.get_name(),
+                "enabled": True,
+                "points_earned": points_earned,
+                "points_possible": points_possible,
+                "enabled_hints": [
+                    {
+                        "name": hint.name,
+                        "value": hint.value
+                    }
+                    for index, hint in enumerate(self._grade_item.hints) if self.is_hint_enabled(index)
+                ]
+            }
+        else:
+            return {
+                "name": self.get_name(),
+                "enabled": False
+            }
 
 
 class SubmissionGradeScore(SubmissionGradeItem):
@@ -393,17 +421,16 @@ class SubmissionGradeScore(SubmissionGradeItem):
             self._comments_html = utils.markdown_to_html(comments)
         self.changed()
 
-    def get_score(self, is_late: bool) -> Tuple[ScoreNumber, ScoreNumber,
-                                                List[Tuple[str, ScoreNumber]]]:
+    def get_score(self, is_late: bool) -> Tuple[ScoreNumber, ScoreNumber]:
         points_earned = self._base_score
         for index, hint in enumerate(self._grade_item.hints):
             if self.is_hint_enabled(index):
                 points_earned += hint.value
-        return points_earned, self._points, [(self.get_name(), points_earned)]
+        return points_earned, self._points
 
     def get_feedback(self, is_late: bool, depth: int = 0) -> str:
         # Start off with the score (although we skip the score if it's 0 out of 0)
-        points_earned, points_possible, _ = self.get_score(is_late)
+        points_earned, points_possible = self.get_score(is_late)
         score_feedback = ""
         if points_earned and not points_possible:
             # No total points, but still points earned
@@ -437,9 +464,9 @@ class SubmissionGradeScore(SubmissionGradeItem):
 
         return feedback
 
-    def to_plain_data(self) -> Dict[str, object]:
-        data = super().to_plain_data()
-        points_earned, points_possible, _ = self.get_score(False)
+    def get_data(self) -> Dict[str, object]:
+        data = super().get_data()
+        points_earned, points_possible = self.get_score(False)
         data.update({
             "score": points_earned,
             "points": points_possible,
@@ -448,6 +475,9 @@ class SubmissionGradeScore(SubmissionGradeItem):
             "touched": self.is_touched()
         })
         return data
+
+    def get_export_data(self, is_late: bool) -> Dict[str, object]:
+        return super().get_export_data(is_late)
 
 
 class SubmissionGradeSection(SubmissionGradeItem):
@@ -500,19 +530,15 @@ class SubmissionGradeSection(SubmissionGradeItem):
         self._late_deduction = late_deduction
         self.changed()
 
-    def get_score(self, is_late: bool) -> Tuple[ScoreNumber, ScoreNumber,
-                                                List[Tuple[str, ScoreNumber]]]:
+    def get_score(self, is_late: bool) -> Tuple[ScoreNumber, ScoreNumber]:
         points_earned = 0.0
         points_possible = 0.0
-        individual_points = []  # type: List[Tuple[str, ScoreNumber]]
 
         for item in self.enumerate_enabled_children():
-            item_earned, item_possible, item_points = item.get_score(is_late)
+            item_earned, item_possible = item.get_score(is_late)
             # Add to the total
             points_earned += item_earned
             points_possible += item_possible
-            individual_points += [(self.get_name() + ": " + name, score)
-                                  for name, score in item_points]
 
         # Account for any hints
         for index, hint in enumerate(self._grade_item.hints):
@@ -524,10 +550,10 @@ class SubmissionGradeSection(SubmissionGradeItem):
             # It's late! Deduct
             points_earned -= _get_deducted_points(points_earned, self._late_deduction)
 
-        return points_earned, points_possible, individual_points
+        return points_earned, points_possible
 
     def get_feedback(self, is_late: bool, depth: int = 0) -> str:
-        points_earned, points_possible, _ = self.get_score(is_late)
+        points_earned, points_possible = self.get_score(is_late)
 
         # Add the title and overall points earned / points possible
         name_html = self.get_name_html()
@@ -560,11 +586,19 @@ class SubmissionGradeSection(SubmissionGradeItem):
 
         return feedback
 
-    def to_plain_data(self) -> Dict[str, object]:
-        data = super().to_plain_data()
+    def get_data(self) -> Dict[str, object]:
+        data = super().get_data()
         data.update({
-            "children": [child.to_plain_data() for child in self._children]
+            "children": [child.get_data() for child in self._children]
         })
+        return data
+
+    def get_export_data(self, is_late: bool) -> Dict[str, object]:
+        data = super().get_export_data(is_late)
+        if self.is_enabled():
+            data.update({
+                "children": [child.get_export_data(is_late) for child in self._children]
+            })
         return data
 
 
@@ -710,30 +744,28 @@ class SubmissionGrade:
         self._overall_comments_html = utils.markdown_to_html(overall_comments)
         self.changed()
 
-    def get_score(self) -> Tuple[ScoreNumber, ScoreNumber, List[Tuple[str, ScoreNumber]]]:
+    def get_score(self) -> Tuple[ScoreNumber, ScoreNumber]:
         """
         Calculate the total score (all points added up) for this submission.
 
-        :return: A tuple with the points earned for this submission, the total points possible for
-            this submission, and the individual point scores for this submission
+        :return: A tuple with the points earned for this submission and the total points possible
+            for this submission.
         """
         points_earned = 0.0
         points_possible = 0.0
-        individual_points = []  # type: List[Tuple[str, ScoreNumber]]
 
         for item in self._grades:
             if item._enabled:
-                item_earned, item_possible, item_points = item.get_score(self._is_late)
+                item_earned, item_possible = item.get_score(self._is_late)
                 # Add to the total
                 points_earned += item_earned
                 points_possible += item_possible
-                individual_points += item_points
 
         # Make everything an int if we can
         points_earned = make_score_number(points_earned)
         points_possible = make_score_number(points_possible)
 
-        return points_earned, points_possible, individual_points
+        return points_earned, points_possible
 
     def get_feedback(self) -> str:
         """
@@ -743,16 +775,27 @@ class SubmissionGrade:
         return FeedbackHTMLTemplates.base.format(content=content,
                                                  overall_comments=self._overall_comments_html)
 
-    def to_plain_data(self) -> Dict[str, object]:
+    def get_data(self) -> Dict[str, object]:
         """
-        Get the grade values as plain old data.
+        Get a representation of this submission's grade items as plain data (lists, dicts, etc.).
         """
-        points_earned, points_possible, _ = self.get_score()
+        points_earned, points_possible = self.get_score()
         return {
-            "is_late": self._is_late,
+            "is_late": self.is_late(),
             "overall_comments": self._overall_comments,
             "overall_comments_html": self._overall_comments_html,
             "points_earned": points_earned,
             "points_possible": points_possible,
-            "grades": [item.to_plain_data() for item in self._grades]
+            "grades": [item.get_data() for item in self._grades]
+        }
+
+    def get_export_data(self) -> Dict[str, object]:
+        """
+        Get export data for this submission's grade items. This is similar to "get_data()",
+        but includes data that is more useful for other applications rather than the gradebook.
+        This does not include data such as the overall score and feedback.
+        """
+        return {
+            "is_late": self.is_late(),
+            "grades": [item.get_export_data(self.is_late()) for item in self._grades]
         }

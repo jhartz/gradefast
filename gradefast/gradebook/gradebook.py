@@ -446,8 +446,7 @@ class GradeBook:
         # return it, instead of trying using a generator with the event lock.)
         with self.event_lock:
             for submission in self.submission_manager.get_all_submissions():
-                points_earned, points_possible, individual_points = \
-                    submission.get_grade().get_score()
+                points_earned, points_possible = submission.get_grade().get_score()
                 grade_details = OrderedDict()  # type: Dict[str, object]
                 grade_details["name"] = submission.get_name()
                 grade_details["score"] = points_earned
@@ -457,8 +456,7 @@ class GradeBook:
                 grade_details["feedback"] = submission.get_grade().get_feedback()
 
                 if include_all:
-                    for item_name, item_points in individual_points:
-                        grade_details[item_name] = item_points
+                    grade_details.update(submission.get_grade().get_export_data())
 
                     times = submission.get_times()
                     if len(times) == 1:
@@ -513,7 +511,7 @@ class GradeBook:
         interested GradeBook clients.
         """
         submission = self.submission_manager.get_submission(submission_id)
-        data = submission.get_grade().to_plain_data()
+        data = submission.get_grade().get_data()
         data.update({
             "submission_id": submission_id,
             "originating_client_id": originating_client_id,

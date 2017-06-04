@@ -195,7 +195,7 @@ class Submission:
         return self._name
 
     def to_json(self) -> dict:
-        points_earned, points_possible, _ = self._submission_grade.get_score()
+        points_earned, points_possible = self._submission_grade.get_score()
         return {
             "id": self._submission_id,
             "name": self._name,
@@ -448,7 +448,7 @@ class SubmissionManager:
     def get_grading_stats(self) -> Stats:
         grades_with_id = []  # type: List[Tuple[float, int]]
         for submission_id, submission in self._submissions_by_id.items():
-            points_earned, points_possible, _ = submission.get_grade().get_score()
+            points_earned, points_possible = submission.get_grade().get_score()
             percentage = 100 * points_earned / points_possible
             grades_with_id.append((percentage, submission_id))
 
