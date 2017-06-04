@@ -158,4 +158,14 @@ export const SONGS = [
         </span>,
         link: "https://www.youtube.com/watch?v=_AVv9Yg1XL0"
     },
+    {
+        // Elton John
+        snippet: "The sun's been quite kind while I wrote this song; It's for people like you that keep it turned on",
+        link: "https://www.youtube.com/watch?v=mTa8U0Wa0q8"
+    },
+    {
+        // J. Geils Band
+        snippet: "I've had the blues, the reds and the pinks",
+        link: "https://www.youtube.com/watch?v=E0LAs7X5ybE"
+    },
 ];
