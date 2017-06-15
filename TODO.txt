@@ -12,8 +12,10 @@ GradeBook TODOs:
 - Allow changing the submission name ("SET_SUBMISSION_NAME", so it's distinct from "GRADE_SET_NAME")
 - Allow changing the late deduction for a particular submission.
     - When you check the "Late" checkbox, show "-xx%" next to it, which you can click on to change.
-- Allow editing notes for a grade item (this will only change it for that submission)
-- Checkbox in submissions dropdown to hide submission names throughout the gradebook
+- Allow editing notes for a grade item (this will only change it for that submission) -- OR maybe
+  not; I could see this causing some major confusion on notes vs comments.
+- Checkbox in submissions dropdown to hide submission names throughout the gradebook, to try to
+  prevent bias
 - Write tests for grade structure parser, and grades.py
 - In the gradebook (particularly gradebook.grades and the UI), find something better to call the
   path to the grade item than "path" (it's confusing with the Path model for filesystem paths).
