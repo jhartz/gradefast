@@ -168,4 +168,12 @@ export const SONGS = [
         snippet: "I've had the blues, the reds and the pinks",
         link: "https://www.youtube.com/watch?v=E0LAs7X5ybE"
     },
+    {
+        // Terrible Tim
+        snippet: <span>
+            So many people in the audience I hope none of you people get killed<br />
+            Dadadadadadada
+        </span>,
+        link: "https://www.youtube.com/watch?v=qkUVToIfrKg"
+    },
 ];
