@@ -417,6 +417,8 @@ def parse_settings(settings_dict: dict) -> Dict[str, object]:
                 settings[setting] = value
             else:
                 errors.add_line("Invalid type for setting \"{}\"".format(key))
+        elif key == "regex":
+            errors.add_line("Invalid setting: \"regex\" (did you mean \"submission regex\"?)")
         else:
             errors.add_line("Invalid setting: \"{}\"".format(key))
 

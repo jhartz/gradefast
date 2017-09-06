@@ -178,10 +178,10 @@ def parse_yaml_file(yaml_file: TextIO, gradebook_enabled: bool) -> SettingsBuild
     settings_builder = SettingsBuilder()
 
     for key in yaml_data.keys():
-        if key == "config":
+        if key in ("config", "submissions"):
             # compatibility :(
-            raise errors.add_line("Found unexpected top-level key: \"config\" "
-                                  "(did you mean \"settings\"?")
+            raise errors.add_line("Found unexpected top-level key: \"{}\" "
+                                  "(did you mean \"settings\"?)".format(key))
         if key not in ("grades", "commands", "settings"):
             raise errors.add_line("Found unexpected top-level key: \"{}\"".format(key))
 
@@ -206,11 +206,14 @@ def parse_yaml_file(yaml_file: TextIO, gradebook_enabled: bool) -> SettingsBuild
     else:
         settings_builder.grade_structure = None
 
-    try:
-        settings_builder.update(parse_settings(
-            yaml_data["settings"] if "settings" in yaml_data else {}))
-    except ModelParseError as exc:
-        errors.add_all(exc)
+    if "settings" in yaml_data and not isinstance(yaml_data["settings"], dict):
+        errors.add_line("\"settings\" in YAML file must be a dictionary")
+    else:
+        try:
+            settings_builder.update(parse_settings(
+                yaml_data["settings"] if "settings" in yaml_data else {}))
+        except ModelParseError as exc:
+            errors.add_all(exc)
 
     errors.raise_if_errors()
     return settings_builder
