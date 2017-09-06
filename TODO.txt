@@ -26,9 +26,6 @@ GradeBook TODOs:
 - 3 states for grade structures: enabled, disabled, or collapsed, in which case any sub grades are
   not shown, and we just enter one big point value, one big comment. This probably means
   implementing a custom checkbox, or doing something hacky like: https://jsfiddle.net/urtwh9t7/2/
-- Push the "dist/" folder to GitHub, so that people can use GradeFast without needing npm. (But,
-  with a big fat notice in the README that, if they modify any of the JS files, they'll need to
-  "npm run build" to see the effects)
 - Bar charts for the statistics in the submissions dropdown
     - For timing: show "stacked" bars if we revisited a submission multiple times in the grader
     - If we generate server-side: it's easier to save
