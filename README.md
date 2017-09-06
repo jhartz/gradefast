@@ -43,13 +43,17 @@ these, after cloning, run:
 
 ### JavaScript
 
-The GradeBook user interface is browser-based (HTML/JavaScript). To compile the JavaScript files,
-you will need a working install of [Node.js](https://nodejs.org/) and [NPM](https://www.npmjs.com/).
+The GradeBook user interface is browser-based (HTML/JavaScript). If you change any of the
+JavaScript files, you will need to recompile them.
 
-To install the Node dependencies and compile the JavaScript files, run:
+To install the Node dependencies and compile the JavaScript files, make sure you have a working
+install of [Node.js](https://nodejs.org/) and [NPM](https://www.npmjs.com/), and then run:
 
     npm install
     npm run build
+
+**If you modify the JavaScript source, make sure you recompile and include your changes in the pull
+request!** This allows people to use GradeFast without having to install Node.js and NPM.
 
 ## Usage
 

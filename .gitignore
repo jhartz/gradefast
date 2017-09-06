@@ -1,8 +1,6 @@
 __pycache__/
 *.py[cod]
 
-gradefast/gradebook/static/dist/
-
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
