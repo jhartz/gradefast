@@ -110,8 +110,7 @@ def _run_gradefast_internal(injector: Injector, submission_paths: Sequence[Path]
         _logger.exception("ERROR RUNNING GRADER")
     finally:
         channel.print()
-        channel.print("Download the gradebook and any other data you need.")
-        channel.print("Once you exit the server, the gradebook is lost.")
+        channel.print("Download the grades and any other data you need before exiting the server.")
         channel.print()
         try:
             channel.input("Press Enter to exit server...")
