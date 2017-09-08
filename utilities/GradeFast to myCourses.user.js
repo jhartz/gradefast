@@ -16,11 +16,13 @@ var FEEDBACK_REPLACEMENTS = [
     [/\+0:/g, "-"]
 ];
 
+console.log("GRADEFAST USERSCRIPT RUNNING");
+
 window.addEventListener("load", function (event) {
     setTimeout(function () {
-        var $btnContainer = $(".d2l-page-buttons-float").not(".d2l-page-buttons-spacer");
-        $a = $('<a class="vui-button d2l-button d2l-left" id="GRADEFAST_IMPORT" role="button"><i>Import Grades from GradeFast</i></a>');
-        $btnContainer.find(".clear").before($a);
+        console.log("INSERTING GRADEFAST BUTTON");
+        $a = $('<button id="GRADEFAST_IMPORT" style="position: fixed; right: 10px; bottom: 10px; font-size: 200%; font-weight: bold; z-index: 9999;">Import Grades from GradeFast</button>');
+        $("body").append($a);
 
         $a.click(function () {
             if (gotGrades) {
@@ -31,13 +33,13 @@ window.addEventListener("load", function (event) {
 
             if (!confirm("Are grades ordered by LAST name? (This is required)")) return;
 
-            var server = prompt("GradeFast server:", "http://127.0.0.1:8051");
-            if (!server) return;
+            var jsonUrl = prompt("GradeFast JSON URL:", "http://127.0.0.1:8051/gradefast/grades.json?...");
+            if (!jsonUrl) return;
 
             // Get the JSON grade data
             var xhr = GM_xmlhttpRequest({
                 method: "GET",
-                url: server + "/gradefast/grades.json",
+                url: jsonUrl,
                 onload: function (response) {
                     if (response.status != 200) {
                         alert("Request failed: " + response.status + " (" + response.statusText + "):\n" +
@@ -92,9 +94,9 @@ function matchRowsAndGrades(jsonGrades) {
                 return;
             }
 
-            var $gradeInput = $(this).find("input");
+            var $gradeInput = $(this).find("input.d_edt");
             if ($gradeInput.length === 0) {
-                console.log("Found container without an input inside: ", this);
+                console.log("Found container without a grade input inside: ", this);
                 return;
             }
 
@@ -198,7 +200,7 @@ function enterGrades() {
                 $htmlIframe.contents().find("textarea").val(fb).change();
 
                 // Click the save button
-                if (!click($htmlIframe.contents().find("a.vui-button-primary"))) {
+                if (!click($htmlIframe.contents().find("button[primary]"))) {
                     alert("Couldn't click Save button!");
                     return;
                 }
@@ -210,7 +212,7 @@ function enterGrades() {
                 }, 200);
                 */
             }, 2500);
-        }, 2500);
+        }, 3000);
     }, 500);
 }
 
