@@ -255,7 +255,8 @@ class Path(SlotEqualityMixin):
         nonambiguous (and Host implementations thank us).
         """
         parts = self._path.split("/") + subpart.split("/")
-        i = 1
+        # Start dropping empty path parts at index 2 so we don't cut off an initial "/" or "//"
+        i = 2
         while i < len(parts):
             if parts[i] == "" or parts[i] == ".":
                 parts.pop(i)

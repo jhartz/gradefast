@@ -34,7 +34,7 @@ class GradeFastLocalModule(Module):
         if not settings.log_file:
             return iochannels.NullLog()
 
-        file = open(settings.log_file.get_local_path(), "a")
+        file = open(settings.log_file.get_local_path(), "a", encoding="utf8")
         if settings.log_as_html:
             file.write("<h1>\n")
         else:
