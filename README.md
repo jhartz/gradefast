@@ -6,6 +6,9 @@ GradeFast is a Python program (with an HTML/JavaScript UI) that eliminates the r
 grading programming assignments and lets you focus on what's important: helping students learn from
 their mistakes. Best of all, it lets you help them without putting much time into it!
 
+GradeFast has 2 components that work together: a command-line application that runs commands and
+executes student assignments, and a web-based UI for entering grades and feedback.
+
 ![GIF demo](images/gradefast-demo.gif)
 
 ## Dependencies
