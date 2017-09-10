@@ -5,8 +5,8 @@ ALWAYS ALWAYS ALWAYS:
 
 ## Commit messages
 
-- [Don't write bad commit messages][http://stopwritingramblingcommitmessages.com/].
-- Follow [these formatting guidelines][http://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html]
+- [Don't write bad commit messages](http://stopwritingramblingcommitmessages.com/).
+- Follow [these formatting guidelines](http://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html)
   (well, except for the part about grammar). Fun fact: a decent version of `vim` will automatically
   break lines for you (if you use it as your `EDITOR` for `git commit`).
 
