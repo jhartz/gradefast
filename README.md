@@ -46,9 +46,6 @@ these, after cloning, run:
 
     git submodule update --init
 
-The submodules are defined using SSH URLs to GitHub, so you must have your SSH public key set up
-with GitHub (see https://help.github.com/articles/connecting-to-github-with-ssh/)
-
 ### JavaScript
 
 The GradeBook user interface is browser-based (HTML/JavaScript). If you change any of the
