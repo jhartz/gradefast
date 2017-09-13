@@ -69,6 +69,10 @@ def make_score_number(val: WeakScoreNumber) -> ScoreNumber:
     return num_val
 
 
+def _str_or_none(s: Optional[object]) -> Optional[str]:
+    return None if s is None else str(s)
+
+
 def _parse_list(lst: List[dict], parse_func: Callable[[dict, List[int], str], T],
                 _path: List[int] = None) -> List[T]:
     if _path is None:
@@ -101,7 +105,7 @@ def parse_commands(lst: List[dict]) -> List[Command]:
 def _parse_command(command_dict: dict, path: List[int], subject: str) -> Command:
     errors = ModelParseError()
 
-    name = command_dict.get("name")
+    name = _str_or_none(command_dict.get("name"))
     if name:
         name = name.strip()
     if name:
@@ -128,7 +132,7 @@ def _parse_command(command_dict: dict, path: List[int], subject: str) -> Command
         errors.raise_if_errors()
         return CommandSet(
             commands,
-            command_dict.get("name"),
+            _str_or_none(command_dict.get("name")),
             command_dict.get("folder"),
             command_dict.get("confirm folder", "folder" in command_dict),
             command_dict.get("environment")
@@ -145,7 +149,7 @@ def _parse_command(command_dict: dict, path: List[int], subject: str) -> Command
 
         is_background = command_dict.get("background")
         is_passthrough = command_dict.get("passthrough") or command_dict.get("passthru")
-        stdin = command_dict.get("input") or command_dict.get("stdin")
+        stdin = _str_or_none(command_dict.get("input") or command_dict.get("stdin"))
         diff_value = command_dict.get("diff")
 
         if is_passthrough:
@@ -166,8 +170,8 @@ def _parse_command(command_dict: dict, path: List[int], subject: str) -> Command
 
         errors.raise_if_errors()
         return CommandItem(
-            command_dict["name"].strip(),
-            command_dict["command"].rstrip(),
+            str(command_dict["name"]).strip(),
+            str(command_dict["command"]).rstrip(),
             command_dict.get("environment"),
             is_background,
             is_passthrough,
@@ -190,10 +194,10 @@ def _parse_command_diff(diff_object: Optional[Union[dict, str]],
     errors = ModelParseError()
 
     try:
-        content = diff_object.get("content") or None
-        file = diff_object.get("file") or None
-        submission_file = diff_object.get("submission file") or None
-        command = diff_object.get("command") or None
+        content = _str_or_none(diff_object.get("content") or None)
+        file = _str_or_none(diff_object.get("file") or None)
+        submission_file = _str_or_none(diff_object.get("submission file") or None)
+        command = _str_or_none(diff_object.get("command") or None)
     except AttributeError:
         raise errors.add("Command item", subject, "diff object must be a string or dictionary")
 
@@ -256,8 +260,8 @@ def _parse_grade_item(item: dict, path: List[int], subject: str) -> GradeItem:
             _logger.warning("{} {} has deprecated \"{}\" (converted to \"hints\")",
                             title, subject, old_hints_prop)
             hint_dicts += map(lambda old_hint: {
-                "name": old_hint.get("name"),
-                "value": old_hint.get("value", 0) or (-1 * old_hint.get("minus", 0)),
+                "name": _str_or_none(old_hint.get("name")),
+                "value": make_score_number(old_hint.get("value") or -old_hint.get("minus", 0)),
                 "default enabled": old_hint.get("default enabled", False)
             }, item[old_hints_prop])
 
