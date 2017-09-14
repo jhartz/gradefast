@@ -3,6 +3,8 @@ TODO
 
 GradeBook TODOs:
 
+- "code" blocks in the Overall Comments section (in the gradebook) are "whited out" (since the text
+  is white, and the code block background is white)
 - Use getters and setters in a consistent way in grades.py
 - Add "late_deduction_percent" to get_data(), ONLY if is_late is true and we actually deducted
   something
