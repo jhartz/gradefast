@@ -4,7 +4,7 @@
 // @version      0.2
 // @description  Gets grades from GradeFast and puts them into a myCourses grade book
 // @author       Jake Hartz
-// @include      https://mycourses.rit.edu/d2l/lms/grades/admin/enter/*
+// @include      https://mycourses.rit.edu/d2l/lms/grades/admin/enter/grade_item_edit.d2l?*
 // @grant        GM_xmlhttpRequest
 // ==/UserScript==
 
