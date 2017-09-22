@@ -8,6 +8,8 @@ GradeBook TODOs:
 - Use getters and setters in a consistent way in grades.py
 - Add "late_deduction_percent" to get_data(), ONLY if is_late is true and we actually deducted
   something
+- In list of submissions, include button to open the submission folder
+- When opening the list of submissions, make sure we're scrolled all the way to the top
 - Use more specific exceptions all over instead of creating a GradeBookPublicException manually
 - Allow changing the name of a grade item by clicking on the title in the gradebook (this will only
   change it for that submission)
