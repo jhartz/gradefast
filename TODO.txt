@@ -38,6 +38,8 @@ GradeBook TODOs:
 
 Grader TODOs:
 
+- Fix issues with excessive stdout buffering. Most subprocesses are block-buffering rather than
+  line-buffering, since they think the output isn't to a terminal.
 - Look into the process group stuff, and try to get it to where we want it (where Ctrl+C kills, and
   another Ctrl+C terminates, but neither affects any background commands).
     - subprocess.CREATE_NEW_PROCESS_GROUP, and make sure we catch Ctrl-C properly and do
@@ -48,9 +50,6 @@ Grader TODOs:
       crashes! So, this might not be what we want.
     - Look at the Popen.send_signal docs: https://docs.python.org/3/library/subprocess.html#subprocess.Popen.send_signal
     - Test on Windows, Mac, and Linux.
-- Fix issues with stdout "buffering" (until the program exits) when we...
-    a) have stdin specified in yaml file,
-    b) and are using turtle graphics (at least in the tests I've been doing)
 - Don't re-add duplicate submissions (when adding a new submission, check if it's "in" the dict
   already, i.e. check equality on "path")
 - Add a diff config option for whether to show the raw output as it comes in (since we need to wait
