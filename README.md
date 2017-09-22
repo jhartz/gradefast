@@ -83,6 +83,9 @@ For more info, see the
 [YAML Configuration Format](https://github.com/jhartz/gradefast/wiki/YAML-Configuration-Format)
 page on the GradeFast wiki.
 
+There are also some utility scripts in the
+[utilities folder](https://github.com/jhartz/gradefast/tree/master/utilities) that may be useful.
+
 ## Contributing to GradeFast
 
 Want to delve deeper and contribute to GradeFast, or use individual parts of GradeFast as part of

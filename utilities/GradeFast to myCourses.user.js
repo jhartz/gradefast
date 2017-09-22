@@ -1,12 +1,40 @@
 // ==UserScript==
 // @name         GradeFast to myCourses
 // @namespace    https://mycourses.rit.edu/
-// @version      0.2
+// @version      0.3
 // @description  Gets grades from GradeFast and puts them into a myCourses grade book
 // @author       Jake Hartz
 // @include      https://mycourses.rit.edu/d2l/lms/grades/admin/enter/grade_item_edit.d2l?*
 // @grant        GM_xmlhttpRequest
 // ==/UserScript==
+
+/*
+ * This userscript gets grade and feedback data from GradeFast and injects it into an RIT myCourses
+ * grade book. This requires that the GradeFast server be running (it sends a request to the server
+ * to get the JSON grade data).
+ *
+ * To use this userscript, install either GreaseMonkey (in Firefox) or TamperMonkey (in Chrome).
+ * Then, on myCourses grade entry pages, you should see a new button in the bottom-right of the
+ * page titled "Import Grades from GradeFast". Click this to begin.
+ *
+ * When you click the "Import Grades from GradeFast" button, it'll prompt you for the URL to the
+ * GradeFast server's JSON export. You can copy-paste this from the GradeFast grade book page
+ * (see the "JSON" link in the top-right of that page). The key on the end of this URL changes for
+ * each GradeFast session.
+ *
+ * After it enters each grade and the corresponding feedback, you should look it over, then click
+ * Save. Then, click "Insert next GradeFast grade" to continue on to the next.
+ *
+ * DISCLAIMER: This is quite some hacky JavaScript that I'm sure won't continue working. Basically,
+ * it just uses the GradeFast JSON export API to get a JSON file containing the grades, and then
+ * dissects the myCourses grade book DOM to figure out where to stick the data. It will likely
+ * break with some future myCourses update.
+ *
+ * For updates, grab the latest version from the GradeFast git repo at:
+ * https://github.com/jhartz/gradefast/tree/master/utilities
+ *
+ * If you have any improvements, feel free to create a pull request!
+ */
 
 var grades = [];
 var gotGrades = false;
@@ -33,7 +61,9 @@ window.addEventListener("load", function (event) {
 
             if (!confirm("Are grades ordered by LAST name? (This is required)")) return;
 
-            var jsonUrl = prompt("GradeFast JSON URL:", "http://127.0.0.1:8051/gradefast/grades.json?...");
+            var jsonUrl = prompt(
+                "GradeFast JSON URL:\n(for more info, read the documentation at the top of the userscript)",
+                "http://127.0.0.1:8051/gradefast/grades.json?.....");
             if (!jsonUrl) return;
 
             // Get the JSON grade data
