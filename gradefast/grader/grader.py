@@ -128,12 +128,12 @@ class Grader:
                     folder_path = path.append(name)
                     file_path = path.append(name + "." + ext)
                     if self.settings.check_zipfiles and ext == "zip":
-                        self.channel.print("Found submission zipfile: {}.zip", name, end="; ")
+                        self.channel.print("Found submission zipfile: {}.zip", name)
                         self.host.unzip(file_path, folder_path)
                         self.channel.print("    extracted to {}/", name)
                         valid_submission = True
                     elif ext in check_file_extensions:
-                        self.channel.print("Found submission file: {}.{}", name, ext, end="; ")
+                        self.channel.print("Found submission file: {}.{}", name, ext)
                         self.host.move_to_folder(file_path, folder_path)
                         self.channel.print("    moved into {}/", name)
                         valid_submission = True
