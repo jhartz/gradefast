@@ -5,6 +5,9 @@ submitted multiple flat files.
 Creates a folder based on their name that matches what gradefast expects,
 and moves all of the flat files into that folder.
 
+NOTE: This functionality is now built in to GradeFast (see the "check file extensions" setting in
+the YAML file).
+
 Authors: Chris Lentner <chris@lentner.me>, Jake Hartz <jake@hartz.io>
 """
 

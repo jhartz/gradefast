@@ -17,6 +17,9 @@ of the file.
 
 ## `folderize.py`
 
+> NOTE: This functionality is now built in to GradeFast (see the "check file extensions" setting
+> in the YAML file).
+
 Sometimes, labs are supposed to be submitted as .zip files, but students make several independent
 submissions of flat source files. This script fixes that. At the end of script execution, the
 folder structure will be as if the students had made correct submissions, and you had already
