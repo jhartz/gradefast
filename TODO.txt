@@ -35,6 +35,8 @@ GradeBook TODOs:
     - If we generate server-side: it's easier to save
     - If we generate client-side: we can provide more info on mouseover, like the actual start/end
       times, and can sort differently, etc.
+- "mode" of seconds of grading time isn't very useful - maybe round to the nearest minute for the
+  mode?
 
 Grader TODOs:
 
