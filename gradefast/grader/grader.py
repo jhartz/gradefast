@@ -235,7 +235,7 @@ class Grader:
                     except (ValueError, IndexError):
                         self.channel.error("Invalid index!")
                     if new_submission_id not in self.submission_manager.get_all_submission_ids():
-                        self.channel.error("Invalid index: {}", submission_id)
+                        self.channel.error("Invalid index: {}", new_submission_id)
                     else:
                         submission_id = new_submission_id
 
