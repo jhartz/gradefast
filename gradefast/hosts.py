@@ -357,6 +357,8 @@ class LocalHost(Host):
 
     @staticmethod
     def _kill_process_gracefully(process: subprocess.Popen) -> None:
+        if process.poll() is None:
+            return
         # Stop the process gracefully (with a "SIGTERM")
         process.terminate()
         # We won't leave until the process is actually dead
