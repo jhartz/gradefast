@@ -7,9 +7,13 @@ let client_seq = 0;
 let update_key = null;
 
 export function sendAuthRequest() {
+    let device = navigator.userAgent;
+    if (device.startsWith("Mozilla/")) {
+        device = device.substring(device.indexOf(" ") + 1);
+    }
     post(CONFIG.BASE + "_auth", {
         client_id: CONFIG.CLIENT_ID,
-        device: navigator.userAgent
+        device
     });
 }
 

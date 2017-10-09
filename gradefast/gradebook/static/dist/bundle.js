@@ -7382,9 +7382,13 @@ var client_seq = 0;
 var update_key = null;
 
 function sendAuthRequest() {
+    var device = navigator.userAgent;
+    if (device.startsWith("Mozilla/")) {
+        device = device.substring(device.indexOf(" ") + 1);
+    }
     (0, _utils.post)(CONFIG.BASE + "_auth", {
         client_id: CONFIG.CLIENT_ID,
-        device: navigator.userAgent
+        device: device
     });
 }
 
