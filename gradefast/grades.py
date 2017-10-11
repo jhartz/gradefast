@@ -550,6 +550,10 @@ class SubmissionGradeSection(SubmissionGradeItem):
             # It's late! Deduct
             points_earned -= _get_deducted_points(points_earned, self._late_deduction)
 
+        # Make everything an int if we can
+        points_earned = make_score_number(points_earned)
+        points_possible = make_score_number(points_possible)
+
         return points_earned, points_possible
 
     def get_feedback(self, is_late: bool, depth: int = 0) -> str:
@@ -771,7 +775,9 @@ class SubmissionGrade:
         """
         Patch together all the grade comments for this submission.
         """
-        content = "\n".join(item.get_feedback(self._is_late, 1) for item in self._grades)
+        content = "\n".join(item.get_feedback(self._is_late, 1)
+                            for item in self._grades
+                            if item._enabled)
         return FeedbackHTMLTemplates.base.format(content=content,
                                                  overall_comments=self._overall_comments_html)
 
