@@ -6,6 +6,8 @@
 // @author       Jake Hartz
 // @include      https://mycourses.rit.edu/d2l/lms/grades/admin/enter/grade_item_edit.d2l?*
 // @grant        GM_xmlhttpRequest
+// @connect      localhost
+// @connect      *
 // ==/UserScript==
 
 /*
