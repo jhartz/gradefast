@@ -3,6 +3,13 @@ TODO
 
 GradeBook TODOs:
 
+- When loading from save file, if the *names* of grade items have changed, this isn't reflected in
+  the gradebook
+- Checkbox in grade statistics to only include people that we've graded (i.e. people that have logs)
+- If nothing in the YAML file has a "deduct percent if late", then don't include the "Late?" cbox
+- prev/next buttons in header bar (next to submission name)
+- For each hint, have a "..." or something that brings up a list of other submissions that have
+  that hint enabled
 - "code" blocks in the Overall Comments section (in the gradebook) are "whited out" (since the text
   is white, and the code block background is white)
 - Use getters and setters in a consistent way in grades.py
@@ -42,6 +49,16 @@ Grader TODOs:
 
 - Fix issues with excessive stdout buffering. Most subprocesses are block-buffering rather than
   line-buffering, since they think the output isn't to a terminal.
+    - https://bugs.python.org/issue31296
+    - https://github.com/pexpect/ptyprocess/issues/43
+    - https://stackoverflow.com/questions/11165521/using-subprocess-with-select-and-pty-hangs-when-capturing-output
+    - https://docs.python.org/3/library/pty.html
+- Seems like stdout and stderr get out of order sometimes (most reproducible is when stderr is
+  always printed before stdout)
+- If someone opens the grade book while a "passthru" process is executing, we still show the prompt
+  right away, but we should wait until the process is done to make it more clear.
+- Store the "saved timestamp" in the save file; then, on startup, if it's more than a month old,
+  ask the user if they really want to restore from it.
 - Look into the process group stuff, and try to get it to where we want it (where Ctrl+C kills, and
   another Ctrl+C terminates, but neither affects any background commands).
     - subprocess.CREATE_NEW_PROCESS_GROUP, and make sure we catch Ctrl-C properly and do
@@ -54,6 +71,8 @@ Grader TODOs:
     - Test on Windows, Mac, and Linux.
 - Don't re-add duplicate submissions (when adding a new submission, check if it's "in" the dict
   already, i.e. check equality on "path")
+- Allow 2 regex groups for "submission regex", where the second is used as the filename when a file
+  is moved into a folder due to "check file extensions"
 - Add a diff config option for whether to show the raw output as it comes in (since we need to wait
   for the process to end before we do the diff).
   - Pros: you get to see that the command is running, and provide input if needed.
