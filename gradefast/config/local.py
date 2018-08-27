@@ -14,6 +14,7 @@ from pyprovide import InjectableClass, InjectableClassType, Module, class_provid
 
 from gradefast import hosts
 from gradefast.models import Settings
+from gradefast.persister import Persister, ShelvePersister, SqlitePersister
 
 
 class GradeFastLocalModule(Module):
@@ -72,3 +73,10 @@ class GradeFastLocalModule(Module):
             return hosts.LocalLinuxHost
         else:
             return hosts.LocalHost
+
+    @class_provider()
+    def provide_persister(self, settings: Settings) -> InjectableClass[Persister]:
+        if settings.use_legacy_save_file_format:
+            return ShelvePersister
+        else:
+            return SqlitePersister

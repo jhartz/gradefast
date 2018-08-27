@@ -383,6 +383,7 @@ EMPTY_STATS = Stats(min=None, max=None, median=None, mean=None, std_dev=None, mo
 Settings = NamedTuple("Settings", [
     ("project_name", str),
     ("save_file", Optional[LocalPath]),
+    ("use_legacy_save_file_format", bool),
     ("log_file", Optional[LocalPath]),
     ("log_as_html", Optional[bool]),
 
@@ -425,6 +426,7 @@ class SettingsDefaults:
     """
 
     save_file = None
+    use_legacy_save_file_format = False
     log_file = None
     log_as_html = False
 

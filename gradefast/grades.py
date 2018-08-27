@@ -23,6 +23,34 @@ class FeedbackHTMLTemplates:
 </div>
 </div>"""
 
+    # For the last lab before Christmas:
+#     base = """\
+# <table cellspacing="0" cellpadding="0" border="0">
+# <tbody>
+# <tr>
+# <td colspan="3"><img src="https://www.cs.rit.edu/~jxh6994/lights.gif" /><img src="https://www.cs.rit.edu/~jxh6994/lights.gif" /><img src="https://www.cs.rit.edu/~jxh6994/lights.gif" /></td>
+# </tr>
+# <tr>
+# <td width="1"><img src="https://www.cs.rit.edu/~jxh6994/lights270.gif" /><br /><img src="https://www.cs.rit.edu/~jxh6994/lights270.gif" /><br /><img src="https://www.cs.rit.edu/~jxh6994/lights270.gif" /><br /><img src="https://www.cs.rit.edu/~jxh6994/lights270.gif" /></td>
+# <td>
+#
+# <div style="font-family: Helvetica, Arial, sans-serif; font-size: 10pt; line-height: 1.3;">
+# {content}
+#
+# <div style="font-size: 10.5pt;">
+# {overall_comments}
+# </div>
+# </div>
+#
+# </td>
+# <td width="1"><img src="https://www.cs.rit.edu/~jxh6994/lights90.gif" /><br /><img src="https://www.cs.rit.edu/~jxh6994/lights90.gif" /><br /><img src="https://www.cs.rit.edu/~jxh6994/lights90.gif" /><br /><img src="https://www.cs.rit.edu/~jxh6994/lights90.gif" /></td>
+# </tr>
+# <tr>
+# <td colspan="3"><img src="https://www.cs.rit.edu/~jxh6994/lights180.gif" /><img src="https://www.cs.rit.edu/~jxh6994/lights180.gif" /><img src="https://www.cs.rit.edu/~jxh6994/lights180.gif" /></td>
+# </tr>
+# </tbody>
+# </table>"""
+
     hint = """
 <div style="text-indent: -20px; margin-left: 20px;">
 <b>{points:+}:</b> {reason}

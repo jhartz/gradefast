@@ -95,14 +95,21 @@ def get_argument_parser() -> argparse.ArgumentParser:
         help="A file in which to save the current GradeFast state, allowing GradeFast to recover "
              "if you quit and come back later. This file is checked on startup; if it already "
              "exists, then GradeFast reads it to resume from where it left off.\n"
-             "DEFAULT: [yaml filename].save.data (in the same directory as the YAML file)"
+             "DEFAULT: [yaml filename]_save_data.sqlite (if --save-file-format=sqlite) or "
+             "[yaml filename].save.data (if --save-file-format=legacy), in the same directory as "
+             "the YAML file"
+    )
+    parser.add_argument(
+        "--save-file-format", choices=("sqlite", "legacy"),
+        help="Which format to use for the GradeFast save file (see \"--save-file\").\n"
+             "DEFAULT: \"sqlite\""
     )
     parser.add_argument(
         "--log-file", metavar="PATH",
         help="A file to save all command line output to. If a log file already exists at this "
              "path, it is appended to. If the filename ends in \".html\" or \".htm\", then the "
              "output is logged as HTML.\n"
-             "DEFAULT: [yaml filename].log (in the same directory as the YAML file)"
+             "DEFAULT: [yaml filename]_output.log (in the same directory as the YAML file)"
     )
     parser.add_argument(
         "--debug-file", metavar="PATH",
@@ -244,18 +251,22 @@ def build_settings(args) -> Settings:
     yaml_file_name = os.path.splitext(os.path.basename(yaml_file_path))[0]
     yaml_directory = LocalPath(os.path.dirname(yaml_file_path))
 
+    use_legacy_save_file_format = args.save_file_format == "legacy"
+
     if args.save_file:
         save_file = LocalPath(os.path.abspath(args.save_file))
     else:
-        save_file = LocalPath(os.path.join(yaml_directory.get_local_path(),
-                                           yaml_file_name + ".save.data"))
+        ext = ".save.data" if use_legacy_save_file_format else "_save_data.sqlite"
+        save_file = LocalPath(os.path.join(yaml_directory.get_local_path(), yaml_file_name + ext))
     logger.info("Save file: {}", save_file)
+    if use_legacy_save_file_format:
+        logger.info("Using legacy save file format")
 
     if args.log_file:
         log_file = LocalPath(os.path.abspath(args.log_file))
     else:
         log_file = LocalPath(os.path.join(yaml_directory.get_local_path(),
-                                          yaml_file_name + ".log"))
+                                          yaml_file_name + "_output.log"))
     logger.info("Log file: {}", log_file)
 
     log_as_html = any(log_file.get_local_path().endswith(ext) for ext in (".html", ".htm"))
@@ -280,6 +291,7 @@ def build_settings(args) -> Settings:
 
     settings_builder.project_name = yaml_file_name
     settings_builder.save_file = save_file
+    settings_builder.use_legacy_save_file_format = use_legacy_save_file_format
     settings_builder.log_file = log_file
     settings_builder.log_as_html = log_as_html
 

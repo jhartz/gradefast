@@ -10,7 +10,9 @@ Author: Jake Hartz <jake@hartz.io>
 import argparse
 import json
 import os
+import pickle
 import shelve
+import sqlite3
 import sys
 from collections import OrderedDict
 
@@ -47,25 +49,61 @@ def dump_tagged_yaml(o):
     yaml.dump(o, stream=sys.stdout)
 
 
+def get_sqlite_data(filename):
+    conn = sqlite3.connect(filename)
+    try:
+        d = OrderedDict()
+
+        c = conn.cursor()
+        c.execute("SELECT namespace, data_key, data_value FROM gradefast "
+                  "ORDER BY namespace, data_key")
+        for row in c:
+            namespace = str(row[0])
+            key = str(row[1])
+            value = pickle.loads(row[2])
+            if namespace not in d:
+                d[namespace] = OrderedDict()
+            d[namespace][key] = value
+
+        return d
+    finally:
+        conn.close()
+
+
+def get_shelve_data(filename):
+    with shelve.open(filename, flag="c", protocol=4) as shelf:
+        d = OrderedDict()
+        for key in sorted(shelf.keys()):
+            d[key] = shelf[key]
+    return d
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--format", choices=["json", "yaml", "tagged-yaml"], default="json",
+    parser.add_argument("--output", choices=["json", "yaml", "tagged-yaml"], default="json",
                         help="The output format")
+    parser.add_argument("--format", choices=["sqlite", "legacy"],
+                        help="The GradeFast save file format")
     parser.add_argument("save_file", metavar="save-file",
                         help="The path to a GradeFast save file")
     args = parser.parse_args()
 
-    with shelve.open(args.save_file, flag="c", protocol=4) as shelf:
-        d = OrderedDict()
-        for key in sorted(shelf.keys()):
-            d[key] = shelf[key]
-        if args.format == "yaml":
-            dump_yaml(d)
-        elif args.format == "tagged-yaml":
-            dump_tagged_yaml(d)
-        else:
-            dump_json(d)
-        sys.stdout.write("\n")
+    if args.format == "sqlite":
+        d = get_sqlite_data(args.save_file)
+    elif args.format == "legacy":
+        d = get_shelve_data(args.save_file)
+    else:
+        print("Please specify a format")
+        return
+
+    if args.output == "yaml":
+        dump_yaml(d)
+    elif args.output == "tagged-yaml":
+        dump_tagged_yaml(d)
+    else:
+        dump_json(d)
+    sys.stdout.write("\n")
+
 
 if __name__ == "__main__":
     main()

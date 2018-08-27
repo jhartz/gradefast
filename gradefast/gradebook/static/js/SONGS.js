@@ -176,4 +176,9 @@ export const SONGS = [
         </span>,
         link: "https://www.youtube.com/watch?v=qkUVToIfrKg"
     },
+    {
+        // Guns N Roses
+        snippet: "It's hard to hold a candle in the cold November rain",
+        link: "https://www.youtube.com/watch?v=s0McfH-hweQ"
+    },
 ];
