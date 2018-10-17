@@ -102,5 +102,4 @@ Licensed under the MIT License. For more, see the `LICENSE` file.
 
 ## Contact
 
-Questions? Bugs? Concerns? Feedback? Contact Jake Hartz. (I trust that you can find my email
-address somewhere.)
+Questions? Bugs? Concerns? Feedback? Contact <a href="https://jake.hartz.io/">Jake Hartz</a>.
